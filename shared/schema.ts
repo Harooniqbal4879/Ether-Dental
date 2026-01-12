@@ -1,18 +1,188 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar } from "drizzle-orm/pg-core";
+import { sql, relations } from "drizzle-orm";
+import { pgTable, text, varchar, integer, timestamp, boolean, decimal } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const users = pgTable("users", {
+// Insurance Carriers
+export const insuranceCarriers = pgTable("insurance_carriers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+  name: text("name").notNull(),
+  phone: text("phone"),
+  website: text("website"),
+  logoUrl: text("logo_url"),
+  clearinghouseCompatible: boolean("clearinghouse_compatible").default(false),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+export const insertInsuranceCarrierSchema = createInsertSchema(insuranceCarriers).omit({ id: true });
+export type InsertInsuranceCarrier = z.infer<typeof insertInsuranceCarrierSchema>;
+export type InsuranceCarrier = typeof insuranceCarriers.$inferSelect;
+
+// Patients
+export const patients = pgTable("patients", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  dateOfBirth: text("date_of_birth").notNull(),
+  ssnLast4: text("ssn_last_4"),
+  phone: text("phone"),
+  email: text("email"),
+  address: text("address"),
+  city: text("city"),
+  state: text("state"),
+  zipCode: text("zip_code"),
+  emergencyContactName: text("emergency_contact_name"),
+  emergencyContactPhone: text("emergency_contact_phone"),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
+export const patientsRelations = relations(patients, ({ many }) => ({
+  insurancePolicies: many(insurancePolicies),
+  verifications: many(verifications),
+  appointments: many(appointments),
+}));
+
+export const insertPatientSchema = createInsertSchema(patients).omit({ id: true, createdAt: true });
+export type InsertPatient = z.infer<typeof insertPatientSchema>;
+export type Patient = typeof patients.$inferSelect;
+
+// Insurance Policies (linking patients to carriers)
+export const insurancePolicies = pgTable("insurance_policies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  patientId: varchar("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
+  carrierId: varchar("carrier_id").notNull().references(() => insuranceCarriers.id),
+  policyNumber: text("policy_number").notNull(),
+  groupNumber: text("group_number"),
+  subscriberName: text("subscriber_name").notNull(),
+  subscriberRelationship: text("subscriber_relationship").notNull(),
+  subscriberDob: text("subscriber_dob"),
+  subscriberId: text("subscriber_id"),
+  isPrimary: boolean("is_primary").default(true),
+  effectiveDate: text("effective_date"),
+  terminationDate: text("termination_date"),
+  cardImageFront: text("card_image_front"),
+  cardImageBack: text("card_image_back"),
+});
+
+export const insurancePoliciesRelations = relations(insurancePolicies, ({ one }) => ({
+  patient: one(patients, {
+    fields: [insurancePolicies.patientId],
+    references: [patients.id],
+  }),
+  carrier: one(insuranceCarriers, {
+    fields: [insurancePolicies.carrierId],
+    references: [insuranceCarriers.id],
+  }),
+}));
+
+export const insertInsurancePolicySchema = createInsertSchema(insurancePolicies).omit({ id: true });
+export type InsertInsurancePolicy = z.infer<typeof insertInsurancePolicySchema>;
+export type InsurancePolicy = typeof insurancePolicies.$inferSelect;
+
+// Appointments
+export const appointments = pgTable("appointments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  patientId: varchar("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
+  scheduledAt: timestamp("scheduled_at").notNull(),
+  appointmentType: text("appointment_type").notNull(),
+  notes: text("notes"),
+  status: text("status").default("scheduled"),
+});
+
+export const appointmentsRelations = relations(appointments, ({ one }) => ({
+  patient: one(patients, {
+    fields: [appointments.patientId],
+    references: [patients.id],
+  }),
+}));
+
+export const insertAppointmentSchema = createInsertSchema(appointments).omit({ id: true });
+export type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
+export type Appointment = typeof appointments.$inferSelect;
+
+// Verifications
+export const verifications = pgTable("verifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  patientId: varchar("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
+  policyId: varchar("policy_id").notNull().references(() => insurancePolicies.id, { onDelete: "cascade" }),
+  status: text("status").notNull().default("pending"), // pending, in_progress, completed, failed
+  method: text("method"), // clearinghouse, phone, manual
+  verifiedAt: timestamp("verified_at"),
+  verifiedBy: text("verified_by"), // user id or "System - AI"
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const verificationsRelations = relations(verifications, ({ one, many }) => ({
+  patient: one(patients, {
+    fields: [verifications.patientId],
+    references: [patients.id],
+  }),
+  policy: one(insurancePolicies, {
+    fields: [verifications.policyId],
+    references: [insurancePolicies.id],
+  }),
+  benefits: many(benefits),
+}));
+
+export const insertVerificationSchema = createInsertSchema(verifications).omit({ id: true, createdAt: true });
+export type InsertVerification = z.infer<typeof insertVerificationSchema>;
+export type Verification = typeof verifications.$inferSelect;
+
+// Benefits (captured from verification)
+export const benefits = pgTable("benefits", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  verificationId: varchar("verification_id").notNull().references(() => verifications.id, { onDelete: "cascade" }),
+  annualMaximum: decimal("annual_maximum", { precision: 10, scale: 2 }),
+  annualUsed: decimal("annual_used", { precision: 10, scale: 2 }),
+  annualRemaining: decimal("annual_remaining", { precision: 10, scale: 2 }),
+  deductibleIndividual: decimal("deductible_individual", { precision: 10, scale: 2 }),
+  deductibleIndividualMet: decimal("deductible_individual_met", { precision: 10, scale: 2 }),
+  deductibleFamily: decimal("deductible_family", { precision: 10, scale: 2 }),
+  deductibleFamilyMet: decimal("deductible_family_met", { precision: 10, scale: 2 }),
+  preventiveCoverage: integer("preventive_coverage"), // percentage
+  basicCoverage: integer("basic_coverage"),
+  majorCoverage: integer("major_coverage"),
+  orthodonticCoverage: integer("orthodontic_coverage"),
+  orthodonticMaximum: decimal("orthodontic_maximum", { precision: 10, scale: 2 }),
+  orthodonticUsed: decimal("orthodontic_used", { precision: 10, scale: 2 }),
+  waitingPeriodBasic: text("waiting_period_basic"),
+  waitingPeriodMajor: text("waiting_period_major"),
+  waitingPeriodOrtho: text("waiting_period_ortho"),
+  cleaningsPerYear: integer("cleanings_per_year"),
+  xraysFrequency: text("xrays_frequency"),
+  fluorideAgeLimit: integer("fluoride_age_limit"),
+  planYear: text("plan_year"), // calendar or benefit
+  renewalDate: text("renewal_date"),
+  inNetwork: boolean("in_network").default(true),
+});
+
+export const benefitsRelations = relations(benefits, ({ one }) => ({
+  verification: one(verifications, {
+    fields: [benefits.verificationId],
+    references: [verifications.id],
+  }),
+}));
+
+export const insertBenefitSchema = createInsertSchema(benefits).omit({ id: true });
+export type InsertBenefit = z.infer<typeof insertBenefitSchema>;
+export type Benefit = typeof benefits.$inferSelect;
+
+// Extended types for frontend use
+export type PatientWithInsurance = Patient & {
+  insurancePolicies: (InsurancePolicy & { carrier: InsuranceCarrier })[];
+  latestVerification?: Verification & { benefits?: Benefit };
+};
+
+export type VerificationWithDetails = Verification & {
+  patient: Patient;
+  policy: InsurancePolicy & { carrier: InsuranceCarrier };
+  benefits?: Benefit;
+};
+
+// Verification status enum for UI
+export const VerificationStatus = {
+  VERIFIED: "completed",
+  NEEDS_VERIFICATION: "pending",
+  IN_PROGRESS: "in_progress",
+  FAILED: "failed",
+} as const;

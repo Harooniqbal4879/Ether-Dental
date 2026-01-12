@@ -1,16 +1,259 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { insertPatientSchema, insertInsuranceCarrierSchema, insertInsurancePolicySchema } from "@shared/schema";
+import { z } from "zod";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // put application routes here
-  // prefix all routes with /api
+  // Dashboard Stats
+  app.get("/api/dashboard/stats", async (req, res) => {
+    try {
+      const stats = await storage.getDashboardStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching dashboard stats:", error);
+      res.status(500).json({ error: "Failed to fetch dashboard stats" });
+    }
+  });
 
-  // use storage to perform CRUD operations on the storage interface
-  // e.g. storage.insertUser(user) or storage.getUserByUsername(username)
+  // Insurance Carriers
+  app.get("/api/carriers", async (req, res) => {
+    try {
+      const carriers = await storage.getCarriers();
+      res.json(carriers);
+    } catch (error) {
+      console.error("Error fetching carriers:", error);
+      res.status(500).json({ error: "Failed to fetch carriers" });
+    }
+  });
+
+  app.post("/api/carriers", async (req, res) => {
+    try {
+      const parsed = insertInsuranceCarrierSchema.parse(req.body);
+      const carrier = await storage.createCarrier(parsed);
+      res.status(201).json(carrier);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      console.error("Error creating carrier:", error);
+      res.status(500).json({ error: "Failed to create carrier" });
+    }
+  });
+
+  // Patients
+  app.get("/api/patients", async (req, res) => {
+    try {
+      const patients = await storage.getPatients();
+      res.json(patients);
+    } catch (error) {
+      console.error("Error fetching patients:", error);
+      res.status(500).json({ error: "Failed to fetch patients" });
+    }
+  });
+
+  app.get("/api/patients/:id", async (req, res) => {
+    try {
+      const patient = await storage.getPatient(req.params.id);
+      if (!patient) {
+        return res.status(404).json({ error: "Patient not found" });
+      }
+      res.json(patient);
+    } catch (error) {
+      console.error("Error fetching patient:", error);
+      res.status(500).json({ error: "Failed to fetch patient" });
+    }
+  });
+
+  // Combined patient and policy creation schema
+  const createPatientWithInsuranceSchema = insertPatientSchema.extend({
+    carrierId: z.string().min(1),
+    policyNumber: z.string().min(1),
+    groupNumber: z.string().optional(),
+    subscriberName: z.string().min(1),
+    subscriberRelationship: z.string().min(1),
+    subscriberDob: z.string().optional(),
+    subscriberId: z.string().optional(),
+  });
+
+  app.post("/api/patients", async (req, res) => {
+    try {
+      const parsed = createPatientWithInsuranceSchema.parse(req.body);
+      
+      // Extract patient data
+      const {
+        carrierId,
+        policyNumber,
+        groupNumber,
+        subscriberName,
+        subscriberRelationship,
+        subscriberDob,
+        subscriberId,
+        ...patientData
+      } = parsed;
+      
+      // Create patient
+      const patient = await storage.createPatient(patientData);
+      
+      // Create insurance policy
+      await storage.createPolicy({
+        patientId: patient.id,
+        carrierId,
+        policyNumber,
+        groupNumber: groupNumber || null,
+        subscriberName,
+        subscriberRelationship,
+        subscriberDob: subscriberDob || null,
+        subscriberId: subscriberId || null,
+        isPrimary: true,
+      });
+      
+      // Create initial verification record (pending)
+      const policies = await storage.getPoliciesForPatient(patient.id);
+      if (policies.length > 0) {
+        await storage.createVerification({
+          patientId: patient.id,
+          policyId: policies[0].id,
+          status: "pending",
+        });
+      }
+      
+      // Return patient with policies
+      const fullPatient = await storage.getPatient(patient.id);
+      res.status(201).json(fullPatient);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      console.error("Error creating patient:", error);
+      res.status(500).json({ error: "Failed to create patient" });
+    }
+  });
+
+  // Patient Verifications
+  app.get("/api/patients/:id/verifications", async (req, res) => {
+    try {
+      const verifications = await storage.getVerificationsForPatient(req.params.id);
+      res.json(verifications);
+    } catch (error) {
+      console.error("Error fetching patient verifications:", error);
+      res.status(500).json({ error: "Failed to fetch verifications" });
+    }
+  });
+
+  // Trigger verification for a patient
+  app.post("/api/patients/:id/verify", async (req, res) => {
+    try {
+      const patient = await storage.getPatient(req.params.id);
+      if (!patient) {
+        return res.status(404).json({ error: "Patient not found" });
+      }
+      
+      if (!patient.insurancePolicies || patient.insurancePolicies.length === 0) {
+        return res.status(400).json({ error: "Patient has no insurance policy" });
+      }
+      
+      const policy = patient.insurancePolicies[0];
+      
+      // Create verification record
+      const verification = await storage.createVerification({
+        patientId: patient.id,
+        policyId: policy.id,
+        status: "in_progress",
+        method: policy.carrier.clearinghouseCompatible ? "clearinghouse" : "phone",
+      });
+      
+      // Simulate verification process (in production, this would call clearinghouse or AI agent)
+      setTimeout(async () => {
+        try {
+          // Update verification as completed
+          await storage.updateVerification(verification.id, {
+            status: "completed",
+            verifiedAt: new Date(),
+            verifiedBy: policy.carrier.clearinghouseCompatible ? "System - Clearinghouse" : "System - AI",
+          });
+          
+          // Create simulated benefits data with consistent calculations
+          const annualMaximum = 1500;
+          const annualUsed = Math.floor(Math.random() * 800);
+          const annualRemaining = Math.max(0, annualMaximum - annualUsed);
+          const deductibleIndividual = 50;
+          const deductibleIndividualMet = Math.min(deductibleIndividual, Math.floor(Math.random() * 60));
+          const deductibleFamily = 150;
+          const deductibleFamilyMet = Math.min(deductibleFamily, Math.floor(Math.random() * 160));
+          
+          await storage.createBenefit({
+            verificationId: verification.id,
+            annualMaximum: String(annualMaximum) + ".00",
+            annualUsed: String(annualUsed) + ".00",
+            annualRemaining: String(annualRemaining) + ".00",
+            deductibleIndividual: String(deductibleIndividual) + ".00",
+            deductibleIndividualMet: String(deductibleIndividualMet) + ".00",
+            deductibleFamily: String(deductibleFamily) + ".00",
+            deductibleFamilyMet: String(deductibleFamilyMet) + ".00",
+            preventiveCoverage: 100,
+            basicCoverage: 80,
+            majorCoverage: 50,
+            orthodonticCoverage: 50,
+            orthodonticMaximum: "1500.00",
+            orthodonticUsed: "0.00",
+            cleaningsPerYear: 2,
+            xraysFrequency: "Bitewings 1x/year, Full mouth 1x/5 years",
+            fluorideAgeLimit: 18,
+            planYear: "calendar",
+            renewalDate: "January 1",
+            inNetwork: true,
+          });
+        } catch (error) {
+          console.error("Error completing verification:", error);
+          await storage.updateVerification(verification.id, {
+            status: "failed",
+            notes: "Verification process failed",
+          });
+        }
+      }, 2000);
+      
+      res.status(202).json({ message: "Verification started", verificationId: verification.id });
+    } catch (error) {
+      console.error("Error triggering verification:", error);
+      res.status(500).json({ error: "Failed to start verification" });
+    }
+  });
+
+  // All Verifications
+  app.get("/api/verifications", async (req, res) => {
+    try {
+      const verifications = await storage.getVerifications();
+      res.json(verifications);
+    } catch (error) {
+      console.error("Error fetching verifications:", error);
+      res.status(500).json({ error: "Failed to fetch verifications" });
+    }
+  });
+
+  app.get("/api/verifications/recent", async (req, res) => {
+    try {
+      const verifications = await storage.getRecentVerifications(10);
+      res.json(verifications);
+    } catch (error) {
+      console.error("Error fetching recent verifications:", error);
+      res.status(500).json({ error: "Failed to fetch recent verifications" });
+    }
+  });
+
+  // Appointments
+  app.get("/api/appointments", async (req, res) => {
+    try {
+      const appointments = await storage.getAppointments();
+      res.json(appointments);
+    } catch (error) {
+      console.error("Error fetching appointments:", error);
+      res.status(500).json({ error: "Failed to fetch appointments" });
+    }
+  });
 
   return httpServer;
 }
