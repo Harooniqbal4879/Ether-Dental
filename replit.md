@@ -70,6 +70,18 @@ This platform enables dental practices to:
 - `GET /api/verifications/recent` - Recent verifications for dashboard
 - `GET /api/appointments` - Upcoming appointments
 
+## Persona System
+
+The application includes role-based access control with a persona switcher in the sidebar:
+
+1. **System Administrator** - System-wide access & AI configuration (full access)
+2. **Practice Administrator** - Full practice access (all features except AI config)
+3. **Front Desk Staff** - Patient management, verifications, appointments
+4. **Treatment Coordinator** - Benefits, treatment planning, appointments
+5. **Billing Manager** - Verification data, reports, carrier management
+
+The persona context is managed in `client/src/lib/persona-context.tsx` and navigation filtering is handled in `client/src/components/app-sidebar.tsx`.
+
 ## Design System
 
 - **Font**: Inter (Google Fonts)
