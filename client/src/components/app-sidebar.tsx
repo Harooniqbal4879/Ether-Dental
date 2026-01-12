@@ -37,25 +37,25 @@ const allNavItems = [
     title: "Dashboard",
     url: "/",
     icon: LayoutDashboard,
-    personas: ["admin", "front_desk", "treatment_coordinator", "billing_manager"],
+    personas: ["system_admin", "admin", "front_desk", "treatment_coordinator", "billing_manager"],
   },
   {
     title: "Patients",
     url: "/patients",
     icon: Users,
-    personas: ["admin", "front_desk", "treatment_coordinator"],
+    personas: ["system_admin", "admin", "front_desk", "treatment_coordinator"],
   },
   {
     title: "Verifications",
     url: "/verifications",
     icon: ClipboardCheck,
-    personas: ["admin", "front_desk", "billing_manager"],
+    personas: ["system_admin", "admin", "front_desk", "billing_manager"],
   },
   {
     title: "Appointments",
     url: "/appointments",
     icon: Calendar,
-    personas: ["admin", "front_desk", "treatment_coordinator"],
+    personas: ["system_admin", "admin", "front_desk", "treatment_coordinator"],
   },
 ];
 
@@ -64,13 +64,13 @@ const configNavItems = [
     title: "Insurance Carriers",
     url: "/carriers",
     icon: Building2,
-    personas: ["admin", "billing_manager"],
+    personas: ["system_admin", "admin", "billing_manager"],
   },
   {
     title: "Settings",
     url: "/settings",
     icon: Settings,
-    personas: ["admin"],
+    personas: ["system_admin", "admin"],
   },
 ];
 

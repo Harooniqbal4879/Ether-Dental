@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, ReactNode } from "react";
 
 export type Persona = 
+  | "system_admin"
   | "admin"
   | "front_desk"
   | "treatment_coordinator"
@@ -15,9 +16,15 @@ export interface PersonaInfo {
 
 export const personas: PersonaInfo[] = [
   {
+    id: "system_admin",
+    title: "System Administrator",
+    description: "System-wide access & AI config",
+    initials: "SA",
+  },
+  {
     id: "admin",
     title: "Practice Administrator",
-    description: "Full access to all features",
+    description: "Full practice access",
     initials: "PA",
   },
   {
