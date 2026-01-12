@@ -295,7 +295,19 @@ export async function registerRoutes(
 
   app.patch("/api/clearinghouse-configs/:id", async (req, res) => {
     try {
-      const config = await storage.updateClearinghouseConfig(req.params.id, req.body);
+      const allowedFields = ["name", "clearinghouseType", "endpointUrl", "username", "secretId", "isActive"];
+      const updateData: Record<string, unknown> = {};
+      for (const field of allowedFields) {
+        if (field in req.body) {
+          updateData[field] = req.body[field];
+        }
+      }
+      
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({ error: "No valid fields provided for update" });
+      }
+      
+      const config = await storage.updateClearinghouseConfig(req.params.id, updateData);
       if (!config) {
         return res.status(404).json({ error: "Configuration not found" });
       }
