@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertPatientSchema, insertInsuranceCarrierSchema, insertInsurancePolicySchema } from "@shared/schema";
+import { insertPatientSchema, insertInsuranceCarrierSchema, insertInsurancePolicySchema, insertClearinghouseConfigSchema } from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(
@@ -252,6 +252,77 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching appointments:", error);
       res.status(500).json({ error: "Failed to fetch appointments" });
+    }
+  });
+
+  // Clearinghouse Configurations
+  app.get("/api/clearinghouse-configs", async (req, res) => {
+    try {
+      const configs = await storage.getClearinghouseConfigs();
+      res.json(configs);
+    } catch (error) {
+      console.error("Error fetching clearinghouse configs:", error);
+      res.status(500).json({ error: "Failed to fetch clearinghouse configurations" });
+    }
+  });
+
+  app.get("/api/clearinghouse-configs/:id", async (req, res) => {
+    try {
+      const config = await storage.getClearinghouseConfig(req.params.id);
+      if (!config) {
+        return res.status(404).json({ error: "Configuration not found" });
+      }
+      res.json(config);
+    } catch (error) {
+      console.error("Error fetching clearinghouse config:", error);
+      res.status(500).json({ error: "Failed to fetch clearinghouse configuration" });
+    }
+  });
+
+  app.post("/api/clearinghouse-configs", async (req, res) => {
+    try {
+      const parsed = insertClearinghouseConfigSchema.parse(req.body);
+      const config = await storage.createClearinghouseConfig(parsed);
+      res.status(201).json(config);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      console.error("Error creating clearinghouse config:", error);
+      res.status(500).json({ error: "Failed to create clearinghouse configuration" });
+    }
+  });
+
+  app.patch("/api/clearinghouse-configs/:id", async (req, res) => {
+    try {
+      const config = await storage.updateClearinghouseConfig(req.params.id, req.body);
+      if (!config) {
+        return res.status(404).json({ error: "Configuration not found" });
+      }
+      res.json(config);
+    } catch (error) {
+      console.error("Error updating clearinghouse config:", error);
+      res.status(500).json({ error: "Failed to update clearinghouse configuration" });
+    }
+  });
+
+  app.delete("/api/clearinghouse-configs/:id", async (req, res) => {
+    try {
+      await storage.deleteClearinghouseConfig(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting clearinghouse config:", error);
+      res.status(500).json({ error: "Failed to delete clearinghouse configuration" });
+    }
+  });
+
+  app.post("/api/clearinghouse-configs/:id/test", async (req, res) => {
+    try {
+      const result = await storage.testClearinghouseConnection(req.params.id);
+      res.json(result);
+    } catch (error) {
+      console.error("Error testing clearinghouse connection:", error);
+      res.status(500).json({ error: "Failed to test connection" });
     }
   });
 

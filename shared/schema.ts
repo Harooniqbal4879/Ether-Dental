@@ -179,10 +179,45 @@ export type VerificationWithDetails = Verification & {
   benefits?: Benefit;
 };
 
+// Clearinghouse Configurations
+// Note: In production, credentials (username, apiKey) should be stored in a secure vault
+// (e.g., HashiCorp Vault, AWS Secrets Manager) and only referenced by secretId here
+export const clearinghouseConfigs = pgTable("clearinghouse_configs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(), // Change Healthcare, Availity, etc.
+  provider: text("provider").notNull(), // change_healthcare, availity, trizetto, office_ally, waystar
+  submitterId: text("submitter_id"), // EDI submitter ID
+  secretId: text("secret_id"), // Reference to external secrets vault (production)
+  isActive: boolean("is_active").default(false),
+  lastTestedAt: timestamp("last_tested_at"),
+  connectionStatus: text("connection_status").default("not_tested"), // not_tested, connected, failed
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertClearinghouseConfigSchema = createInsertSchema(clearinghouseConfigs).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true,
+  lastTestedAt: true,
+  connectionStatus: true,
+});
+export type InsertClearinghouseConfig = z.infer<typeof insertClearinghouseConfigSchema>;
+export type ClearinghouseConfig = typeof clearinghouseConfigs.$inferSelect;
+
 // Verification status enum for UI
 export const VerificationStatus = {
   VERIFIED: "completed",
   NEEDS_VERIFICATION: "pending",
   IN_PROGRESS: "in_progress",
   FAILED: "failed",
+} as const;
+
+// Clearinghouse providers
+export const ClearinghouseProviders = {
+  CHANGE_HEALTHCARE: "change_healthcare",
+  AVAILITY: "availity",
+  TRIZETTO: "trizetto",
+  OFFICE_ALLY: "office_ally",
+  WAYSTAR: "waystar",
 } as const;

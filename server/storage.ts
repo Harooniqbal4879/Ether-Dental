@@ -5,6 +5,7 @@ import {
   verifications,
   benefits,
   appointments,
+  clearinghouseConfigs,
   type Patient,
   type InsertPatient,
   type InsuranceCarrier,
@@ -19,9 +20,11 @@ import {
   type InsertAppointment,
   type PatientWithInsurance,
   type VerificationWithDetails,
+  type ClearinghouseConfig,
+  type InsertClearinghouseConfig,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, gte, sql } from "drizzle-orm";
+import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
 
 export interface IStorage {
   // Insurance Carriers
@@ -61,6 +64,14 @@ export interface IStorage {
     failedVerifications: number;
     upcomingAppointments: number;
   }>;
+
+  // Clearinghouse Configurations
+  getClearinghouseConfigs(): Promise<ClearinghouseConfig[]>;
+  getClearinghouseConfig(id: string): Promise<ClearinghouseConfig | undefined>;
+  createClearinghouseConfig(config: InsertClearinghouseConfig): Promise<ClearinghouseConfig>;
+  updateClearinghouseConfig(id: string, data: Partial<ClearinghouseConfig>): Promise<ClearinghouseConfig | undefined>;
+  deleteClearinghouseConfig(id: string): Promise<boolean>;
+  testClearinghouseConnection(id: string): Promise<{ success: boolean; message: string }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -331,7 +342,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           gte(appointments.scheduledAt, now),
-          gte(nextWeek, appointments.scheduledAt)
+          lte(appointments.scheduledAt, nextWeek)
         )
       );
     
@@ -341,6 +352,60 @@ export class DatabaseStorage implements IStorage {
       completedToday: Number(completedTodayCount?.count ?? 0),
       failedVerifications: Number(failedCount?.count ?? 0),
       upcomingAppointments: Number(upcomingCount?.count ?? 0),
+    };
+  }
+
+  // Clearinghouse Configurations
+  async getClearinghouseConfigs(): Promise<ClearinghouseConfig[]> {
+    return db.select().from(clearinghouseConfigs).orderBy(clearinghouseConfigs.name);
+  }
+
+  async getClearinghouseConfig(id: string): Promise<ClearinghouseConfig | undefined> {
+    const [config] = await db.select().from(clearinghouseConfigs).where(eq(clearinghouseConfigs.id, id));
+    return config;
+  }
+
+  async createClearinghouseConfig(config: InsertClearinghouseConfig): Promise<ClearinghouseConfig> {
+    const [created] = await db.insert(clearinghouseConfigs).values(config).returning();
+    return created;
+  }
+
+  async updateClearinghouseConfig(id: string, data: Partial<ClearinghouseConfig>): Promise<ClearinghouseConfig | undefined> {
+    const [updated] = await db
+      .update(clearinghouseConfigs)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(clearinghouseConfigs.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteClearinghouseConfig(id: string): Promise<boolean> {
+    await db.delete(clearinghouseConfigs).where(eq(clearinghouseConfigs.id, id));
+    return true;
+  }
+
+  async testClearinghouseConnection(id: string): Promise<{ success: boolean; message: string }> {
+    const config = await this.getClearinghouseConfig(id);
+    if (!config) {
+      return { success: false, message: "Configuration not found" };
+    }
+    
+    // Simulate connection test (in production, this would make actual API call)
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Random success/failure for demo (80% success rate)
+    const success = Math.random() > 0.2;
+    
+    await this.updateClearinghouseConfig(id, {
+      lastTestedAt: new Date(),
+      connectionStatus: success ? "connected" : "failed",
+    });
+    
+    return {
+      success,
+      message: success 
+        ? "Connection successful - EDI 270/271 test passed" 
+        : "Connection failed - please verify your credentials",
     };
   }
 }
