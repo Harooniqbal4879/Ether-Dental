@@ -7,6 +7,8 @@ import {
   Building2,
   Settings,
   Shield,
+  ChevronDown,
+  Check,
 } from "lucide-react";
 import {
   Sidebar,
@@ -20,27 +22,40 @@ import {
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
+import { usePersona, personas, type Persona } from "@/lib/persona-context";
 
-const mainNavItems = [
+const allNavItems = [
   {
     title: "Dashboard",
     url: "/",
     icon: LayoutDashboard,
+    personas: ["admin", "front_desk", "treatment_coordinator", "billing_manager"],
   },
   {
     title: "Patients",
     url: "/patients",
     icon: Users,
+    personas: ["admin", "front_desk", "treatment_coordinator"],
   },
   {
     title: "Verifications",
     url: "/verifications",
     icon: ClipboardCheck,
+    personas: ["admin", "front_desk", "billing_manager"],
   },
   {
     title: "Appointments",
     url: "/appointments",
     icon: Calendar,
+    personas: ["admin", "front_desk", "treatment_coordinator"],
   },
 ];
 
@@ -49,16 +64,26 @@ const configNavItems = [
     title: "Insurance Carriers",
     url: "/carriers",
     icon: Building2,
+    personas: ["admin", "billing_manager"],
   },
   {
     title: "Settings",
     url: "/settings",
     icon: Settings,
+    personas: ["admin"],
   },
 ];
 
 export function AppSidebar() {
   const [location] = useLocation();
+  const { currentPersona, setCurrentPersona, personaInfo } = usePersona();
+
+  const visibleMainItems = allNavItems.filter((item) =>
+    item.personas.includes(currentPersona)
+  );
+  const visibleConfigItems = configNavItems.filter((item) =>
+    item.personas.includes(currentPersona)
+  );
 
   return (
     <Sidebar>
@@ -85,7 +110,7 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainNavItems.map((item) => (
+              {visibleMainItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
@@ -103,45 +128,80 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarGroup className="mt-4">
-          <SidebarGroupLabel className="px-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Configuration
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {configNavItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={location === item.url}
-                    className="px-4"
-                  >
-                    <Link href={item.url} data-testid={`nav-${item.title.toLowerCase().replace(" ", "-")}`}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {visibleConfigItems.length > 0 && (
+          <SidebarGroup className="mt-4">
+            <SidebarGroupLabel className="px-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Configuration
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {visibleConfigItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={location === item.url}
+                      className="px-4"
+                    >
+                      <Link href={item.url} data-testid={`nav-${item.title.toLowerCase().replace(" ", "-")}`}>
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border p-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-sm font-medium">
-            SP
-          </div>
-          <div className="flex flex-col">
-            <span className="text-sm font-medium text-sidebar-foreground">
-              Sunny Pines Dental
-            </span>
-            <span className="text-xs text-muted-foreground">
-              Practice Admin
-            </span>
-          </div>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="flex w-full items-center gap-3 rounded-md p-2 text-left hover-elevate"
+              data-testid="button-persona-switcher"
+            >
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
+                {personaInfo.initials}
+              </div>
+              <div className="flex flex-1 flex-col">
+                <span className="text-sm font-medium text-sidebar-foreground">
+                  {personaInfo.title}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  Sunny Pines Dental
+                </span>
+              </div>
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-64">
+            <DropdownMenuLabel>Switch Persona</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {personas.map((persona) => (
+              <DropdownMenuItem
+                key={persona.id}
+                onClick={() => setCurrentPersona(persona.id as Persona)}
+                className="flex items-center gap-3"
+                data-testid={`persona-${persona.id}`}
+              >
+                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-xs font-medium">
+                  {persona.initials}
+                </div>
+                <div className="flex flex-1 flex-col">
+                  <span className="text-sm font-medium">{persona.title}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {persona.description}
+                  </span>
+                </div>
+                {currentPersona === persona.id && (
+                  <Check className="h-4 w-4 text-primary" />
+                )}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </SidebarFooter>
     </Sidebar>
   );
