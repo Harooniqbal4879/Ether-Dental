@@ -786,6 +786,27 @@ export async function registerRoutes(
     }
   });
 
+  // Professional shifts and transactions
+  app.get("/api/professionals/:id/shifts", async (req, res) => {
+    try {
+      const shifts = await storage.getShiftsForProfessional(req.params.id);
+      res.json(shifts);
+    } catch (error) {
+      console.error("Error fetching professional shifts:", error);
+      res.status(500).json({ error: "Failed to fetch professional shifts" });
+    }
+  });
+
+  app.get("/api/professionals/:id/transactions", async (req, res) => {
+    try {
+      const transactions = await storage.getTransactionsForProfessional(req.params.id);
+      res.json(transactions);
+    } catch (error) {
+      console.error("Error fetching professional transactions:", error);
+      res.status(500).json({ error: "Failed to fetch professional transactions" });
+    }
+  });
+
   // Professional Badges
   app.get("/api/professionals/:id/badges", async (req, res) => {
     try {

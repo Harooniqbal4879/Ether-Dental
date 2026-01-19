@@ -141,6 +141,10 @@ export interface IStorage {
   updateShiftTransaction(id: string, data: Partial<ShiftTransaction>): Promise<ShiftTransaction | undefined>;
   getShift(id: string): Promise<StaffShift | undefined>;
   updateShift(id: string, data: Partial<StaffShift>): Promise<StaffShift | undefined>;
+
+  // Professional-specific queries
+  getShiftsForProfessional(professionalId: string): Promise<StaffShift[]>;
+  getTransactionsForProfessional(professionalId: string): Promise<ShiftTransactionWithDetails[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -839,6 +843,33 @@ export class DatabaseStorage implements IStorage {
       .where(eq(staffShifts.id, id))
       .returning();
     return updated;
+  }
+
+  // Professional-specific queries
+  async getShiftsForProfessional(professionalId: string): Promise<StaffShift[]> {
+    return db
+      .select()
+      .from(staffShifts)
+      .where(eq(staffShifts.assignedProfessionalId, professionalId))
+      .orderBy(desc(staffShifts.date));
+  }
+
+  async getTransactionsForProfessional(professionalId: string): Promise<ShiftTransactionWithDetails[]> {
+    const transactions = await db
+      .select()
+      .from(shiftTransactions)
+      .where(eq(shiftTransactions.professionalId, professionalId))
+      .orderBy(desc(shiftTransactions.createdAt));
+    
+    const result: ShiftTransactionWithDetails[] = [];
+    for (const tx of transactions) {
+      const [shift] = await db.select().from(staffShifts).where(eq(staffShifts.id, tx.shiftId));
+      const [professional] = await db.select().from(professionals).where(eq(professionals.id, tx.professionalId));
+      if (shift && professional) {
+        result.push({ ...tx, shift, professional });
+      }
+    }
+    return result;
   }
 }
 
