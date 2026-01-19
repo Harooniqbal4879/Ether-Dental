@@ -6,6 +6,10 @@ import {
   verifications,
   benefits,
   appointments,
+  professionals,
+  professionalBadges,
+  StaffRoles,
+  DentalSpecialties,
 } from "@shared/schema";
 
 async function seed() {
@@ -241,6 +245,149 @@ async function seed() {
   }
 
   console.log("Created appointments");
+
+  // Seed Professionals
+  const professionalsData = [
+    {
+      firstName: "Dr. Amanda",
+      lastName: "Rodriguez",
+      email: "a.rodriguez@sunnypines.dental",
+      phone: "(555) 111-2222",
+      role: StaffRoles.DENTIST,
+      specialty: DentalSpecialties.GENERAL_DENTISTRY,
+      specialties: [DentalSpecialties.COSMETICS, DentalSpecialties.PROSTHODONTICS],
+      education: "UCLA School of Dentistry",
+      graduationDate: "2012",
+      licenseNumber: "DEN-78432",
+      licenseState: "California",
+      licenseYearIssued: "2012",
+      experienceRange: "10-15 years",
+      software: ["Dentrix", "Eaglesoft", "Open Dental"],
+      procedures: ["Crowns", "Bridges", "Veneers", "Composite Fillings", "Extractions", "Root Canal Therapy"],
+      rating: "4.9",
+      credentialsVerified: true,
+    },
+    {
+      firstName: "Jessica",
+      lastName: "Chen",
+      email: "j.chen@sunnypines.dental",
+      phone: "(555) 222-3333",
+      role: StaffRoles.HYGIENIST,
+      specialty: DentalSpecialties.PERIODONTICS,
+      specialties: [],
+      education: "USC Herman Ostrow School of Dentistry",
+      graduationDate: "2018",
+      licenseNumber: "RDH-56789",
+      licenseState: "California",
+      licenseYearIssued: "2018",
+      experienceRange: "5-10 years",
+      software: ["Dentrix", "Curve Dental"],
+      procedures: ["Prophylaxis", "Scaling and Root Planing", "Fluoride Treatment", "Sealants", "Periodontal Maintenance"],
+      rating: "4.8",
+      credentialsVerified: true,
+    },
+    {
+      firstName: "Marcus",
+      lastName: "Thompson",
+      email: "m.thompson@sunnypines.dental",
+      phone: "(555) 333-4444",
+      role: StaffRoles.DENTAL_ASSISTANT,
+      specialty: DentalSpecialties.ORAL_SURGERY,
+      specialties: [DentalSpecialties.ENDODONTICS],
+      education: "Pasadena City College Dental Assisting Program",
+      graduationDate: "2019",
+      licenseNumber: "RDA-34567",
+      licenseState: "California",
+      licenseYearIssued: "2019",
+      experienceRange: "3-5 years",
+      software: ["Dentrix", "Eaglesoft"],
+      procedures: ["Chairside Assistance", "X-ray Taking", "Impression Taking", "Sterilization Protocols"],
+      rating: "4.7",
+      credentialsVerified: true,
+    },
+    {
+      firstName: "Dr. Benjamin",
+      lastName: "Park",
+      email: "b.park@sunnypines.dental",
+      phone: "(555) 444-5555",
+      role: StaffRoles.DENTIST,
+      specialty: DentalSpecialties.ORTHODONTICS,
+      specialties: [DentalSpecialties.PEDIATRICS],
+      education: "University of the Pacific Arthur A. Dugoni School of Dentistry",
+      graduationDate: "2015",
+      licenseNumber: "DEN-92145",
+      licenseState: "California",
+      licenseYearIssued: "2015",
+      experienceRange: "5-10 years",
+      software: ["Dolphin Imaging", "Invisalign Provider Portal", "Dentrix"],
+      procedures: ["Invisalign", "Traditional Braces", "Retainers", "Space Maintainers", "Palatal Expanders"],
+      rating: "4.9",
+      credentialsVerified: true,
+    },
+    {
+      firstName: "Patricia",
+      lastName: "Williams",
+      email: "p.williams@sunnypines.dental",
+      phone: "(555) 555-6666",
+      role: StaffRoles.OFFICE_COORDINATOR,
+      specialty: null,
+      specialties: [],
+      education: "California State University, Long Beach",
+      graduationDate: "2016",
+      licenseNumber: null,
+      licenseState: null,
+      licenseYearIssued: null,
+      experienceRange: "5-10 years",
+      software: ["Dentrix", "QuickBooks", "Microsoft Office"],
+      procedures: [],
+      rating: "4.6",
+      credentialsVerified: true,
+    },
+    {
+      firstName: "David",
+      lastName: "Garcia",
+      email: "d.garcia@sunnypines.dental",
+      phone: "(555) 666-7777",
+      role: StaffRoles.BILLING_STAFF,
+      specialty: null,
+      specialties: [],
+      education: "Cerritos College Medical Billing & Coding",
+      graduationDate: "2017",
+      licenseNumber: null,
+      licenseState: null,
+      licenseYearIssued: null,
+      experienceRange: "5-10 years",
+      software: ["Dentrix", "Dentrix Ascend", "CDT Coding", "Practice Management Systems"],
+      procedures: [],
+      rating: "4.8",
+      credentialsVerified: true,
+    },
+  ];
+
+  const createdProfessionals = await db.insert(professionals).values(professionalsData).returning();
+  console.log(`Created ${createdProfessionals.length} professionals`);
+
+  // Create badges for professionals
+  const badgeData = [
+    { professionalId: createdProfessionals[0].id, badgeType: "perfect_attendance", level: "gold", count: 52 },
+    { professionalId: createdProfessionals[0].id, badgeType: "shifts_completed", level: "gold", count: 156 },
+    { professionalId: createdProfessionals[0].id, badgeType: "knowledge", level: "silver", count: 24 },
+    { professionalId: createdProfessionals[1].id, badgeType: "timeliness", level: "gold", count: 98 },
+    { professionalId: createdProfessionals[1].id, badgeType: "teamwork", level: "silver", count: 45 },
+    { professionalId: createdProfessionals[1].id, badgeType: "shifts_completed", level: "silver", count: 87 },
+    { professionalId: createdProfessionals[2].id, badgeType: "teamwork", level: "bronze", count: 12 },
+    { professionalId: createdProfessionals[2].id, badgeType: "shifts_completed", level: "bronze", count: 34 },
+    { professionalId: createdProfessionals[3].id, badgeType: "perfect_attendance", level: "silver", count: 28 },
+    { professionalId: createdProfessionals[3].id, badgeType: "knowledge", level: "gold", count: 67 },
+    { professionalId: createdProfessionals[3].id, badgeType: "shifts_completed", level: "silver", count: 72 },
+    { professionalId: createdProfessionals[4].id, badgeType: "timeliness", level: "bronze", count: 15 },
+    { professionalId: createdProfessionals[5].id, badgeType: "knowledge", level: "silver", count: 38 },
+    { professionalId: createdProfessionals[5].id, badgeType: "shifts_completed", level: "bronze", count: 45 },
+  ];
+
+  await db.insert(professionalBadges).values(badgeData);
+  console.log(`Created ${badgeData.length} professional badges`);
+
   console.log("Database seeding complete!");
 }
 
