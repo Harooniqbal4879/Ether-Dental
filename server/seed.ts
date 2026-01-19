@@ -8,6 +8,8 @@ import {
   appointments,
   professionals,
   professionalBadges,
+  staffShifts,
+  shiftTransactions,
   StaffRoles,
   DentalSpecialties,
 } from "@shared/schema";
@@ -387,6 +389,118 @@ async function seed() {
 
   await db.insert(professionalBadges).values(badgeData);
   console.log(`Created ${badgeData.length} professional badges`);
+
+  // Create sample shifts (including some completed ones)
+  const today = new Date();
+  const formatDate = (d: Date) => d.toISOString().split('T')[0];
+  
+  const shiftsData = [
+    {
+      date: formatDate(new Date(today.getTime() - 14 * 24 * 60 * 60 * 1000)), // 14 days ago
+      role: StaffRoles.HYGIENIST,
+      specialties: [DentalSpecialties.GENERAL_DENTISTRY],
+      arrivalTime: "07:45",
+      firstPatientTime: "08:00",
+      endTime: "17:00",
+      breakDuration: 60,
+      pricingMode: "fixed",
+      fixedHourlyRate: "52.00",
+      status: "completed",
+      assignedProfessionalId: createdProfessionals[1].id,
+    },
+    {
+      date: formatDate(new Date(today.getTime() - 10 * 24 * 60 * 60 * 1000)), // 10 days ago
+      role: StaffRoles.DENTAL_ASSISTANT,
+      specialties: [DentalSpecialties.GENERAL_DENTISTRY],
+      arrivalTime: "07:30",
+      firstPatientTime: "08:00",
+      endTime: "16:00",
+      breakDuration: 30,
+      pricingMode: "fixed",
+      fixedHourlyRate: "28.00",
+      status: "completed",
+      assignedProfessionalId: createdProfessionals[2].id,
+    },
+    {
+      date: formatDate(new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)), // 7 days ago
+      role: StaffRoles.DENTIST,
+      specialties: [DentalSpecialties.GENERAL_DENTISTRY, DentalSpecialties.COSMETIC_DENTISTRY],
+      arrivalTime: "08:00",
+      firstPatientTime: "08:30",
+      endTime: "17:30",
+      breakDuration: 60,
+      pricingMode: "smart",
+      minHourlyRate: "85.00",
+      maxHourlyRate: "110.00",
+      status: "completed",
+      assignedProfessionalId: createdProfessionals[0].id,
+    },
+    {
+      date: formatDate(new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000)), // 3 days from now
+      role: StaffRoles.HYGIENIST,
+      specialties: null,
+      arrivalTime: "08:00",
+      firstPatientTime: "08:30",
+      endTime: "16:30",
+      breakDuration: 30,
+      pricingMode: "fixed",
+      fixedHourlyRate: "50.00",
+      status: "open",
+    },
+    {
+      date: formatDate(new Date(today.getTime() + 5 * 24 * 60 * 60 * 1000)), // 5 days from now
+      role: StaffRoles.FRONT_DESK,
+      specialties: null,
+      arrivalTime: "07:30",
+      firstPatientTime: "08:00",
+      endTime: "17:00",
+      breakDuration: 60,
+      pricingMode: "fixed",
+      fixedHourlyRate: "22.00",
+      status: "open",
+    },
+  ];
+
+  const createdShifts = await db.insert(staffShifts).values(shiftsData).returning();
+  console.log(`Created ${createdShifts.length} staff shifts`);
+
+  // Create transactions for completed shifts
+  const completedShifts = createdShifts.filter(s => s.status === "completed");
+  
+  const transactionsData = [];
+  for (const shift of completedShifts) {
+    const hoursWorked = 8.0;
+    const hourlyRate = parseFloat(shift.fixedHourlyRate || shift.maxHourlyRate || "50.00");
+    const regularPay = hoursWorked * hourlyRate;
+    const serviceFeeRate = 0.225;
+    const convenienceFeeRate = 0.035;
+    const serviceFee = regularPay * serviceFeeRate;
+    const convenienceFee = (regularPay + serviceFee) * convenienceFeeRate;
+    const totalPay = regularPay + serviceFee + convenienceFee;
+
+    transactionsData.push({
+      shiftId: shift.id,
+      professionalId: shift.assignedProfessionalId!,
+      chargeDate: shift.date,
+      hoursWorked: hoursWorked.toFixed(2),
+      hourlyRate: hourlyRate.toFixed(2),
+      mealBreakMinutes: shift.breakDuration || 0,
+      adjustmentMade: false,
+      regularPay: regularPay.toFixed(2),
+      serviceFeeRate: serviceFeeRate.toFixed(4),
+      serviceFee: serviceFee.toFixed(2),
+      convenienceFeeRate: convenienceFeeRate.toFixed(4),
+      convenienceFee: convenienceFee.toFixed(2),
+      counterCoverDiscount: "0.00",
+      totalPay: totalPay.toFixed(2),
+      status: "charged",
+    });
+  }
+
+  if (transactionsData.length > 0) {
+    await db.insert(shiftTransactions).values(transactionsData);
+    console.log(`Created ${transactionsData.length} shift transactions`);
+  }
 
   console.log("Database seeding complete!");
 }
