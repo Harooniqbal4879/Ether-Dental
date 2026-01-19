@@ -17,6 +17,7 @@ import Appointments from "@/pages/appointments";
 import Carriers from "@/pages/carriers";
 import Settings from "@/pages/settings";
 import Staffing from "@/pages/staffing";
+import AddShift from "@/pages/add-shift";
 import Services from "@/pages/services";
 import PatientPortal from "@/pages/patient-portal";
 import NotFound from "@/pages/not-found";
@@ -33,6 +34,7 @@ function MainRouter() {
       <Route path="/carriers" component={Carriers} />
       <Route path="/settings" component={Settings} />
       <Route path="/staffing" component={Staffing} />
+      <Route path="/staffing/add-shift" component={AddShift} />
       <Route path="/services" component={Services} />
       <Route component={NotFound} />
     </Switch>
