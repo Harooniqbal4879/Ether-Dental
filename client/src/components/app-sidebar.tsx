@@ -4,7 +4,6 @@ import {
   Users,
   ClipboardCheck,
   Calendar,
-  Building2,
   Settings,
   Shield,
   ChevronDown,
@@ -81,12 +80,6 @@ const allNavItems = [
 ];
 
 const configNavItems = [
-  {
-    title: "Insurance Carriers",
-    url: "/carriers",
-    icon: Building2,
-    personas: ["system_admin", "admin", "billing_manager"],
-  },
   {
     title: "Settings",
     url: "/settings",
