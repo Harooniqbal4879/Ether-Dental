@@ -63,6 +63,9 @@ import {
   MapPin,
   Phone,
   Globe,
+  X,
+  Calendar,
+  UserCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ClearinghouseConfig, InsertClearinghouseConfig } from "@shared/schema";
@@ -113,6 +116,35 @@ const APPOINTMENT_LENGTHS = [
   "60 min",
   "75 min",
   "90 min",
+];
+
+const SHIFT_TIMES = [
+  "7:00 AM", "7:30 AM", "8:00 AM", "8:30 AM", "9:00 AM", "9:30 AM",
+  "10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM", "12:00 PM", "12:30 PM",
+  "1:00 PM", "1:30 PM", "2:00 PM", "2:30 PM", "3:00 PM", "3:30 PM",
+  "4:00 PM", "4:30 PM", "5:00 PM", "5:30 PM", "6:00 PM", "6:30 PM", "7:00 PM",
+];
+
+const BREAK_DURATIONS = ["30 min", "45 min", "60 min", "90 min"];
+
+const CONTACT_METHODS = ["Phone", "Email", "Text"];
+
+const TEAM_MEMBERS = [
+  "Dr. Sarah Johnson",
+  "Dr. Michael Chen",
+  "Lisa Martinez (Office Manager)",
+  "Emily Davis (Front Desk)",
+  "Robert Kim (Treatment Coordinator)",
+];
+
+const DAYS_OF_WEEK = [
+  { key: "sunday", label: "Su", fullName: "Sunday" },
+  { key: "monday", label: "Mo", fullName: "Monday" },
+  { key: "tuesday", label: "Tu", fullName: "Tuesday" },
+  { key: "wednesday", label: "We", fullName: "Wednesday" },
+  { key: "thursday", label: "Th", fullName: "Thursday" },
+  { key: "friday", label: "Fr", fullName: "Friday" },
+  { key: "saturday", label: "Sa", fullName: "Saturday" },
 ];
 
 type ClearinghouseType = (typeof CLEARINGHOUSE_OPTIONS)[number]["value"];
@@ -230,9 +262,8 @@ function ClearinghouseForm({
 }) {
   const [formData, setFormData] = useState({
     name: initialData?.name ?? "",
-    clearinghouseType: (initialData?.clearinghouseType ?? "change_healthcare") as ClearinghouseType,
-    endpointUrl: initialData?.endpointUrl ?? "",
-    username: initialData?.username ?? "",
+    provider: (initialData?.provider ?? "change_healthcare") as ClearinghouseType,
+    submitterId: initialData?.submitterId ?? "",
     secretId: initialData?.secretId ?? "",
     isActive: initialData?.isActive ?? true,
   });
@@ -241,9 +272,8 @@ function ClearinghouseForm({
     e.preventDefault();
     onSubmit({
       name: formData.name,
-      clearinghouseType: formData.clearinghouseType,
-      endpointUrl: formData.endpointUrl || null,
-      username: formData.username || null,
+      provider: formData.provider,
+      submitterId: formData.submitterId || null,
       secretId: formData.secretId || null,
       isActive: formData.isActive,
     });
@@ -266,8 +296,8 @@ function ClearinghouseForm({
       <div className="space-y-2">
         <Label htmlFor="clearinghouse-type">Clearinghouse</Label>
         <Select
-          value={formData.clearinghouseType}
-          onValueChange={(value: ClearinghouseType) => setFormData({ ...formData, clearinghouseType: value })}
+          value={formData.provider}
+          onValueChange={(value: ClearinghouseType) => setFormData({ ...formData, provider: value })}
         >
           <SelectTrigger data-testid="select-clearinghouse-type">
             <SelectValue placeholder="Select a clearinghouse" />
@@ -283,25 +313,13 @@ function ClearinghouseForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="endpoint-url">API Endpoint URL</Label>
+        <Label htmlFor="submitter-id">Submitter ID</Label>
         <Input
-          id="endpoint-url"
-          type="url"
-          placeholder="https://api.clearinghouse.com/edi"
-          value={formData.endpointUrl}
-          onChange={(e) => setFormData({ ...formData, endpointUrl: e.target.value })}
-          data-testid="input-endpoint-url"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="username">Username / Submitter ID</Label>
-        <Input
-          id="username"
-          placeholder="Your clearinghouse username"
-          value={formData.username}
-          onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-          data-testid="input-username"
+          id="submitter-id"
+          placeholder="Your EDI submitter ID"
+          value={formData.submitterId}
+          onChange={(e) => setFormData({ ...formData, submitterId: e.target.value })}
+          data-testid="input-submitter-id"
         />
       </div>
 
@@ -327,7 +345,7 @@ function ClearinghouseForm({
           </p>
         </div>
         <Switch
-          checked={formData.isActive}
+          checked={formData.isActive ?? false}
           onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
           data-testid="switch-config-active"
         />
@@ -359,8 +377,8 @@ function ClearinghouseConfigCard({
   isTesting: boolean;
 }) {
   const clearinghouseLabel =
-    CLEARINGHOUSE_OPTIONS.find((o) => o.value === config.clearinghouseType)?.label ??
-    config.clearinghouseType;
+    CLEARINGHOUSE_OPTIONS.find((o) => o.value === config.provider)?.label ??
+    config.provider;
 
   return (
     <div className="flex items-center justify-between rounded-lg border p-4">
@@ -755,10 +773,8 @@ function PracticeInformationTab() {
 
   const createConfigMutation = useMutation({
     mutationFn: async (data: Omit<InsertClearinghouseConfig, "id">) => {
-      return apiRequest("/api/clearinghouse-configs", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      const res = await apiRequest("POST", "/api/clearinghouse-configs", data);
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clearinghouse-configs"] });
@@ -779,9 +795,7 @@ function PracticeInformationTab() {
 
   const deleteConfigMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest(`/api/clearinghouse-configs/${id}`, {
-        method: "DELETE",
-      });
+      await apiRequest("DELETE", `/api/clearinghouse-configs/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clearinghouse-configs"] });
@@ -802,10 +816,8 @@ function PracticeInformationTab() {
   const testConnectionMutation = useMutation({
     mutationFn: async (id: string) => {
       setTestingConfigId(id);
-      const response = await apiRequest(`/api/clearinghouse-configs/${id}/test`, {
-        method: "POST",
-      });
-      return response;
+      const response = await apiRequest("POST", `/api/clearinghouse-configs/${id}/test`);
+      return response.json() as Promise<{ success: boolean; message: string }>;
     },
     onSuccess: (data: { success: boolean; message: string }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/clearinghouse-configs"] });
@@ -1295,13 +1307,331 @@ function PracticeInformationTab() {
 
 function StaffingSettingsTab() {
   const [settings, setSettings] = useState({
+    mainContact: "",
+    emergencyContactName: "",
+    emergencyContactMethod: "",
+    emergencyContactInfo: "",
+    activeDays: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday"],
+    shiftSchedule: {
+      monday: { arrival: "8:30 AM", firstPatient: "9:00 AM", endTime: "5:00 PM", breakDuration: "60 min" },
+      tuesday: { arrival: "8:30 AM", firstPatient: "9:00 AM", endTime: "5:00 PM", breakDuration: "60 min" },
+      wednesday: { arrival: "8:30 AM", firstPatient: "9:00 AM", endTime: "5:00 PM", breakDuration: "60 min" },
+      thursday: { arrival: "8:30 AM", firstPatient: "9:00 AM", endTime: "5:00 PM", breakDuration: "60 min" },
+      friday: { arrival: "8:30 AM", firstPatient: "9:00 AM", endTime: "5:00 PM", breakDuration: "60 min" },
+      saturday: { arrival: "8:30 AM", firstPatient: "9:00 AM", endTime: "2:00 PM", breakDuration: "60 min" },
+    } as Record<string, { arrival: string; firstPatient: string; endTime: string; breakDuration: string }>,
+    instantBookShifts: false,
+    accommodateLactationBreaks: false,
+    accommodateLeftHanded: false,
+    additionalExpectations: "",
     autoVerifyBeforeAppointments: true,
     reverifyStale: true,
     preferClearinghouse: true,
   });
 
+  const toggleDay = (dayKey: string) => {
+    setSettings((prev) => ({
+      ...prev,
+      activeDays: prev.activeDays.includes(dayKey)
+        ? prev.activeDays.filter((d) => d !== dayKey)
+        : [...prev.activeDays, dayKey],
+    }));
+  };
+
+  const updateShiftSchedule = (day: string, field: string, value: string) => {
+    setSettings((prev) => ({
+      ...prev,
+      shiftSchedule: {
+        ...prev.shiftSchedule,
+        [day]: {
+          ...prev.shiftSchedule[day],
+          [field]: value,
+        },
+      },
+    }));
+  };
+
   return (
     <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Main contact for hygienist</CardTitle>
+          <CardDescription>
+            This will be shared with hygienists in case they have questions about your office
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <Label>Who should hygienists reach out to?</Label>
+            <Select
+              value={settings.mainContact}
+              onValueChange={(value) => setSettings({ ...settings, mainContact: value })}
+            >
+              <SelectTrigger data-testid="select-main-contact">
+                <SelectValue placeholder="Select a team member..." />
+              </SelectTrigger>
+              <SelectContent>
+                {TEAM_MEMBERS.map((member) => (
+                  <SelectItem key={member} value={member}>
+                    {member}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Emergency contact</CardTitle>
+          <CardDescription>
+            To be used in case of emergencies or other urgent communications
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-2">
+              <Label>Contact name</Label>
+              <Input
+                placeholder="Full name"
+                value={settings.emergencyContactName}
+                onChange={(e) => setSettings({ ...settings, emergencyContactName: e.target.value })}
+                data-testid="input-emergency-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>How to contact</Label>
+              <Select
+                value={settings.emergencyContactMethod}
+                onValueChange={(value) => setSettings({ ...settings, emergencyContactMethod: value })}
+              >
+                <SelectTrigger data-testid="select-emergency-method">
+                  <SelectValue placeholder="Contact via" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CONTACT_METHODS.map((method) => (
+                    <SelectItem key={method} value={method}>
+                      {method}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Contact</Label>
+              <Input
+                placeholder="Where can we reach you?"
+                value={settings.emergencyContactInfo}
+                onChange={(e) => setSettings({ ...settings, emergencyContactInfo: e.target.value })}
+                data-testid="input-emergency-contact"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted">
+              <Calendar className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <div>
+              <CardTitle className="text-base">Set your preferred shift hours</CardTitle>
+              <CardDescription>
+                These hours will be your default when creating new shifts
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex gap-2">
+            {DAYS_OF_WEEK.map((day) => (
+              <button
+                key={day.key}
+                type="button"
+                onClick={() => toggleDay(day.key)}
+                className={cn(
+                  "flex h-10 w-10 items-center justify-center rounded-full text-sm font-medium transition-colors",
+                  settings.activeDays.includes(day.key)
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                )}
+                data-testid={`toggle-day-${day.key}`}
+              >
+                {day.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="pb-3 text-left font-medium"></th>
+                  <th className="pb-3 text-left font-medium">Arrival time</th>
+                  <th className="pb-3 text-left font-medium">First patient</th>
+                  <th className="pb-3 text-left font-medium">End time</th>
+                  <th className="pb-3 text-left font-medium">Break (unpaid)</th>
+                  <th className="pb-3 text-left font-medium"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {DAYS_OF_WEEK.filter((day) => settings.activeDays.includes(day.key)).map((day) => (
+                  <tr key={day.key} className="border-b last:border-0">
+                    <td className="py-3 pr-4 font-medium">{day.fullName}</td>
+                    <td className="py-3 pr-2">
+                      <Select
+                        value={settings.shiftSchedule[day.key]?.arrival}
+                        onValueChange={(value) => updateShiftSchedule(day.key, "arrival", value)}
+                      >
+                        <SelectTrigger className="w-[120px]" data-testid={`select-arrival-${day.key}`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {SHIFT_TIMES.map((time) => (
+                            <SelectItem key={time} value={time}>
+                              {time}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </td>
+                    <td className="py-3 pr-2">
+                      <Select
+                        value={settings.shiftSchedule[day.key]?.firstPatient}
+                        onValueChange={(value) => updateShiftSchedule(day.key, "firstPatient", value)}
+                      >
+                        <SelectTrigger className="w-[120px]" data-testid={`select-first-patient-${day.key}`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {SHIFT_TIMES.map((time) => (
+                            <SelectItem key={time} value={time}>
+                              {time}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </td>
+                    <td className="py-3 pr-2">
+                      <Select
+                        value={settings.shiftSchedule[day.key]?.endTime}
+                        onValueChange={(value) => updateShiftSchedule(day.key, "endTime", value)}
+                      >
+                        <SelectTrigger className="w-[120px]" data-testid={`select-end-time-${day.key}`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {SHIFT_TIMES.map((time) => (
+                            <SelectItem key={time} value={time}>
+                              {time}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </td>
+                    <td className="py-3 pr-2">
+                      <Select
+                        value={settings.shiftSchedule[day.key]?.breakDuration}
+                        onValueChange={(value) => updateShiftSchedule(day.key, "breakDuration", value)}
+                      >
+                        <SelectTrigger className="w-[100px]" data-testid={`select-break-${day.key}`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {BREAK_DURATIONS.map((duration) => (
+                            <SelectItem key={duration} value={duration}>
+                              {duration}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </td>
+                    <td className="py-3">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => toggleDay(day.key)}
+                        data-testid={`button-remove-day-${day.key}`}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Default shift settings</CardTitle>
+          <CardDescription>
+            Set your defaults to maximize your ability to fill shifts
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between py-2">
+            <div>
+              <span className="font-medium">Instant book for shift requests</span>
+              <p className="text-sm text-muted-foreground">
+                Automatically accept requests made at least 7 days ahead of the shift
+              </p>
+            </div>
+            <YesNoToggle
+              value={settings.instantBookShifts}
+              onChange={(val) => setSettings({ ...settings, instantBookShifts: val })}
+              testId="toggle-instant-book"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Additional shift accommodations</CardTitle>
+          <CardDescription>
+            Extra information to help find great matches for your office
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between py-2">
+            <span className="font-medium">Are you able to accommodate lactation breaks?</span>
+            <YesNoToggle
+              value={settings.accommodateLactationBreaks}
+              onChange={(val) => setSettings({ ...settings, accommodateLactationBreaks: val })}
+              testId="toggle-lactation"
+            />
+          </div>
+          <Separator />
+          <div className="flex items-center justify-between py-2">
+            <span className="font-medium">Are you able to accommodate left-handed hygienists?</span>
+            <YesNoToggle
+              value={settings.accommodateLeftHanded}
+              onChange={(val) => setSettings({ ...settings, accommodateLeftHanded: val })}
+              testId="toggle-left-handed"
+            />
+          </div>
+          <Separator />
+          <div className="space-y-2 py-2">
+            <Label>Communicate any additional expectations for temporary hygienists (optional)</Label>
+            <Textarea
+              placeholder="Description"
+              value={settings.additionalExpectations}
+              onChange={(e) => setSettings({ ...settings, additionalExpectations: e.target.value })}
+              className="min-h-[100px]"
+              maxLength={500}
+              data-testid="textarea-expectations"
+            />
+            <p className="text-xs text-muted-foreground text-right">{settings.additionalExpectations.length}/500</p>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
