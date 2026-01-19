@@ -108,10 +108,10 @@ export function AppSidebar() {
           </div>
           <div className="flex flex-col">
             <span className="text-base font-semibold text-sidebar-foreground">
-              DentalVerify
+              EtherAI
             </span>
             <span className="text-xs text-muted-foreground">
-              Insurance Platform
+              Dental Practice Management
             </span>
           </div>
         </Link>

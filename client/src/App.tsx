@@ -72,7 +72,7 @@ function MainLayout() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="light" storageKey="dental-verify-theme">
+      <ThemeProvider defaultTheme="light" storageKey="etherai-theme">
         <TooltipProvider>
           <MainLayout />
         </TooltipProvider>
