@@ -97,7 +97,22 @@ The application runs on port 5000 with both frontend and backend served together
 - `npm run db:push` - Push schema changes to database
 - `npx tsx server/seed.ts` - Seed database with sample data
 
+### Settings Page Structure
+
+The Settings page follows the Teero app design pattern with 4 tabs:
+
+1. **Office Profile** - Photos, office basics (name, address, phone, website), about your office, team composition, break facilities
+2. **Practice Information** - Software selection, equipment settings, practice identifiers (NPI, Tax ID), clearinghouse credentials, appearance/theme
+3. **Staffing Settings** - Verification automation, notification preferences
+4. **Billing** - Subscription management, payment methods, billing history
+
 ### Recent Changes
+- Settings page redesigned with 4-tab structure based on Teero app design
+- Added Office Profile tab with photos, team composition, and break facilities
+- Added Practice Information tab with software, equipment, and clearinghouse management
+- Added Staffing Settings tab with verification automation options
+- Added Billing tab with subscription and payment info
+- Clearinghouse credentials use vault-based secretId for security
 - Initial implementation of full dental insurance verification platform
 - Dashboard with verification status tracking
 - Patient management with insurance policies
