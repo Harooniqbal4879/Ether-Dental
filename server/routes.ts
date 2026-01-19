@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertPatientSchema, insertInsuranceCarrierSchema, insertInsurancePolicySchema, insertClearinghouseConfigSchema } from "@shared/schema";
+import { insertPatientSchema, insertInsuranceCarrierSchema, insertInsurancePolicySchema, insertClearinghouseConfigSchema, insertStaffShiftSchema } from "@shared/schema";
 import { z } from "zod";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 
@@ -482,6 +482,72 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error verifying payment:", error);
       res.status(500).json({ error: "Failed to verify payment" });
+    }
+  });
+
+  // Staff Shifts
+  app.get("/api/shifts", async (req, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      
+      if (!startDate || !endDate || typeof startDate !== 'string' || typeof endDate !== 'string') {
+        return res.status(400).json({ error: "startDate and endDate query parameters required" });
+      }
+      
+      const shifts = await storage.getShifts(startDate, endDate);
+      res.json(shifts);
+    } catch (error) {
+      console.error("Error fetching shifts:", error);
+      res.status(500).json({ error: "Failed to fetch shifts" });
+    }
+  });
+
+  // Create shifts (accepts array of shift data with multiple dates)
+  const createShiftsSchema = z.object({
+    dates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).min(1, "At least one date required"),
+    role: z.string().min(1),
+    arrivalTime: z.string().min(1),
+    firstPatientTime: z.string().min(1),
+    endTime: z.string().min(1),
+    breakDuration: z.string().min(1),
+    pricingMode: z.enum(["fixed", "smart"]),
+    minHourlyRate: z.coerce.number().optional().nullable(),
+    maxHourlyRate: z.coerce.number().optional().nullable(),
+    fixedHourlyRate: z.coerce.number().optional().nullable(),
+  });
+
+  app.post("/api/shifts", async (req, res) => {
+    try {
+      const parsed = createShiftsSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.errors });
+      }
+
+      const { dates, ...shiftData } = parsed.data;
+      
+      // Create one shift per selected date
+      const shiftsToCreate = dates.map((date) => ({
+        date,
+        role: shiftData.role,
+        arrivalTime: shiftData.arrivalTime,
+        firstPatientTime: shiftData.firstPatientTime,
+        endTime: shiftData.endTime,
+        breakDuration: shiftData.breakDuration,
+        pricingMode: shiftData.pricingMode,
+        minHourlyRate: shiftData.minHourlyRate?.toString() || null,
+        maxHourlyRate: shiftData.maxHourlyRate?.toString() || null,
+        fixedHourlyRate: shiftData.fixedHourlyRate?.toString() || null,
+        status: "open" as const,
+      }));
+
+      const createdShifts = await storage.createShifts(shiftsToCreate);
+      res.status(201).json(createdShifts);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      console.error("Error creating shifts:", error);
+      res.status(500).json({ error: "Failed to create shifts" });
     }
   });
 
