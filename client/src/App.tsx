@@ -36,6 +36,7 @@ function MainRouter() {
       <Route path="/staffing" component={Staffing} />
       <Route path="/staffing/add-shift" component={AddShift} />
       <Route path="/services" component={Services} />
+      <Route path="/portal" component={PatientPortal} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -73,15 +74,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="light" storageKey="dental-verify-theme">
         <TooltipProvider>
-          <Switch>
-            <Route path="/portal">
-              <PatientPortal />
-              <Toaster />
-            </Route>
-            <Route>
-              <MainLayout />
-            </Route>
-          </Switch>
+          <MainLayout />
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>
