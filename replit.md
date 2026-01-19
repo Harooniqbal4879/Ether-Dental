@@ -121,7 +121,24 @@ The Settings page follows the Teero app design pattern with 4 tabs:
 3. **Staffing Settings** - Verification automation, notification preferences
 4. **Billing** - Subscription management, payment methods, billing history
 
+### Add Shift Page
+
+The Add Shift page (`/staffing/add-shift`) allows practice managers to create new shift postings with:
+- Multi-date calendar selection (can select multiple dates at once)
+- Time configuration: Arrival time, First patient, End time, Break (unpaid)
+- Two pricing modes:
+  - **Fixed pricing**: Set one hourly rate
+  - **Smart pricing**: Set min/max range, system optimizes daily
+- Visual hourly rate slider with fill rate indicator
+- Estimated pricing sidebar with detailed cost breakdown:
+  - Base wages
+  - Payroll fees (expandable breakdown: Social Security, Medicare, Federal/State unemployment, Workers comp, Paid sick leave)
+  - Teero fee (12%)
+  - Hourly total
+- Post shifts button with Terms of Service and Privacy Policy links
+
 ### Recent Changes
+- Added Add Shift page (`/staffing/add-shift`) for creating new shift postings with multi-date selection, time configuration, and dual pricing modes (Fixed/Smart)
 - Added Patient Portal (`/portal`) for patients to view balances and make credit card payments via Stripe Checkout
 - Integrated Stripe payment processing with proper webhook handling
 - Added `patient_billing` and `patient_payments` database tables for tracking patient balances and payment history
