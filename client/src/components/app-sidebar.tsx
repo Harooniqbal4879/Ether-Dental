@@ -59,7 +59,7 @@ const allNavItems = [
     personas: ["system_admin", "admin", "front_desk", "treatment_coordinator"],
   },
   {
-    title: "Hygienist Staffing",
+    title: "Staffing",
     url: "/staffing",
     icon: UserCheck,
     personas: ["system_admin", "admin", "front_desk"],

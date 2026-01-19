@@ -6,6 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/page-header";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   ChevronLeft,
   ChevronRight,
   Plus,
@@ -15,8 +22,33 @@ import {
   Ban,
   Search,
   Gift,
+  Stethoscope,
+  UserCog,
+  Briefcase,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const STAFF_ROLES = {
+  all: { label: "All Roles", category: "all" },
+  dentist: { label: "Dentist", category: "clinical" },
+  hygienist: { label: "Hygienist", category: "clinical" },
+  dental_assistant: { label: "Dental Assistant", category: "clinical" },
+  office_coordinator: { label: "Office Coordinator", category: "administrative" },
+  front_desk: { label: "Front Desk", category: "administrative" },
+  billing: { label: "Billing Staff", category: "administrative" },
+} as const;
+
+type StaffRole = keyof typeof STAFF_ROLES;
+
+const ROLE_BADGE_COLORS: Record<StaffRole, string> = {
+  all: "bg-muted text-muted-foreground",
+  dentist: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+  hygienist: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+  dental_assistant: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
+  office_coordinator: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+  front_desk: "bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200",
+  billing: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+};
 
 const DAYS_OF_WEEK = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const DAYS_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
@@ -173,16 +205,17 @@ function PendingView() {
   );
 }
 
-function HygienistsView() {
+function TeamView({ roleFilter }: { roleFilter: StaffRole }) {
   const [activeTab, setActiveTab] = useState("all");
+  const roleLabel = roleFilter === "all" ? "team members" : STAFF_ROLES[roleFilter].label.toLowerCase() + "s";
   
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold" data-testid="text-hygiene-team-title">Your hygiene team</h2>
-        <Button variant="outline" data-testid="button-refer-hygienist">
+        <h2 className="text-xl font-semibold" data-testid="text-team-title">Your team</h2>
+        <Button variant="outline" data-testid="button-refer-staff">
           <Gift className="h-4 w-4 mr-2" />
-          Refer a hygienist
+          Refer a professional
         </Button>
       </div>
       
@@ -205,10 +238,10 @@ function HygienistsView() {
         <TabsContent value="all" className="mt-4">
           <div className="rounded-lg bg-muted/50 p-12 flex flex-col items-center justify-center min-h-[350px]">
             <div className="mb-4">
-              <CalendarIcon className="h-16 w-16 text-muted-foreground/40" />
+              <Users className="h-16 w-16 text-muted-foreground/40" />
             </div>
             <p className="text-muted-foreground text-center max-w-md mb-6" data-testid="text-no-professionals">
-              No professionals have been scheduled to work at your office. When a professional has requested a shift, you can add them to your favorites.
+              No {roleLabel} have been scheduled to work at your office yet. When staff request shifts, you can add them to your favorites.
             </p>
             <Button variant="default" data-testid="button-start-adding-shifts">
               <Plus className="h-4 w-4 mr-2" />
@@ -223,7 +256,7 @@ function HygienistsView() {
               <Heart className="h-16 w-16 text-muted-foreground/40" />
             </div>
             <p className="text-muted-foreground text-center max-w-md" data-testid="text-no-favorites">
-              No favorite hygienists yet. Add hygienists to your favorites after they complete shifts at your office.
+              No favorite {roleLabel} yet. Add staff to your favorites after they complete shifts at your office.
             </p>
           </div>
         </TabsContent>
@@ -234,7 +267,7 @@ function HygienistsView() {
               <Ban className="h-16 w-16 text-muted-foreground/40" />
             </div>
             <p className="text-muted-foreground text-center max-w-md" data-testid="text-no-blocked">
-              No blocked hygienists. If needed, you can block hygienists from requesting shifts at your office.
+              No blocked {roleLabel}. If needed, you can block staff from requesting shifts at your office.
             </p>
           </div>
         </TabsContent>
@@ -243,9 +276,10 @@ function HygienistsView() {
   );
 }
 
-function ShiftHistoryView() {
+function ShiftHistoryView({ roleFilter }: { roleFilter: StaffRole }) {
   const [activeTab, setActiveTab] = useState("completed");
   const [searchQuery, setSearchQuery] = useState("");
+  const roleLabel = roleFilter === "all" ? "staff" : STAFF_ROLES[roleFilter].label.toLowerCase();
   
   return (
     <div className="space-y-4">
@@ -254,11 +288,11 @@ function ShiftHistoryView() {
         <div className="relative w-64">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search hygienist name"
+            placeholder={`Search ${roleLabel} name`}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
-            data-testid="input-search-hygienist"
+            data-testid="input-search-staff"
           />
         </div>
       </div>
@@ -280,7 +314,7 @@ function ShiftHistoryView() {
               No shift history yet.
             </h3>
             <p className="text-muted-foreground text-center max-w-md mb-6">
-              Once you book shifts and hygienists complete them, you'll see all the details here.
+              Once you book shifts and staff complete them, you'll see all the details here.
             </p>
             <Button variant="default" data-testid="button-add-shifts-history">
               Add shifts
@@ -303,8 +337,18 @@ function ShiftHistoryView() {
   );
 }
 
+function RoleFilterBadge({ role }: { role: StaffRole }) {
+  if (role === "all") return null;
+  return (
+    <Badge className={cn("text-xs", ROLE_BADGE_COLORS[role])} data-testid={`badge-role-${role}`}>
+      {STAFF_ROLES[role].label}
+    </Badge>
+  );
+}
+
 export default function StaffingPage() {
   const [location, setLocation] = useLocation();
+  const [roleFilter, setRoleFilter] = useState<StaffRole>("all");
   
   const urlParams = new URLSearchParams(window.location.search);
   const tabFromUrl = urlParams.get("tab") || "calendar";
@@ -321,18 +365,55 @@ export default function StaffingPage() {
     setLocation(`/staffing?tab=${value}`);
   };
 
+  const clinicalRoles = Object.entries(STAFF_ROLES).filter(([_, v]) => v.category === "clinical");
+  const adminRoles = Object.entries(STAFF_ROLES).filter(([_, v]) => v.category === "administrative");
+
   return (
     <div className="flex-1 space-y-6 p-6">
-      <PageHeader
-        title="Hygienist Staffing"
-        description="Manage temporary and permanent hygienist staffing for your practice"
-      />
+      <div className="flex items-start justify-between gap-4">
+        <PageHeader
+          title="Staffing"
+          description="Manage temporary and permanent staffing for your practice"
+        />
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-muted-foreground">Filter by role:</span>
+          <Select value={roleFilter} onValueChange={(v) => setRoleFilter(v as StaffRole)}>
+            <SelectTrigger className="w-[200px]" data-testid="select-role-filter">
+              <SelectValue placeholder="All Roles" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" data-testid="option-all-roles">All Roles</SelectItem>
+              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Clinical</div>
+              {clinicalRoles.map(([key, role]) => (
+                <SelectItem key={key} value={key} data-testid={`option-${key}`}>
+                  <div className="flex items-center gap-2">
+                    <span className={cn("w-2 h-2 rounded-full", ROLE_BADGE_COLORS[key as StaffRole].split(" ")[0])} />
+                    {role.label}
+                  </div>
+                </SelectItem>
+              ))}
+              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Administrative</div>
+              {adminRoles.map(([key, role]) => (
+                <SelectItem key={key} value={key} data-testid={`option-${key}`}>
+                  <div className="flex items-center gap-2">
+                    <span className={cn("w-2 h-2 rounded-full", ROLE_BADGE_COLORS[key as StaffRole].split(" ")[0])} />
+                    {role.label}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {roleFilter !== "all" && (
+            <RoleFilterBadge role={roleFilter} />
+          )}
+        </div>
+      </div>
       
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
         <TabsList className="bg-muted/50">
           <TabsTrigger value="calendar" data-testid="tab-staffing-calendar">Calendar</TabsTrigger>
           <TabsTrigger value="pending" data-testid="tab-staffing-pending">Pending</TabsTrigger>
-          <TabsTrigger value="hygienists" data-testid="tab-staffing-hygienists">Hygienists</TabsTrigger>
+          <TabsTrigger value="team" data-testid="tab-staffing-team">Team</TabsTrigger>
           <TabsTrigger value="history" data-testid="tab-staffing-history">Shift history</TabsTrigger>
         </TabsList>
         
@@ -344,12 +425,12 @@ export default function StaffingPage() {
           <PendingView />
         </TabsContent>
         
-        <TabsContent value="hygienists">
-          <HygienistsView />
+        <TabsContent value="team">
+          <TeamView roleFilter={roleFilter} />
         </TabsContent>
         
         <TabsContent value="history">
-          <ShiftHistoryView />
+          <ShiftHistoryView roleFilter={roleFilter} />
         </TabsContent>
       </Tabs>
     </div>
