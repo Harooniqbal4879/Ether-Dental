@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
+import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -28,6 +29,8 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 const DAYS_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 const DAYS_OF_WEEK = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -41,6 +44,15 @@ const TIME_OPTIONS = [
 ];
 
 const BREAK_OPTIONS = ["No break", "15 min", "30 min", "45 min", "60 min", "90 min"];
+
+const ROLE_OPTIONS = [
+  { value: "Hygienist", label: "Hygienist", category: "Clinical" },
+  { value: "Dentist", label: "Dentist", category: "Clinical" },
+  { value: "Dental Assistant", label: "Dental Assistant", category: "Clinical" },
+  { value: "Office Coordinator", label: "Office Coordinator", category: "Administrative" },
+  { value: "Front Desk", label: "Front Desk", category: "Administrative" },
+  { value: "Billing Staff", label: "Billing Staff", category: "Administrative" },
+];
 
 const PAYROLL_BREAKDOWN = {
   socialSecurityTax: { label: "Social security tax", rate: 0.062 },
@@ -108,12 +120,14 @@ function getFillRateInfo(rate: number, minRate: number, maxRate: number) {
 
 export default function AddShiftPage() {
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
   
   const today = new Date();
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
   const [selectedDates, setSelectedDates] = useState<Set<string>>(new Set());
   
+  const [selectedRole, setSelectedRole] = useState("Hygienist");
   const [arrivalTime, setArrivalTime] = useState("8:30 AM");
   const [firstPatient, setFirstPatient] = useState("9:00 AM");
   const [endTime, setEndTime] = useState("5:00 PM");
@@ -126,6 +140,57 @@ export default function AddShiftPage() {
   
   const [showPayrollBreakdown, setShowPayrollBreakdown] = useState(false);
   const [pricingTab, setPricingTab] = useState<"min" | "max">("min");
+
+  const createShiftsMutation = useMutation({
+    mutationFn: async (data: {
+      dates: string[];
+      role: string;
+      arrivalTime: string;
+      firstPatientTime: string;
+      endTime: string;
+      breakDuration: string;
+      pricingMode: "fixed" | "smart";
+      minHourlyRate: number | null;
+      maxHourlyRate: number | null;
+      fixedHourlyRate: number | null;
+    }) => {
+      const response = await apiRequest("POST", "/api/shifts", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
+      toast({
+        title: "Shifts posted",
+        description: `Successfully posted ${selectedDates.size} shift${selectedDates.size !== 1 ? 's' : ''}.`,
+      });
+      setLocation("/staffing");
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to post shifts. Please try again.",
+        variant: "destructive",
+      });
+      console.error("Failed to create shifts:", error);
+    },
+  });
+
+  const handlePostShifts = () => {
+    if (selectedDates.size === 0) return;
+    
+    createShiftsMutation.mutate({
+      dates: Array.from(selectedDates).sort(),
+      role: selectedRole,
+      arrivalTime,
+      firstPatientTime: firstPatient,
+      endTime,
+      breakDuration,
+      pricingMode,
+      minHourlyRate: pricingMode === "smart" ? minHourlyRate : null,
+      maxHourlyRate: pricingMode === "smart" ? maxHourlyRate : null,
+      fixedHourlyRate: pricingMode === "fixed" ? fixedHourlyRate : null,
+    });
+  };
   
   const monthName = new Date(currentYear, currentMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   const days = getMonthData(currentYear, currentMonth);
@@ -306,7 +371,21 @@ export default function AddShiftPage() {
               {selectedDates.size > 0 && (
                 <div className="border-t pt-6">
                   <div className="flex flex-wrap items-center gap-4">
-                    <span className="text-sm font-medium w-20">{firstSelectedDayName}</span>
+                    <div>
+                      <label className="block text-xs text-muted-foreground mb-1">Role</label>
+                      <Select value={selectedRole} onValueChange={setSelectedRole}>
+                        <SelectTrigger className="w-[160px]" data-testid="select-role">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ROLE_OPTIONS.map((role) => (
+                            <SelectItem key={role.value} value={role.value} data-testid={`option-role-${role.value.replace(/[ ]/g, '-')}`}>
+                              {role.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                     
                     <div>
                       <label className="block text-xs text-muted-foreground mb-1">Arrival time</label>
@@ -582,10 +661,13 @@ export default function AddShiftPage() {
             <div className="space-y-4">
               <Button 
                 className="w-full h-12 text-base"
-                disabled={selectedDates.size === 0}
+                disabled={selectedDates.size === 0 || createShiftsMutation.isPending}
+                onClick={handlePostShifts}
                 data-testid="button-post-shifts"
               >
-                Post {selectedDates.size} shift{selectedDates.size !== 1 ? 's' : ''}
+                {createShiftsMutation.isPending 
+                  ? "Posting..." 
+                  : `Post ${selectedDates.size} shift${selectedDates.size !== 1 ? 's' : ''}`}
               </Button>
               
               <p className="text-xs text-muted-foreground text-center">
