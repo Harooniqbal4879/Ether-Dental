@@ -31,6 +31,9 @@ import {
 import { cn } from "@/lib/utils";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { DentalSpecialties } from "@shared/schema";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const DAYS_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 const DAYS_OF_WEEK = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -128,6 +131,7 @@ export default function AddShiftPage() {
   const [selectedDates, setSelectedDates] = useState<Set<string>>(new Set());
   
   const [selectedRole, setSelectedRole] = useState("Hygienist");
+  const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([]);
   const [arrivalTime, setArrivalTime] = useState("8:30 AM");
   const [firstPatient, setFirstPatient] = useState("9:00 AM");
   const [endTime, setEndTime] = useState("5:00 PM");
@@ -145,6 +149,7 @@ export default function AddShiftPage() {
     mutationFn: async (data: {
       dates: string[];
       role: string;
+      specialties: string[];
       arrivalTime: string;
       firstPatientTime: string;
       endTime: string;
@@ -184,6 +189,7 @@ export default function AddShiftPage() {
     createShiftsMutation.mutate({
       dates: Array.from(selectedDates).sort(),
       role: selectedRole,
+      specialties: selectedSpecialties,
       arrivalTime,
       firstPatientTime: firstPatient,
       endTime,
@@ -193,6 +199,14 @@ export default function AddShiftPage() {
       maxHourlyRate: pricingMode === "smart" ? maxHourlyRate : null,
       fixedHourlyRate: pricingMode === "fixed" ? fixedHourlyRate : null,
     });
+  };
+
+  const toggleSpecialty = (specialty: string) => {
+    setSelectedSpecialties(prev => 
+      prev.includes(specialty) 
+        ? prev.filter(s => s !== specialty)
+        : [...prev, specialty]
+    );
   };
   
   const monthName = new Date(currentYear, currentMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
@@ -445,6 +459,44 @@ export default function AddShiftPage() {
                         </SelectContent>
                       </Select>
                     </div>
+                  </div>
+                  
+                  <div className="mt-4">
+                    <label className="block text-xs text-muted-foreground mb-2">Required Specialties (optional)</label>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.values(DentalSpecialties).map((specialty) => (
+                        <button
+                          key={specialty}
+                          type="button"
+                          onClick={() => toggleSpecialty(specialty)}
+                          className={cn(
+                            "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm border transition-colors",
+                            selectedSpecialties.includes(specialty)
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-background hover:bg-muted border-border"
+                          )}
+                          data-testid={`button-specialty-${specialty.replace(/[ ]/g, '-')}`}
+                        >
+                          <Checkbox 
+                            checked={selectedSpecialties.includes(specialty)} 
+                            className="h-3.5 w-3.5 pointer-events-none"
+                          />
+                          {specialty}
+                        </button>
+                      ))}
+                    </div>
+                    {selectedSpecialties.length > 0 && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">Selected:</span>
+                        <div className="flex flex-wrap gap-1">
+                          {selectedSpecialties.map(s => (
+                            <Badge key={s} variant="secondary" className="text-xs">
+                              {s}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

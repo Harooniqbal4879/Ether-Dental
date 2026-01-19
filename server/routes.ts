@@ -506,6 +506,7 @@ export async function registerRoutes(
   const createShiftsSchema = z.object({
     dates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).min(1, "At least one date required"),
     role: z.string().min(1),
+    specialties: z.array(z.string()).optional().default([]),
     arrivalTime: z.string().min(1),
     firstPatientTime: z.string().min(1),
     endTime: z.string().min(1),
@@ -529,6 +530,7 @@ export async function registerRoutes(
       const shiftsToCreate = dates.map((date) => ({
         date,
         role: shiftData.role,
+        specialties: shiftData.specialties.length > 0 ? shiftData.specialties : null,
         arrivalTime: shiftData.arrivalTime,
         firstPatientTime: shiftData.firstPatientTime,
         endTime: shiftData.endTime,

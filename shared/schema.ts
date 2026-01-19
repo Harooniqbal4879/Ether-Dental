@@ -295,6 +295,7 @@ export const staffShifts = pgTable("staff_shifts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   date: text("date").notNull(), // YYYY-MM-DD format
   role: text("role").notNull(), // Dentist, Hygienist, Dental Assistant, etc.
+  specialties: text("specialties").array(), // Required specialties for this shift
   arrivalTime: text("arrival_time").notNull(), // e.g. "8:30 AM"
   firstPatientTime: text("first_patient_time").notNull(), // e.g. "9:00 AM"
   endTime: text("end_time").notNull(), // e.g. "5:00 PM"

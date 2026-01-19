@@ -238,6 +238,12 @@ function CalendarView() {
                           <Clock className="h-3 w-3 flex-shrink-0" />
                           <span className="truncate">{shift.arrivalTime}</span>
                         </div>
+                        {shift.specialties && shift.specialties.length > 0 && (
+                          <div className="text-[10px] opacity-70 truncate mt-0.5">
+                            {shift.specialties.slice(0, 2).join(", ")}
+                            {shift.specialties.length > 2 && ` +${shift.specialties.length - 2}`}
+                          </div>
+                        )}
                       </div>
                     ))}
                     {dayShifts.length > 2 && (
