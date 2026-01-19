@@ -452,7 +452,7 @@ export default function StaffingPage() {
     <div className="flex-1 space-y-6 p-6">
       <div className="flex items-start justify-between gap-4">
         <PageHeader
-          title="Staffing"
+          title="Staffing Requests"
           description="Manage temporary and permanent staffing for your practice"
         />
         <div className="flex items-center gap-3">

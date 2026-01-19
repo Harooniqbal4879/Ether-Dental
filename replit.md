@@ -58,7 +58,7 @@ The sidebar navigation is organized as follows:
   - Patients tab (/patients) - Patient list and management
   - Verifications tab (/patients?tab=verifications) - Insurance verification tracking
   - Appointments tab (/patients?tab=appointments) - Upcoming appointments
-- **Staffing** - Multi-role shift management
+- **Staffing Requests** - Multi-role shift management
 - **Services** - Subscription service offerings
 - **Patient Portal** - Patient payment interface (also accessible via Patient persona)
 - **Professionals Hub** - Dental professional profiles and credentials (accessible by office staff and professionals)
