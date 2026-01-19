@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
@@ -8,7 +9,12 @@ import {
   Settings,
   Shield,
   ChevronDown,
+  ChevronRight,
   Check,
+  UserCheck,
+  Clock,
+  Heart,
+  History,
 } from "lucide-react";
 import {
   Sidebar,
@@ -19,9 +25,17 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,6 +73,15 @@ const allNavItems = [
   },
 ];
 
+const staffingSubItems = [
+  { title: "Calendar", url: "/staffing?tab=calendar", icon: Calendar },
+  { title: "Pending", url: "/staffing?tab=pending", icon: Clock },
+  { title: "Hygienists", url: "/staffing?tab=hygienists", icon: Users },
+  { title: "Shift history", url: "/staffing?tab=history", icon: History },
+];
+
+const staffingPersonas = ["system_admin", "admin", "front_desk"];
+
 const configNavItems = [
   {
     title: "Insurance Carriers",
@@ -77,6 +100,7 @@ const configNavItems = [
 export function AppSidebar() {
   const [location] = useLocation();
   const { currentPersona, setCurrentPersona, personaInfo } = usePersona();
+  const [staffingOpen, setStaffingOpen] = useState(location.startsWith("/staffing"));
 
   const visibleMainItems = allNavItems.filter((item) =>
     item.personas.includes(currentPersona)
@@ -84,6 +108,8 @@ export function AppSidebar() {
   const visibleConfigItems = configNavItems.filter((item) =>
     item.personas.includes(currentPersona)
   );
+  const showStaffing = staffingPersonas.includes(currentPersona);
+  const isStaffingActive = location.startsWith("/staffing");
 
   return (
     <Sidebar>
@@ -124,6 +150,45 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+
+              {showStaffing && (
+                <Collapsible
+                  open={staffingOpen}
+                  onOpenChange={setStaffingOpen}
+                  className="group/collapsible"
+                >
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton
+                        isActive={isStaffingActive}
+                        className="px-4"
+                        data-testid="nav-hygienist-staffing"
+                      >
+                        <UserCheck className="h-4 w-4" />
+                        <span>Hygienist staffing</span>
+                        <ChevronRight className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        {staffingSubItems.map((subItem) => (
+                          <SidebarMenuSubItem key={subItem.title}>
+                            <SidebarMenuSubButton
+                              asChild
+                              isActive={location === subItem.url || (location === "/staffing" && subItem.url.includes("calendar"))}
+                            >
+                              <Link href={subItem.url} data-testid={`nav-staffing-${subItem.title.toLowerCase().replace(" ", "-")}`}>
+                                <subItem.icon className="h-4 w-4" />
+                                <span>{subItem.title}</span>
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
