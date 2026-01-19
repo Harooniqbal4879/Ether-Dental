@@ -96,6 +96,25 @@ const XRAY_SOFTWARE = [
   "Other",
 ];
 
+const SCALER_TYPES = [
+  "Ultrasonic",
+  "Piezoelectric",
+  "Magnetostrictive",
+  "Manual only",
+  "Both ultrasonic and manual",
+];
+
+const APPOINTMENT_LENGTHS = [
+  "30 min",
+  "35 min",
+  "40 min",
+  "45 min",
+  "50 min",
+  "60 min",
+  "75 min",
+  "90 min",
+];
+
 type ClearinghouseType = (typeof CLEARINGHOUSE_OPTIONS)[number]["value"];
 
 function getStatusBadge(status: string | null) {
@@ -715,6 +734,19 @@ function PracticeInformationTab() {
     hasOverheadLights: true,
     preferredScrubColor: false,
     clinicalAttireProvided: false,
+    useAirPolishers: false,
+    scalerType: "",
+    assistedHygieneSchedule: true,
+    rootPlaningProcedures: true,
+    seeNewPatients: true,
+    administerLocalAnesthesia: true,
+    workWithNitrousPatients: true,
+    appointmentLengthAdults: "60 min",
+    appointmentLengthKids: "35 min",
+    appointmentLengthPerio: "",
+    appointmentLengthScaling: "",
+    dentalTreatmentRooms: 0,
+    dedicatedHygieneRooms: 0,
   });
 
   const { data: configs = [], isLoading: isLoadingConfigs } = useQuery<ClearinghouseConfig[]>({
@@ -882,6 +914,202 @@ function PracticeInformationTab() {
               value={practiceData.clinicalAttireProvided}
               onChange={(val) => setPracticeData({ ...practiceData, clinicalAttireProvided: val })}
               testId="toggle-attire"
+            />
+          </div>
+          <Separator />
+          <div className="flex items-center justify-between py-2">
+            <span className="font-medium">Do you use air polishers?</span>
+            <YesNoToggle
+              value={practiceData.useAirPolishers}
+              onChange={(val) => setPracticeData({ ...practiceData, useAirPolishers: val })}
+              testId="toggle-air-polishers"
+            />
+          </div>
+          <Separator />
+          <div className="space-y-2 py-2">
+            <Label>Which scalers do you use?</Label>
+            <Select
+              value={practiceData.scalerType}
+              onValueChange={(value) => setPracticeData({ ...practiceData, scalerType: value })}
+            >
+              <SelectTrigger data-testid="select-scaler-type">
+                <SelectValue placeholder="Scaler type" />
+              </SelectTrigger>
+              <SelectContent>
+                {SCALER_TYPES.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Responsibilities of temporary hygienists</CardTitle>
+          <CardDescription>
+            Select the clinical duties temporary hygienists may perform at your office
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between py-2">
+            <span className="font-medium">Run an assisted hygiene schedule?</span>
+            <YesNoToggle
+              value={practiceData.assistedHygieneSchedule}
+              onChange={(val) => setPracticeData({ ...practiceData, assistedHygieneSchedule: val })}
+              testId="toggle-assisted-hygiene"
+            />
+          </div>
+          <Separator />
+          <div className="flex items-center justify-between py-2">
+            <span className="font-medium">Conduct root-planing procedures?</span>
+            <YesNoToggle
+              value={practiceData.rootPlaningProcedures}
+              onChange={(val) => setPracticeData({ ...practiceData, rootPlaningProcedures: val })}
+              testId="toggle-root-planing"
+            />
+          </div>
+          <Separator />
+          <div className="flex items-center justify-between py-2">
+            <span className="font-medium">See new patients?</span>
+            <YesNoToggle
+              value={practiceData.seeNewPatients}
+              onChange={(val) => setPracticeData({ ...practiceData, seeNewPatients: val })}
+              testId="toggle-new-patients"
+            />
+          </div>
+          <Separator />
+          <div className="flex items-center justify-between py-2">
+            <span className="font-medium">Administer local anesthesia?</span>
+            <YesNoToggle
+              value={practiceData.administerLocalAnesthesia}
+              onChange={(val) => setPracticeData({ ...practiceData, administerLocalAnesthesia: val })}
+              testId="toggle-anesthesia"
+            />
+          </div>
+          <Separator />
+          <div className="flex items-center justify-between py-2">
+            <span className="font-medium">Work with nitrous patients?</span>
+            <YesNoToggle
+              value={practiceData.workWithNitrousPatients}
+              onChange={(val) => setPracticeData({ ...practiceData, workWithNitrousPatients: val })}
+              testId="toggle-nitrous"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Appointment length</CardTitle>
+          <CardDescription>
+            Standard appointment duration for each service
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="space-y-2">
+              <Label>Adults</Label>
+              <Select
+                value={practiceData.appointmentLengthAdults}
+                onValueChange={(value) => setPracticeData({ ...practiceData, appointmentLengthAdults: value })}
+              >
+                <SelectTrigger data-testid="select-appt-adults">
+                  <SelectValue placeholder="Select length" />
+                </SelectTrigger>
+                <SelectContent>
+                  {APPOINTMENT_LENGTHS.map((length) => (
+                    <SelectItem key={length} value={length}>
+                      {length}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Kids</Label>
+              <Select
+                value={practiceData.appointmentLengthKids}
+                onValueChange={(value) => setPracticeData({ ...practiceData, appointmentLengthKids: value })}
+              >
+                <SelectTrigger data-testid="select-appt-kids">
+                  <SelectValue placeholder="Select length" />
+                </SelectTrigger>
+                <SelectContent>
+                  {APPOINTMENT_LENGTHS.map((length) => (
+                    <SelectItem key={length} value={length}>
+                      {length}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Perio</Label>
+              <Select
+                value={practiceData.appointmentLengthPerio}
+                onValueChange={(value) => setPracticeData({ ...practiceData, appointmentLengthPerio: value })}
+              >
+                <SelectTrigger data-testid="select-appt-perio">
+                  <SelectValue placeholder="Select length" />
+                </SelectTrigger>
+                <SelectContent>
+                  {APPOINTMENT_LENGTHS.map((length) => (
+                    <SelectItem key={length} value={length}>
+                      {length}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Scaling & Root Planing</Label>
+              <Select
+                value={practiceData.appointmentLengthScaling}
+                onValueChange={(value) => setPracticeData({ ...practiceData, appointmentLengthScaling: value })}
+              >
+                <SelectTrigger data-testid="select-appt-scaling">
+                  <SelectValue placeholder="Select length" />
+                </SelectTrigger>
+                <SelectContent>
+                  {APPOINTMENT_LENGTHS.map((length) => (
+                    <SelectItem key={length} value={length}>
+                      {length}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Clinical spaces</CardTitle>
+          <CardDescription>
+            Tell us about your treatment rooms
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between py-2">
+            <span className="font-medium">Dental treatment rooms</span>
+            <NumberInput
+              value={practiceData.dentalTreatmentRooms}
+              onChange={(val) => setPracticeData({ ...practiceData, dentalTreatmentRooms: val })}
+              testId="input-treatment-rooms"
+            />
+          </div>
+          <Separator />
+          <div className="flex items-center justify-between py-2">
+            <span className="font-medium">Dedicated hygiene rooms</span>
+            <NumberInput
+              value={practiceData.dedicatedHygieneRooms}
+              onChange={(val) => setPracticeData({ ...practiceData, dedicatedHygieneRooms: val })}
+              testId="input-hygiene-rooms"
             />
           </div>
         </CardContent>
