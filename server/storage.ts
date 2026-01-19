@@ -9,6 +9,9 @@ import {
   patientBilling,
   patientPayments,
   staffShifts,
+  professionals,
+  professionalBadges,
+  roleSpecialties,
   type Patient,
   type InsertPatient,
   type InsuranceCarrier,
@@ -31,6 +34,13 @@ import {
   type InsertPatientPayment,
   type StaffShift,
   type InsertStaffShift,
+  type Professional,
+  type InsertProfessional,
+  type ProfessionalBadge,
+  type InsertProfessionalBadge,
+  type ProfessionalWithBadges,
+  type RoleSpecialty,
+  type InsertRoleSpecialty,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -102,6 +112,22 @@ export interface IStorage {
   getShiftsByDate(date: string): Promise<StaffShift[]>;
   createShift(shift: InsertStaffShift): Promise<StaffShift>;
   createShifts(shifts: InsertStaffShift[]): Promise<StaffShift[]>;
+
+  // Professionals
+  getProfessionals(filters?: { role?: string; specialty?: string }): Promise<ProfessionalWithBadges[]>;
+  getProfessional(id: string): Promise<ProfessionalWithBadges | undefined>;
+  createProfessional(professional: InsertProfessional): Promise<Professional>;
+  updateProfessional(id: string, data: Partial<Professional>): Promise<Professional | undefined>;
+  deleteProfessional(id: string): Promise<boolean>;
+
+  // Professional Badges
+  getBadgesForProfessional(professionalId: string): Promise<ProfessionalBadge[]>;
+  createProfessionalBadge(badge: InsertProfessionalBadge): Promise<ProfessionalBadge>;
+
+  // Role Specialties
+  getRoleSpecialties(role?: string): Promise<RoleSpecialty[]>;
+  createRoleSpecialty(roleSpecialty: InsertRoleSpecialty): Promise<RoleSpecialty>;
+  deleteRoleSpecialty(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -633,6 +659,93 @@ export class DatabaseStorage implements IStorage {
   async createShifts(shifts: InsertStaffShift[]): Promise<StaffShift[]> {
     if (shifts.length === 0) return [];
     return db.insert(staffShifts).values(shifts).returning();
+  }
+
+  // Professionals
+  async getProfessionals(filters?: { role?: string; specialty?: string }): Promise<ProfessionalWithBadges[]> {
+    let query = db.select().from(professionals).orderBy(professionals.lastName);
+    
+    const allProfessionals = await query;
+    
+    let filtered = allProfessionals;
+    if (filters?.role) {
+      filtered = filtered.filter(p => p.role === filters.role);
+    }
+    if (filters?.specialty) {
+      filtered = filtered.filter(p => 
+        p.specialty === filters.specialty || 
+        (p.specialties && p.specialties.includes(filters.specialty!))
+      );
+    }
+    
+    const result: ProfessionalWithBadges[] = [];
+    for (const professional of filtered) {
+      const badges = await this.getBadgesForProfessional(professional.id);
+      result.push({ ...professional, badges });
+    }
+    
+    return result;
+  }
+
+  async getProfessional(id: string): Promise<ProfessionalWithBadges | undefined> {
+    const [professional] = await db.select().from(professionals).where(eq(professionals.id, id));
+    if (!professional) return undefined;
+    
+    const badges = await this.getBadgesForProfessional(professional.id);
+    return { ...professional, badges };
+  }
+
+  async createProfessional(professional: InsertProfessional): Promise<Professional> {
+    const [created] = await db.insert(professionals).values(professional).returning();
+    return created;
+  }
+
+  async updateProfessional(id: string, data: Partial<Professional>): Promise<Professional | undefined> {
+    const [updated] = await db
+      .update(professionals)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(professionals.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteProfessional(id: string): Promise<boolean> {
+    await db.delete(professionals).where(eq(professionals.id, id));
+    return true;
+  }
+
+  // Professional Badges
+  async getBadgesForProfessional(professionalId: string): Promise<ProfessionalBadge[]> {
+    return db
+      .select()
+      .from(professionalBadges)
+      .where(eq(professionalBadges.professionalId, professionalId));
+  }
+
+  async createProfessionalBadge(badge: InsertProfessionalBadge): Promise<ProfessionalBadge> {
+    const [created] = await db.insert(professionalBadges).values(badge).returning();
+    return created;
+  }
+
+  // Role Specialties
+  async getRoleSpecialties(role?: string): Promise<RoleSpecialty[]> {
+    if (role) {
+      return db
+        .select()
+        .from(roleSpecialties)
+        .where(eq(roleSpecialties.role, role));
+    }
+    return db.select().from(roleSpecialties);
+  }
+
+  async createRoleSpecialty(roleSpecialty: InsertRoleSpecialty): Promise<RoleSpecialty> {
+    const [created] = await db.insert(roleSpecialties).values(roleSpecialty).returning();
+    return created;
+  }
+
+  async deleteRoleSpecialty(id: string): Promise<boolean> {
+    await db.delete(roleSpecialties).where(eq(roleSpecialties.id, id));
+    return true;
   }
 }
 

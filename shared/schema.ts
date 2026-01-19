@@ -323,3 +323,167 @@ export const StaffRoles = {
   FRONT_DESK: "Front Desk",
   BILLING_STAFF: "Billing Staff",
 } as const;
+
+// Dental Specialties enum
+export const DentalSpecialties = {
+  COSMETICS: "Cosmetics",
+  ENDODONTICS: "Endodontics",
+  GENERAL_DENTISTRY: "General Dentistry",
+  ORAL_SURGERY: "Oral and Maxillofacial Surgery",
+  ORTHODONTICS: "Orthodontics",
+  PEDIATRICS: "Pediatrics",
+  PERIODONTICS: "Periodontics",
+  PROSTHODONTICS: "Prosthodontics",
+} as const;
+
+// Experience ranges
+export const ExperienceRanges = {
+  LESS_THAN_1: "Less than 1 year",
+  ONE_TO_THREE: "1 - 3 Years",
+  THREE_TO_FIVE: "3 - 5 Years",
+  FIVE_TO_TEN: "5 - 10 Years",
+  TEN_PLUS: "10+ Years",
+} as const;
+
+// Professionals - dental professionals who can work shifts
+export const professionals = pgTable("professionals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone"),
+  photoUrl: text("photo_url"),
+  role: text("role").notNull(), // Dentist, Hygienist, etc.
+  rating: decimal("rating", { precision: 2, scale: 1 }).default("0.0"),
+  credentialsVerified: boolean("credentials_verified").default(false),
+  education: text("education"), // School name
+  graduationDate: text("graduation_date"), // MM/DD/YYYY
+  licenseNumber: text("license_number"),
+  licenseState: text("license_state"),
+  licenseYearIssued: text("license_year_issued"),
+  experienceRange: text("experience_range"), // 1-3 Years, 3-5 Years, etc.
+  software: text("software").array(), // Array of software skills
+  specialty: text("specialty"), // Primary specialty
+  specialties: text("specialties").array(), // Additional specialties
+  procedures: text("procedures").array(), // Experienced procedures
+  bio: text("bio"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertProfessionalSchema = createInsertSchema(professionals).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  rating: true,
+});
+export type InsertProfessional = z.infer<typeof insertProfessionalSchema>;
+export type Professional = typeof professionals.$inferSelect;
+
+// Professional Badges - achievements and recognitions
+export const professionalBadges = pgTable("professional_badges", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  professionalId: varchar("professional_id").notNull().references(() => professionals.id, { onDelete: "cascade" }),
+  badgeType: text("badge_type").notNull(), // perfect_attendance, shifts_completed, timeliness, knowledge, teamwork
+  level: text("level").notNull().default("bronze"), // bronze, silver, gold
+  count: integer("count").default(0), // Number associated with badge (e.g., 20 shifts)
+  earnedAt: timestamp("earned_at").defaultNow(),
+});
+
+export const professionalBadgesRelations = relations(professionalBadges, ({ one }) => ({
+  professional: one(professionals, {
+    fields: [professionalBadges.professionalId],
+    references: [professionals.id],
+  }),
+}));
+
+export const insertProfessionalBadgeSchema = createInsertSchema(professionalBadges).omit({
+  id: true,
+  earnedAt: true,
+});
+export type InsertProfessionalBadge = z.infer<typeof insertProfessionalBadgeSchema>;
+export type ProfessionalBadge = typeof professionalBadges.$inferSelect;
+
+// Role Specialties - defines which specialties are associated with each role
+export const roleSpecialties = pgTable("role_specialties", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  role: text("role").notNull(), // Staff role
+  specialty: text("specialty").notNull(), // Specialty name
+  isDefault: boolean("is_default").default(false), // Whether this is a default specialty for the role
+});
+
+export const insertRoleSpecialtySchema = createInsertSchema(roleSpecialties).omit({
+  id: true,
+});
+export type InsertRoleSpecialty = z.infer<typeof insertRoleSpecialtySchema>;
+export type RoleSpecialty = typeof roleSpecialties.$inferSelect;
+
+// Badge types enum
+export const BadgeTypes = {
+  PERFECT_ATTENDANCE: "perfect_attendance",
+  SHIFTS_COMPLETED: "shifts_completed",
+  TIMELINESS: "timeliness",
+  KNOWLEDGE: "knowledge",
+  TEAMWORK: "teamwork",
+} as const;
+
+// Badge levels
+export const BadgeLevels = {
+  BRONZE: "bronze",
+  SILVER: "silver",
+  GOLD: "gold",
+} as const;
+
+// Dental procedures by category
+export const DentalProcedures = {
+  GENERAL: [
+    "Cleanings",
+    "Hygiene/Oral Examinations",
+    "X-Rays",
+    "Fluoride",
+    "Sealants",
+  ],
+  RESTORATIVE: [
+    "Fillings",
+    "Crown & Bridge Procedures",
+    "Deliver of Crown & Bridge",
+    "Dental Implant Procedures",
+    "Fixed Retainers",
+  ],
+  COSMETIC: [
+    "Whitening",
+    "Veneers",
+    "Bonding",
+    "Invisalign/Clear Retainers",
+  ],
+  SURGICAL: [
+    "Extractions",
+    "Root Canal (Molar)",
+    "Root Canal (Pre-Molar)",
+    "Oral Sedation/Nitrous Oxide Administration",
+  ],
+  PERIODONTAL: [
+    "Gum Disease Treatment (Scaling & Root Planing)",
+    "Periodontal Charting",
+    "SRP",
+  ],
+  SPECIALTY: [
+    "Dentures",
+    "X-Ray Interpretation/ Treatment Planning",
+  ],
+  HYGIENE: [
+    "Air Polisher",
+    "Digital Impressions/ Intraoral Scanning",
+    "Instrument Sterilization",
+    "Local Anesthesia",
+    "Nitrous Oxide Administration",
+    "Oral Hygiene Instruction",
+    "Prophy",
+  ],
+} as const;
+
+// Professional with badges type
+export type ProfessionalWithBadges = Professional & {
+  badges: ProfessionalBadge[];
+};
