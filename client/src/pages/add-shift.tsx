@@ -63,7 +63,7 @@ const PAYROLL_BREAKDOWN = {
   paidSickLeave: { label: "Paid sick leave (ESTA)", rate: 0.0333 },
 };
 
-const TEERO_FEE_RATE = 0.12;
+const ETHERAI_FEE_RATE = 0.12;
 const MIN_RATE = 49;
 const MAX_RATE = 58;
 
@@ -248,8 +248,8 @@ export default function AddShiftPage() {
     }, 0);
     
     const subtotal = baseWage + payrollFees;
-    const teeroFee = subtotal * TEERO_FEE_RATE;
-    const hourlyTotal = subtotal + teeroFee;
+    const etherAIFee = subtotal * ETHERAI_FEE_RATE;
+    const hourlyTotal = subtotal + etherAIFee;
     
     return {
       baseWage,
@@ -260,7 +260,7 @@ export default function AddShiftPage() {
         rate: item.rate,
         amount: baseWage * item.rate,
       })),
-      teeroFee,
+      etherAIFee,
       hourlyTotal,
     };
   }, [displayRate]);
@@ -674,7 +674,7 @@ export default function AddShiftPage() {
               </Button>
               
               <p className="text-xs text-muted-foreground text-center">
-                It's always free to post shifts on Teero. Free cancellation up to 24 hours before a confirmed shift begins. By clicking "Post shifts" you agree to the Teero{" "}
+                It's always free to post shifts on EtherAI. Free cancellation up to 24 hours before a confirmed shift begins. By clicking "Post shifts" you agree to the EtherAI{" "}
                 <a href="#" className="underline" data-testid="link-terms-of-service">Terms of Service</a> and <a href="#" className="underline" data-testid="link-privacy-policy">Privacy Policy</a>.
               </p>
             </div>
@@ -746,9 +746,9 @@ export default function AddShiftPage() {
                 </Collapsible>
                 
                 <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Teero fee (12%)</span>
-                  <span className="text-sm" data-testid="text-teero-fee">
-                    ${pricing.teeroFee.toFixed(2)}
+                  <span className="text-sm text-muted-foreground">EtherAI fee (12%)</span>
+                  <span className="text-sm" data-testid="text-etherai-fee">
+                    ${pricing.etherAIFee.toFixed(2)}
                   </span>
                 </div>
                 

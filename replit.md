@@ -117,7 +117,7 @@ The application runs on port 5000 with both frontend and backend served together
 
 ### Settings Page Structure
 
-The Settings page follows the Teero app design pattern with 4 tabs:
+The Settings page follows the EtherAI app design pattern with 4 tabs:
 
 1. **Office Profile** - Photos, office basics (name, address, phone, website), about your office, team composition, break facilities
 2. **Practice Information** - Software selection, equipment settings, practice identifiers (NPI, Tax ID), clearinghouse credentials, appearance/theme
@@ -136,7 +136,7 @@ The Add Shift page (`/staffing/add-shift`) allows practice managers to create ne
 - Estimated pricing sidebar with detailed cost breakdown:
   - Base wages
   - Payroll fees (expandable breakdown: Social Security, Medicare, Federal/State unemployment, Workers comp, Paid sick leave)
-  - Teero fee (12%)
+  - EtherAI fee (12%)
   - Hourly total
 - Post shifts button with Terms of Service and Privacy Policy links
 
@@ -160,7 +160,7 @@ The Add Shift page (`/staffing/add-shift`) allows practice managers to create ne
 - Roles grouped into Clinical and Administrative categories with color-coded badges
 - Renamed "Hygienist Staffing" to "Staffing" and "Hygienists" tab to "Team"
 - Dynamic search placeholders and empty states based on selected role filter
-- Settings page redesigned with 4-tab structure based on Teero app design
+- Settings page redesigned with 4-tab structure based on EtherAI app design
 - Added Office Profile tab with photos, team composition, and break facilities
 - Added Practice Information tab with software, equipment, and clearinghouse management
 - Added Staffing Settings tab with verification automation options
