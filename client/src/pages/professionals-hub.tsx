@@ -102,7 +102,7 @@ function formatCurrency(amount: string | number | null | undefined): string {
 
 function MyShiftsView({ professionalId }: { professionalId: string }) {
   const { data: shifts, isLoading } = useQuery<StaffShift[]>({
-    queryKey: ["/api/professionals", professionalId, "shifts"],
+    queryKey: [`/api/professionals/${professionalId}/shifts`],
   });
 
   const today = new Date().toISOString().split("T")[0];
@@ -235,7 +235,7 @@ function MyShiftsView({ professionalId }: { professionalId: string }) {
 
 function MyEarningsView({ professionalId }: { professionalId: string }) {
   const { data: transactions, isLoading } = useQuery<ShiftTransactionWithDetails[]>({
-    queryKey: ["/api/professionals", professionalId, "transactions"],
+    queryKey: [`/api/professionals/${professionalId}/transactions`],
   });
 
   const totalEarnings = transactions?.reduce((sum, tx) => sum + parseFloat(tx.regularPay || "0"), 0) || 0;
@@ -356,11 +356,29 @@ function MyEarningsView({ professionalId }: { professionalId: string }) {
 function ProfessionalPortalView() {
   const [activeTab, setActiveTab] = useState("shifts");
   
-  const { data: professionals } = useQuery<ProfessionalWithBadges[]>({
+  const { data: professionals, isLoading } = useQuery<ProfessionalWithBadges[]>({
     queryKey: ["/api/professionals"],
   });
 
+  // In a real application, this would be determined by the authenticated user's profile
+  // For demo purposes, we use the first professional in the list
   const currentProfessional = professionals?.[0];
+
+  if (isLoading) {
+    return (
+      <div className="container max-w-5xl py-6 space-y-6">
+        <div className="flex items-start gap-4">
+          <Skeleton className="h-16 w-16 rounded-full" />
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-4 w-32" />
+          </div>
+        </div>
+        <Skeleton className="h-10 w-80" />
+        <Skeleton className="h-64" />
+      </div>
+    );
+  }
 
   if (!currentProfessional) {
     return (
