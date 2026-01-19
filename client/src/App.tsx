@@ -17,6 +17,7 @@ import Appointments from "@/pages/appointments";
 import Carriers from "@/pages/carriers";
 import Settings from "@/pages/settings";
 import Staffing from "@/pages/staffing";
+import Services from "@/pages/services";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -31,6 +32,7 @@ function Router() {
       <Route path="/carriers" component={Carriers} />
       <Route path="/settings" component={Settings} />
       <Route path="/staffing" component={Staffing} />
+      <Route path="/services" component={Services} />
       <Route component={NotFound} />
     </Switch>
   );

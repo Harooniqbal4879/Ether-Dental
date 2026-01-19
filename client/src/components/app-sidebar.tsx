@@ -10,6 +10,7 @@ import {
   ChevronDown,
   Check,
   UserCheck,
+  Sparkles,
 } from "lucide-react";
 import {
   Sidebar,
@@ -63,6 +64,12 @@ const allNavItems = [
     url: "/staffing",
     icon: UserCheck,
     personas: ["system_admin", "admin", "front_desk"],
+  },
+  {
+    title: "Services",
+    url: "/services",
+    icon: Sparkles,
+    personas: ["system_admin", "admin", "billing_manager"],
   },
 ];
 
