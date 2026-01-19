@@ -58,7 +58,7 @@ export default function Dashboard() {
         description="Your dental practice management hub - track verifications, manage patients, and streamline operations"
         actions={
           <Button asChild data-testid="button-view-all-verifications">
-            <Link href="/verifications">
+            <Link href="/patients?tab=verifications">
               View All Verifications
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
@@ -85,7 +85,7 @@ export default function Dashboard() {
                 className="cursor-pointer hover-elevate"
               />
             </Link>
-            <Link href="/verifications">
+            <Link href="/patients?tab=verifications">
               <StatCard
                 title="Pending Verifications"
                 value={stats?.pendingVerifications ?? 0}
@@ -98,7 +98,7 @@ export default function Dashboard() {
                 }`}
               />
             </Link>
-            <Link href="/verifications">
+            <Link href="/patients?tab=verifications">
               <StatCard
                 title="Completed Today"
                 value={stats?.completedToday ?? 0}
@@ -107,7 +107,7 @@ export default function Dashboard() {
                 className="cursor-pointer hover-elevate"
               />
             </Link>
-            <Link href="/appointments">
+            <Link href="/patients?tab=appointments">
               <StatCard
                 title="Upcoming Appointments"
                 value={stats?.upcomingAppointments ?? 0}
@@ -183,7 +183,7 @@ export default function Dashboard() {
               Recent Verifications
             </CardTitle>
             <Button variant="ghost" size="sm" asChild>
-              <Link href="/verifications" data-testid="link-see-all-verifications">
+              <Link href="/patients?tab=verifications" data-testid="link-see-all-verifications">
                 See all
                 <ArrowRight className="ml-1 h-3.5 w-3.5" />
               </Link>

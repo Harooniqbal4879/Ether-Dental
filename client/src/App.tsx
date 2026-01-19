@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -12,8 +12,6 @@ import Dashboard from "@/pages/dashboard";
 import Patients from "@/pages/patients";
 import PatientDetail from "@/pages/patient-detail";
 import PatientForm from "@/pages/patient-form";
-import Verifications from "@/pages/verifications";
-import Appointments from "@/pages/appointments";
 import Carriers from "@/pages/carriers";
 import Settings from "@/pages/settings";
 import Staffing from "@/pages/staffing";
@@ -29,8 +27,12 @@ function MainRouter() {
       <Route path="/patients" component={Patients} />
       <Route path="/patients/new" component={PatientForm} />
       <Route path="/patients/:id" component={PatientDetail} />
-      <Route path="/verifications" component={Verifications} />
-      <Route path="/appointments" component={Appointments} />
+      <Route path="/verifications">
+        <Redirect to="/patients?tab=verifications" />
+      </Route>
+      <Route path="/appointments">
+        <Redirect to="/patients?tab=appointments" />
+      </Route>
       <Route path="/carriers" component={Carriers} />
       <Route path="/settings" component={Settings} />
       <Route path="/staffing" component={Staffing} />

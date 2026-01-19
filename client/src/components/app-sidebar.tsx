@@ -2,8 +2,6 @@ import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
   Users,
-  ClipboardCheck,
-  Calendar,
   Settings,
   Shield,
   ChevronDown,
@@ -45,19 +43,7 @@ const allNavItems = [
     title: "Patients",
     url: "/patients",
     icon: Users,
-    personas: ["system_admin", "admin", "front_desk", "treatment_coordinator"],
-  },
-  {
-    title: "Verifications",
-    url: "/verifications",
-    icon: ClipboardCheck,
-    personas: ["system_admin", "admin", "front_desk", "billing_manager"],
-  },
-  {
-    title: "Appointments",
-    url: "/appointments",
-    icon: Calendar,
-    personas: ["system_admin", "admin", "front_desk", "treatment_coordinator"],
+    personas: ["system_admin", "admin", "front_desk", "treatment_coordinator", "billing_manager"],
   },
   {
     title: "Staffing",
