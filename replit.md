@@ -72,9 +72,10 @@ The sidebar navigation is organized as follows:
 4. **Verifications** - Tracks verification status (pending, in_progress, completed, failed)
 5. **Benefits** - Detailed coverage information (maximums, deductibles, percentages)
 6. **Appointments** - Scheduled patient appointments
-7. **Staff Shifts** - Shift postings with role, date, times, and pricing configuration
+7. **Staff Shifts** - Shift postings with role, date, times, pricing configuration, and assigned professional
 8. **Professionals** - Dental professional profiles with credentials, specialties, education, experience
 9. **Professional Badges** - Achievement recognition (perfect_attendance, shifts_completed, timeliness, knowledge, teamwork) with bronze/silver/gold levels
+10. **Shift Transactions** - Payment records for completed shifts with detailed breakdown
 
 ### API Endpoints
 
@@ -90,7 +91,14 @@ The sidebar navigation is organized as follows:
 - `GET /api/verifications/recent` - Recent verifications for dashboard
 - `GET /api/appointments` - Upcoming appointments
 - `GET /api/shifts?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD` - Get shifts in date range
+- `GET /api/shifts/:id` - Get single shift details
+- `PATCH /api/shifts/:id` - Update shift
 - `POST /api/shifts` - Create new shifts (accepts dates array for multi-date posting)
+- `POST /api/shifts/:id/complete` - Complete a shift and create payment transaction
+- `GET /api/shifts/:id/transaction` - Get transaction for a shift
+- `GET /api/shift-transactions` - List all shift transactions
+- `GET /api/shift-transactions/:id` - Get transaction details
+- `POST /api/shift-transactions/:id/charge` - Charge a pending transaction
 - `GET /api/professionals` - List all professionals with badges
 - `GET /api/professionals/:id` - Get professional details with badges
 - `POST /api/professionals` - Create new professional
@@ -167,6 +175,14 @@ The Add Shift page (`/staffing/add-shift`) allows practice managers to create ne
 - Post shifts button with Terms of Service and Privacy Policy links
 
 ### Recent Changes
+- Added shift payment transaction system with detailed payment breakdown
+- Shift completion creates transactions with: regular pay, service fee (22.5%), convenience fee (3.5%), adjustments, counter cover discounts
+- Transaction status workflow: pending → charged
+- Clicking shifts on calendar opens detail dialog showing shift info and transaction details for completed shifts
+- Added `shift_transactions` database table for immutable payment records
+- Extended `staff_shifts` with assignedProfessionalId field
+- Renamed "Staffing" to "Staffing Requests" throughout application
+- Added specialty requirements to shift creation
 - Consolidated Verifications and Appointments into Patients page as tabs with URL-based navigation (/patients?tab=verifications, /patients?tab=appointments)
 - Added Insurance Carriers management as 5th tab in Settings page, removed from standalone navigation
 - Rebranded application from "DentalVerify" to "EtherAI - Dental Practice Management System" throughout UI
