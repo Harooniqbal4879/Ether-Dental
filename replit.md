@@ -104,6 +104,8 @@ The sidebar navigation is organized as follows:
 - `POST /api/professionals` - Create new professional
 - `PUT /api/professionals/:id` - Update professional
 - `POST /api/professionals/:id/badges` - Add badge to professional
+- `GET /api/professionals/:id/shifts` - Get shifts assigned to a professional
+- `GET /api/professionals/:id/transactions` - Get payment transactions for a professional
 
 ## Services & Billing Model
 
@@ -174,7 +176,20 @@ The Add Shift page (`/staffing/add-shift`) allows practice managers to create ne
   - Hourly total
 - Post shifts button with Terms of Service and Privacy Policy links
 
+### Professional Portal
+
+When viewing as a Professional persona, the Professionals Hub displays a personalized portal with:
+- Welcome message with the professional's name and avatar
+- **My Shifts tab** - View upcoming and completed shifts with role badges, times, and hourly rates
+- **My Earnings tab** - View payment history and earnings summary with stats cards:
+  - Total Earnings
+  - Pending Payments
+  - Shifts Completed
+- Payment transaction details showing hours worked, hourly rate, and fees
+
 ### Recent Changes
+- Added Professional Portal with My Shifts and My Earnings views for professionals to track their work and payments
+- Added API endpoints for professional-specific data: GET /api/professionals/:id/shifts and /api/professionals/:id/transactions
 - Added shift payment transaction system with detailed payment breakdown
 - Shift completion creates transactions with: regular pay, service fee (22.5%), convenience fee (3.5%), adjustments, counter cover discounts
 - Transaction status workflow: pending → charged
