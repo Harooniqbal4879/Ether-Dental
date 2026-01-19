@@ -107,6 +107,11 @@ The Settings page follows the Teero app design pattern with 4 tabs:
 4. **Billing** - Subscription management, payment methods, billing history
 
 ### Recent Changes
+- Expanded Staffing feature from hygienist-only to multi-role support
+- Added role filter dropdown with 6 staff roles: Dentist, Hygienist, Dental Assistant, Office Coordinator, Front Desk, Billing Staff
+- Roles grouped into Clinical and Administrative categories with color-coded badges
+- Renamed "Hygienist Staffing" to "Staffing" and "Hygienists" tab to "Team"
+- Dynamic search placeholders and empty states based on selected role filter
 - Settings page redesigned with 4-tab structure based on Teero app design
 - Added Office Profile tab with photos, team composition, and break facilities
 - Added Practice Information tab with software, equipment, and clearinghouse management
