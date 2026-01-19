@@ -66,6 +66,7 @@ import {
   X,
   Calendar,
   UserCheck,
+  Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ClearinghouseConfig, InsertClearinghouseConfig } from "@shared/schema";
@@ -1748,85 +1749,93 @@ function StaffingSettingsTab() {
 }
 
 function BillingTab() {
+  const [billingEmail, setBillingEmail] = useState("billing@yourpractice.com");
+  const [hasPaymentMethod, setHasPaymentMethod] = useState(false);
+
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted">
-              <CreditCard className="h-5 w-5 text-muted-foreground" />
-            </div>
-            <div>
-              <CardTitle className="text-base">Subscription</CardTitle>
-              <CardDescription>
-                Manage your plan and billing
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-lg border p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h4 className="font-medium">Professional Plan</h4>
-                <p className="text-sm text-muted-foreground">$199/month - billed monthly</p>
-              </div>
-              <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-                Active
-              </Badge>
-            </div>
-            <Separator className="my-4" />
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Next billing date</span>
-                <span>February 1, 2026</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Verifications this month</span>
-                <span>127 / unlimited</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Team members</span>
-                <span>5 / 10</span>
-              </div>
-            </div>
-            <div className="mt-4 flex gap-2">
-              <Button variant="outline" size="sm" data-testid="button-change-plan">
-                Change Plan
-              </Button>
-              <Button variant="outline" size="sm" data-testid="button-view-invoices">
-                View Invoices
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+    <div className="space-y-8">
+      {/* Billing Notifications */}
+      <div className="space-y-4">
+        <div>
+          <h3 className="text-lg font-semibold" data-testid="text-billing-notifications-title">Billing notifications</h3>
+          <p className="text-sm text-muted-foreground">
+            Choose who gets email notifications about invoices and payments.
+          </p>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="billing-email">Contact email</Label>
+          <Input
+            id="billing-email"
+            type="email"
+            value={billingEmail}
+            onChange={(e) => setBillingEmail(e.target.value)}
+            placeholder="billing@yourpractice.com"
+            className="max-w-md"
+            data-testid="input-billing-email"
+          />
+        </div>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Payment Method</CardTitle>
-          <CardDescription>
-            Manage your payment details
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between rounded-lg border p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted">
-                <CreditCard className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="font-medium">Visa ending in 4242</p>
-                <p className="text-sm text-muted-foreground">Expires 12/2027</p>
-              </div>
-            </div>
-            <Button variant="outline" size="sm" data-testid="button-update-payment">
-              Update
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <Separator />
 
+      {/* Select Payment Method */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <h3 className="text-lg font-semibold" data-testid="text-payment-method-title">Select payment method</h3>
+          {!hasPaymentMethod && (
+            <Badge variant="destructive" className="text-xs" data-testid="badge-payment-missing">
+              MISSING
+            </Badge>
+          )}
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Choose your preferred payment method. We charge after the shift based on actual hours worked, using Stripe for secure transactions.
+        </p>
+        
+        <Button 
+          variant="default" 
+          className="bg-foreground text-background hover:bg-foreground/90"
+          data-testid="button-add-payment-method"
+        >
+          Add payment method
+        </Button>
+
+        {!hasPaymentMethod && (
+          <div className="rounded-md bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 p-4">
+            <p className="text-sm text-red-700 dark:text-red-400" data-testid="text-payment-warning">
+              A payment method is required before your first shift begins. All payments are securely collected via Stripe after the shift is completed.
+            </p>
+          </div>
+        )}
+      </div>
+
+      <Separator />
+
+      {/* Invoices & Payments */}
+      <div className="space-y-4">
+        <div>
+          <h3 className="text-lg font-semibold" data-testid="text-invoices-title">Invoices & payments</h3>
+          <p className="text-sm text-muted-foreground">
+            History of your billing transactions and payments.
+          </p>
+        </div>
+        
+        <div className="rounded-lg bg-muted/50 p-8 flex flex-col items-center justify-center min-h-[200px]">
+          <div className="mb-4">
+            <Search className="h-16 w-16 text-muted-foreground/50" />
+          </div>
+          <h4 className="text-lg font-medium text-muted-foreground" data-testid="text-no-invoices">
+            No invoices & payments yet.
+          </h4>
+          <p className="text-sm text-muted-foreground text-center mt-1">
+            Once you book shifts or subscribe to services, you'll see all the details here
+          </p>
+        </div>
+      </div>
+
+      <Separator />
+
+      {/* Legacy Subscription Card - kept for reference */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Billing History</CardTitle>
