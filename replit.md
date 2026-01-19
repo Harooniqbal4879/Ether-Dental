@@ -70,6 +70,21 @@ This platform enables dental practices to:
 - `GET /api/verifications/recent` - Recent verifications for dashboard
 - `GET /api/appointments` - Upcoming appointments
 
+## Services & Billing Model
+
+The platform offers a hybrid service model:
+
+### Self-Service (Free/Included)
+- **Insurance Verification** - Practice staff handles eligibility checks and benefits breakdown directly in the platform
+
+### Remote Services (Subscription)
+- **Insurance Billing** - Daily claims submission, payment posting, appeals and denials management
+  - Pricing: $1,199/mo (under $40k) → 2.25%* (above $150k)
+- **Patient Billing** - Electronic statements, follow-up letters, collection calls
+  - Pricing: $999/mo (under $100k) → 0.3%* (above $500k)
+
+The Services page (`/services`) displays all available services with pricing tiers and subscription management.
+
 ## Persona System
 
 The application includes role-based access control with a persona switcher in the sidebar:
@@ -107,6 +122,10 @@ The Settings page follows the Teero app design pattern with 4 tabs:
 4. **Billing** - Subscription management, payment methods, billing history
 
 ### Recent Changes
+- Added Services page with hybrid billing model (self-service + remote services)
+- Three service offerings: Insurance Verification, Insurance Billing, Patient Billing
+- Pricing tiers based on production/collections volume
+- Subscription management UI with "How It Works" explanations
 - Expanded Staffing feature from hygienist-only to multi-role support
 - Added role filter dropdown with 6 staff roles: Dentist, Hygienist, Dental Assistant, Office Coordinator, Front Desk, Billing Staff
 - Roles grouped into Clinical and Administrative categories with color-coded badges
