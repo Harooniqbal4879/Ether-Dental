@@ -55,6 +55,7 @@ This platform enables dental practices to:
 4. **Verifications** - Tracks verification status (pending, in_progress, completed, failed)
 5. **Benefits** - Detailed coverage information (maximums, deductibles, percentages)
 6. **Appointments** - Scheduled patient appointments
+7. **Staff Shifts** - Shift postings with role, date, times, and pricing configuration
 
 ### API Endpoints
 
@@ -69,6 +70,8 @@ This platform enables dental practices to:
 - `GET /api/verifications` - List all verifications
 - `GET /api/verifications/recent` - Recent verifications for dashboard
 - `GET /api/appointments` - Upcoming appointments
+- `GET /api/shifts?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD` - Get shifts in date range
+- `POST /api/shifts` - Create new shifts (accepts dates array for multi-date posting)
 
 ## Services & Billing Model
 
@@ -138,6 +141,11 @@ The Add Shift page (`/staffing/add-shift`) allows practice managers to create ne
 - Post shifts button with Terms of Service and Privacy Policy links
 
 ### Recent Changes
+- Connected Add Shift form to backend API with database persistence
+- Shifts now display on the staffing calendar with role-colored badges and arrival times
+- Added `staff_shifts` database table for storing shift postings
+- Added GET/POST `/api/shifts` endpoints for shift management
+- Added loading and error states to the staffing calendar
 - Added Add Shift page (`/staffing/add-shift`) for creating new shift postings with multi-date selection, time configuration, and dual pricing modes (Fixed/Smart)
 - Added Patient Portal (`/portal`) for patients to view balances and make credit card payments via Stripe Checkout
 - Integrated Stripe payment processing with proper webhook handling
