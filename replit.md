@@ -61,6 +61,7 @@ The sidebar navigation is organized as follows:
 - **Staffing** - Multi-role shift management
 - **Services** - Subscription service offerings
 - **Patient Portal** - Patient payment interface (also accessible via Patient persona)
+- **Professionals Hub** - Dental professional profiles and credentials (accessible by office staff and professionals)
 - **Settings** - Practice configuration (5 tabs including Carriers)
 
 ### Data Models
@@ -72,6 +73,8 @@ The sidebar navigation is organized as follows:
 5. **Benefits** - Detailed coverage information (maximums, deductibles, percentages)
 6. **Appointments** - Scheduled patient appointments
 7. **Staff Shifts** - Shift postings with role, date, times, and pricing configuration
+8. **Professionals** - Dental professional profiles with credentials, specialties, education, experience
+9. **Professional Badges** - Achievement recognition (perfect_attendance, shifts_completed, timeliness, knowledge, teamwork) with bronze/silver/gold levels
 
 ### API Endpoints
 
@@ -88,6 +91,11 @@ The sidebar navigation is organized as follows:
 - `GET /api/appointments` - Upcoming appointments
 - `GET /api/shifts?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD` - Get shifts in date range
 - `POST /api/shifts` - Create new shifts (accepts dates array for multi-date posting)
+- `GET /api/professionals` - List all professionals with badges
+- `GET /api/professionals/:id` - Get professional details with badges
+- `POST /api/professionals` - Create new professional
+- `PUT /api/professionals/:id` - Update professional
+- `POST /api/professionals/:id/badges` - Add badge to professional
 
 ## Services & Billing Model
 
@@ -113,6 +121,8 @@ The application includes role-based access control with a persona switcher in th
 3. **Front Desk Staff** - Patient management, verifications, appointments
 4. **Treatment Coordinator** - Benefits, treatment planning, appointments
 5. **Billing Manager** - Verification data, reports, carrier management
+6. **Patient** - View bills & make payments via Patient Portal
+7. **Professional** - Manage profile & view shifts via Professionals Hub
 
 The persona context is managed in `client/src/lib/persona-context.tsx` and navigation filtering is handled in `client/src/components/app-sidebar.tsx`.
 
