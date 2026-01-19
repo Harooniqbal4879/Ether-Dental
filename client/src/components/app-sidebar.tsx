@@ -9,6 +9,7 @@ import {
   UserCheck,
   Sparkles,
   CreditCard,
+  Contact,
 } from "lucide-react";
 import {
   Sidebar,
@@ -62,6 +63,12 @@ const allNavItems = [
     url: "/portal",
     icon: CreditCard,
     personas: ["patient"],
+  },
+  {
+    title: "Professionals Hub",
+    url: "/professionals",
+    icon: Contact,
+    personas: ["system_admin", "admin", "front_desk", "professional"],
   },
 ];
 

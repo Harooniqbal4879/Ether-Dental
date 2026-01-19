@@ -18,6 +18,7 @@ import Staffing from "@/pages/staffing";
 import AddShift from "@/pages/add-shift";
 import Services from "@/pages/services";
 import PatientPortal from "@/pages/patient-portal";
+import ProfessionalsHub from "@/pages/professionals-hub";
 import NotFound from "@/pages/not-found";
 
 function MainRouter() {
@@ -39,6 +40,8 @@ function MainRouter() {
       <Route path="/staffing/add-shift" component={AddShift} />
       <Route path="/services" component={Services} />
       <Route path="/portal" component={PatientPortal} />
+      <Route path="/professionals" component={ProfessionalsHub} />
+      <Route path="/professionals/:id" component={ProfessionalsHub} />
       <Route component={NotFound} />
     </Switch>
   );

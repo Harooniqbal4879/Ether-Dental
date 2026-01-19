@@ -6,7 +6,8 @@ export type Persona =
   | "front_desk"
   | "treatment_coordinator"
   | "billing_manager"
-  | "patient";
+  | "patient"
+  | "professional";
 
 export interface PersonaInfo {
   id: Persona;
@@ -51,6 +52,12 @@ export const personas: PersonaInfo[] = [
     title: "Patient",
     description: "View bills & make payments",
     initials: "PT",
+  },
+  {
+    id: "professional",
+    title: "Professional",
+    description: "Manage profile & view shifts",
+    initials: "PR",
   },
 ];
 

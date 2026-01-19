@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertPatientSchema, insertInsuranceCarrierSchema, insertInsurancePolicySchema, insertClearinghouseConfigSchema, insertStaffShiftSchema } from "@shared/schema";
+import { insertPatientSchema, insertInsuranceCarrierSchema, insertInsurancePolicySchema, insertClearinghouseConfigSchema, insertStaffShiftSchema, insertProfessionalSchema, insertProfessionalBadgeSchema, insertRoleSpecialtySchema } from "@shared/schema";
 import { z } from "zod";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 
@@ -548,6 +548,138 @@ export async function registerRoutes(
       }
       console.error("Error creating shifts:", error);
       res.status(500).json({ error: "Failed to create shifts" });
+    }
+  });
+
+  // Professionals
+  app.get("/api/professionals", async (req, res) => {
+    try {
+      const { role, specialty } = req.query;
+      const filters: { role?: string; specialty?: string } = {};
+      if (typeof role === "string") filters.role = role;
+      if (typeof specialty === "string") filters.specialty = specialty;
+      
+      const professionals = await storage.getProfessionals(filters);
+      res.json(professionals);
+    } catch (error) {
+      console.error("Error fetching professionals:", error);
+      res.status(500).json({ error: "Failed to fetch professionals" });
+    }
+  });
+
+  app.get("/api/professionals/:id", async (req, res) => {
+    try {
+      const professional = await storage.getProfessional(req.params.id);
+      if (!professional) {
+        return res.status(404).json({ error: "Professional not found" });
+      }
+      res.json(professional);
+    } catch (error) {
+      console.error("Error fetching professional:", error);
+      res.status(500).json({ error: "Failed to fetch professional" });
+    }
+  });
+
+  app.post("/api/professionals", async (req, res) => {
+    try {
+      const parsed = insertProfessionalSchema.parse(req.body);
+      const professional = await storage.createProfessional(parsed);
+      res.status(201).json(professional);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      console.error("Error creating professional:", error);
+      res.status(500).json({ error: "Failed to create professional" });
+    }
+  });
+
+  app.put("/api/professionals/:id", async (req, res) => {
+    try {
+      const professional = await storage.updateProfessional(req.params.id, req.body);
+      if (!professional) {
+        return res.status(404).json({ error: "Professional not found" });
+      }
+      res.json(professional);
+    } catch (error) {
+      console.error("Error updating professional:", error);
+      res.status(500).json({ error: "Failed to update professional" });
+    }
+  });
+
+  app.delete("/api/professionals/:id", async (req, res) => {
+    try {
+      await storage.deleteProfessional(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting professional:", error);
+      res.status(500).json({ error: "Failed to delete professional" });
+    }
+  });
+
+  // Professional Badges
+  app.get("/api/professionals/:id/badges", async (req, res) => {
+    try {
+      const badges = await storage.getBadgesForProfessional(req.params.id);
+      res.json(badges);
+    } catch (error) {
+      console.error("Error fetching badges:", error);
+      res.status(500).json({ error: "Failed to fetch badges" });
+    }
+  });
+
+  app.post("/api/professionals/:id/badges", async (req, res) => {
+    try {
+      const parsed = insertProfessionalBadgeSchema.parse({
+        ...req.body,
+        professionalId: req.params.id,
+      });
+      const badge = await storage.createProfessionalBadge(parsed);
+      res.status(201).json(badge);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      console.error("Error creating badge:", error);
+      res.status(500).json({ error: "Failed to create badge" });
+    }
+  });
+
+  // Role Specialties
+  app.get("/api/role-specialties", async (req, res) => {
+    try {
+      const { role } = req.query;
+      const roleSpecialties = await storage.getRoleSpecialties(
+        typeof role === "string" ? role : undefined
+      );
+      res.json(roleSpecialties);
+    } catch (error) {
+      console.error("Error fetching role specialties:", error);
+      res.status(500).json({ error: "Failed to fetch role specialties" });
+    }
+  });
+
+  app.post("/api/role-specialties", async (req, res) => {
+    try {
+      const parsed = insertRoleSpecialtySchema.parse(req.body);
+      const roleSpecialty = await storage.createRoleSpecialty(parsed);
+      res.status(201).json(roleSpecialty);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      console.error("Error creating role specialty:", error);
+      res.status(500).json({ error: "Failed to create role specialty" });
+    }
+  });
+
+  app.delete("/api/role-specialties/:id", async (req, res) => {
+    try {
+      await storage.deleteRoleSpecialty(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting role specialty:", error);
+      res.status(500).json({ error: "Failed to delete role specialty" });
     }
   });
 
