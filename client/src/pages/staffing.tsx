@@ -7,6 +7,15 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/page-header";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -27,9 +36,14 @@ import {
   UserCog,
   Briefcase,
   Clock,
+  DollarSign,
+  User,
+  CheckCircle2,
+  XCircle,
+  Receipt,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { StaffShift } from "@shared/schema";
+import type { StaffShift, ShiftTransactionWithDetails, ProfessionalWithBadges } from "@shared/schema";
 
 const STAFF_ROLES = {
   all: { label: "All Roles", category: "all" },
@@ -68,6 +82,254 @@ function getRoleBadgeColor(role: string): string {
 const DAYS_OF_WEEK = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const DAYS_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
+function getStatusBadge(status: string) {
+  switch (status) {
+    case "open":
+      return <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">Open</Badge>;
+    case "filled":
+      return <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300">Filled</Badge>;
+    case "completed":
+      return <Badge variant="outline" className="bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">Completed</Badge>;
+    case "cancelled":
+      return <Badge variant="outline" className="bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300">Cancelled</Badge>;
+    default:
+      return <Badge variant="outline">{status}</Badge>;
+  }
+}
+
+function formatCurrency(value: string | number | null | undefined): string {
+  if (value === null || value === undefined) return "$0.00";
+  const num = typeof value === "string" ? parseFloat(value) : value;
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(num);
+}
+
+function ShiftDetailDialog({ 
+  shift, 
+  open, 
+  onOpenChange 
+}: { 
+  shift: StaffShift | null; 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { data: transaction, isLoading: txLoading } = useQuery<ShiftTransactionWithDetails>({
+    queryKey: [`/api/shifts/${shift?.id}/transaction`],
+    enabled: !!shift?.id && shift?.status === "completed",
+  });
+
+  const { data: professional } = useQuery<ProfessionalWithBadges>({
+    queryKey: [`/api/professionals/${shift?.assignedProfessionalId}`],
+    enabled: !!shift?.assignedProfessionalId,
+  });
+
+  if (!shift) return null;
+
+  const formattedDate = new Date(shift.date + "T00:00:00").toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg" data-testid="dialog-shift-detail">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <CalendarIcon className="h-5 w-5" />
+            Shift Details
+          </DialogTitle>
+          <DialogDescription>{formattedDate}</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Badge className={cn("text-xs", getRoleBadgeColor(shift.role))} data-testid="badge-shift-role">
+                {shift.role}
+              </Badge>
+              {getStatusBadge(shift.status)}
+            </div>
+          </div>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Schedule</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Arrival Time</span>
+                <span data-testid="text-arrival-time">{shift.arrivalTime}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">First Patient</span>
+                <span data-testid="text-first-patient-time">{shift.firstPatientTime}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">End Time</span>
+                <span data-testid="text-end-time">{shift.endTime}</span>
+              </div>
+              {shift.breakDuration && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Break Duration</span>
+                  <span data-testid="text-break-duration">{shift.breakDuration} min</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {shift.specialties && shift.specialties.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Required Specialties</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-wrap gap-1">
+                {shift.specialties.map((spec, i) => (
+                  <Badge key={i} variant="secondary" className="text-xs" data-testid={`badge-specialty-${i}`}>
+                    {spec}
+                  </Badge>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Pricing</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Mode</span>
+                <span className="capitalize" data-testid="text-pricing-mode">{shift.pricingMode}</span>
+              </div>
+              {shift.pricingMode === "fixed" && shift.fixedHourlyRate && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Hourly Rate</span>
+                  <span data-testid="text-fixed-rate">{formatCurrency(shift.fixedHourlyRate)}/hr</span>
+                </div>
+              )}
+              {shift.pricingMode === "smart" && (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Min Rate</span>
+                    <span data-testid="text-min-rate">{formatCurrency(shift.minHourlyRate)}/hr</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Max Rate</span>
+                    <span data-testid="text-max-rate">{formatCurrency(shift.maxHourlyRate)}/hr</span>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {professional && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Assigned Professional
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Name</span>
+                  <span data-testid="text-professional-name">{professional.firstName} {professional.lastName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Role</span>
+                  <span data-testid="text-professional-role">{professional.role}</span>
+                </div>
+                {professional.rating && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Rating</span>
+                    <span data-testid="text-professional-rating">{professional.rating}</span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {shift.status === "completed" && (
+            <Card className="border-emerald-200 dark:border-emerald-800">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Receipt className="h-4 w-4" />
+                  Transaction Details
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                {txLoading ? (
+                  <div className="animate-pulse space-y-2">
+                    <div className="h-4 bg-muted rounded w-full" />
+                    <div className="h-4 bg-muted rounded w-3/4" />
+                  </div>
+                ) : transaction ? (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Hours Worked</span>
+                      <span data-testid="text-hours-worked">{transaction.hoursWorked} hrs</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Hourly Rate</span>
+                      <span data-testid="text-tx-hourly-rate">{formatCurrency(transaction.hourlyRate)}/hr</span>
+                    </div>
+                    <Separator />
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Regular Pay</span>
+                      <span data-testid="text-regular-pay">{formatCurrency(transaction.regularPay)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Service Fee (22.5%)</span>
+                      <span data-testid="text-service-fee">{formatCurrency(transaction.serviceFee)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Convenience Fee (3.5%)</span>
+                      <span data-testid="text-convenience-fee">{formatCurrency(transaction.convenienceFee)}</span>
+                    </div>
+                    {transaction.adjustmentMade && transaction.adjustmentAmount && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Adjustment</span>
+                        <span data-testid="text-adjustment">{formatCurrency(transaction.adjustmentAmount)}</span>
+                      </div>
+                    )}
+                    {parseFloat(transaction.counterCoverDiscount || "0") > 0 && (
+                      <div className="flex justify-between text-green-600">
+                        <span>Counter Cover Discount</span>
+                        <span data-testid="text-discount">-{formatCurrency(transaction.counterCoverDiscount)}</span>
+                      </div>
+                    )}
+                    <Separator />
+                    <div className="flex justify-between font-semibold">
+                      <span>Total</span>
+                      <span data-testid="text-total-pay">{formatCurrency(transaction.totalPay)}</span>
+                    </div>
+                    <div className="flex justify-between pt-2">
+                      <span className="text-muted-foreground">Status</span>
+                      <Badge 
+                        variant={transaction.status === "charged" ? "default" : "secondary"}
+                        data-testid="badge-tx-status"
+                      >
+                        {transaction.status === "charged" ? (
+                          <><CheckCircle2 className="h-3 w-3 mr-1" /> Charged</>
+                        ) : (
+                          <><Clock className="h-3 w-3 mr-1" /> Pending</>
+                        )}
+                      </Badge>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-muted-foreground">No transaction found for this shift.</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function getMonthData(year: number, month: number) {
   const firstDay = new Date(year, month, 1);
   const lastDay = new Date(year, month + 1, 0);
@@ -103,6 +365,8 @@ function CalendarView() {
   const today = new Date();
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
+  const [selectedShift, setSelectedShift] = useState<StaffShift | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
   
   const monthName = new Date(currentYear, currentMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   const days = getMonthData(currentYear, currentMonth);
@@ -113,6 +377,11 @@ function CalendarView() {
   const { data: shifts = [], isLoading, isError } = useQuery<StaffShift[]>({
     queryKey: [`/api/shifts?startDate=${startDate}&endDate=${endDate}`],
   });
+
+  const handleShiftClick = (shift: StaffShift) => {
+    setSelectedShift(shift);
+    setDialogOpen(true);
+  };
   
   const shiftsByDate = useMemo(() => {
     const map = new Map<string, StaffShift[]>();
@@ -227,9 +496,14 @@ function CalendarView() {
                     {dayShifts.slice(0, 2).map((shift) => (
                       <div 
                         key={shift.id} 
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => handleShiftClick(shift)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleShiftClick(shift); }}
                         className={cn(
-                          "text-xs px-1.5 py-0.5 rounded",
-                          getRoleBadgeColor(shift.role)
+                          "text-xs px-1.5 py-0.5 rounded w-full text-left cursor-pointer hover-elevate",
+                          getRoleBadgeColor(shift.role),
+                          shift.status === "completed" && "border-l-2 border-emerald-500"
                         )}
                         data-testid={`shift-${shift.id}`}
                       >
@@ -258,6 +532,12 @@ function CalendarView() {
           })}
         </div>
       </div>
+
+      <ShiftDetailDialog 
+        shift={selectedShift} 
+        open={dialogOpen} 
+        onOpenChange={setDialogOpen} 
+      />
     </div>
   );
 }
