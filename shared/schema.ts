@@ -304,9 +304,18 @@ export const staffShifts = pgTable("staff_shifts", {
   minHourlyRate: decimal("min_hourly_rate", { precision: 10, scale: 2 }),
   maxHourlyRate: decimal("max_hourly_rate", { precision: 10, scale: 2 }),
   fixedHourlyRate: decimal("fixed_hourly_rate", { precision: 10, scale: 2 }),
-  status: text("status").notNull().default("open"), // open, filled, cancelled
+  status: text("status").notNull().default("open"), // open, filled, completed, cancelled
+  assignedProfessionalId: varchar("assigned_professional_id").references(() => professionals.id),
+  scheduledBy: text("scheduled_by"), // Name of person who scheduled the shift
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+export const staffShiftsRelations = relations(staffShifts, ({ one }) => ({
+  assignedProfessional: one(professionals, {
+    fields: [staffShifts.assignedProfessionalId],
+    references: [professionals.id],
+  }),
+}));
 
 export const insertStaffShiftSchema = createInsertSchema(staffShifts).omit({
   id: true,
@@ -314,6 +323,55 @@ export const insertStaffShiftSchema = createInsertSchema(staffShifts).omit({
 });
 export type InsertStaffShift = z.infer<typeof insertStaffShiftSchema>;
 export type StaffShift = typeof staffShifts.$inferSelect;
+
+// Shift Transactions - payment records for completed shifts
+export const shiftTransactions = pgTable("shift_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  shiftId: varchar("shift_id").notNull().references(() => staffShifts.id, { onDelete: "cascade" }),
+  professionalId: varchar("professional_id").notNull().references(() => professionals.id),
+  chargeDate: text("charge_date").notNull(), // YYYY-MM-DD
+  hoursWorked: decimal("hours_worked", { precision: 5, scale: 2 }).notNull(),
+  hourlyRate: decimal("hourly_rate", { precision: 10, scale: 2 }).notNull(),
+  mealBreakMinutes: integer("meal_break_minutes").notNull().default(0),
+  adjustmentMade: boolean("adjustment_made").default(false),
+  adjustmentAmount: decimal("adjustment_amount", { precision: 10, scale: 2 }),
+  adjustmentReason: text("adjustment_reason"),
+  regularPay: decimal("regular_pay", { precision: 10, scale: 2 }).notNull(),
+  serviceFeeRate: decimal("service_fee_rate", { precision: 5, scale: 4 }).notNull().default("0.2250"), // 22.5%
+  serviceFee: decimal("service_fee", { precision: 10, scale: 2 }).notNull(),
+  convenienceFeeRate: decimal("convenience_fee_rate", { precision: 5, scale: 4 }).notNull().default("0.0350"), // 3.5%
+  convenienceFee: decimal("convenience_fee", { precision: 10, scale: 2 }).notNull(),
+  counterCoverDiscount: decimal("counter_cover_discount", { precision: 10, scale: 2 }).default("0.00"),
+  totalPay: decimal("total_pay", { precision: 10, scale: 2 }).notNull(),
+  status: text("status").notNull().default("pending"), // pending, charged, failed
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  stripeChargeId: text("stripe_charge_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const shiftTransactionsRelations = relations(shiftTransactions, ({ one }) => ({
+  shift: one(staffShifts, {
+    fields: [shiftTransactions.shiftId],
+    references: [staffShifts.id],
+  }),
+  professional: one(professionals, {
+    fields: [shiftTransactions.professionalId],
+    references: [professionals.id],
+  }),
+}));
+
+export const insertShiftTransactionSchema = createInsertSchema(shiftTransactions).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertShiftTransaction = z.infer<typeof insertShiftTransactionSchema>;
+export type ShiftTransaction = typeof shiftTransactions.$inferSelect;
+
+// Shift transaction with related data
+export type ShiftTransactionWithDetails = ShiftTransaction & {
+  shift: StaffShift;
+  professional: Professional;
+};
 
 // Staff Roles enum for UI
 export const StaffRoles = {

@@ -553,6 +553,173 @@ export async function registerRoutes(
     }
   });
 
+  // Get single shift
+  app.get("/api/shifts/:id", async (req, res) => {
+    try {
+      const shift = await storage.getShift(req.params.id);
+      if (!shift) {
+        return res.status(404).json({ error: "Shift not found" });
+      }
+      res.json(shift);
+    } catch (error) {
+      console.error("Error fetching shift:", error);
+      res.status(500).json({ error: "Failed to fetch shift" });
+    }
+  });
+
+  // Update shift
+  app.patch("/api/shifts/:id", async (req, res) => {
+    try {
+      const shift = await storage.updateShift(req.params.id, req.body);
+      if (!shift) {
+        return res.status(404).json({ error: "Shift not found" });
+      }
+      res.json(shift);
+    } catch (error) {
+      console.error("Error updating shift:", error);
+      res.status(500).json({ error: "Failed to update shift" });
+    }
+  });
+
+  // Shift Transactions
+  app.get("/api/shift-transactions", async (req, res) => {
+    try {
+      const { startDate, endDate, status } = req.query;
+      const filters: { startDate?: string; endDate?: string; status?: string } = {};
+      if (typeof startDate === "string") filters.startDate = startDate;
+      if (typeof endDate === "string") filters.endDate = endDate;
+      if (typeof status === "string") filters.status = status;
+      
+      const transactions = await storage.getShiftTransactions(filters);
+      res.json(transactions);
+    } catch (error) {
+      console.error("Error fetching shift transactions:", error);
+      res.status(500).json({ error: "Failed to fetch shift transactions" });
+    }
+  });
+
+  app.get("/api/shift-transactions/:id", async (req, res) => {
+    try {
+      const transaction = await storage.getShiftTransaction(req.params.id);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transaction not found" });
+      }
+      res.json(transaction);
+    } catch (error) {
+      console.error("Error fetching shift transaction:", error);
+      res.status(500).json({ error: "Failed to fetch shift transaction" });
+    }
+  });
+
+  app.get("/api/shifts/:id/transaction", async (req, res) => {
+    try {
+      const transaction = await storage.getShiftTransactionByShiftId(req.params.id);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transaction not found for this shift" });
+      }
+      res.json(transaction);
+    } catch (error) {
+      console.error("Error fetching shift transaction:", error);
+      res.status(500).json({ error: "Failed to fetch shift transaction" });
+    }
+  });
+
+  // Complete a shift and create transaction
+  const completeShiftSchema = z.object({
+    professionalId: z.string(),
+    hoursWorked: z.coerce.number(),
+    hourlyRate: z.coerce.number(),
+    mealBreakMinutes: z.coerce.number().default(0),
+    adjustmentMade: z.boolean().default(false),
+    adjustmentAmount: z.coerce.number().optional(),
+    adjustmentReason: z.string().optional(),
+    counterCoverDiscount: z.coerce.number().default(0),
+  });
+
+  app.post("/api/shifts/:id/complete", async (req, res) => {
+    try {
+      const parsed = completeShiftSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.errors });
+      }
+
+      const shift = await storage.getShift(req.params.id);
+      if (!shift) {
+        return res.status(404).json({ error: "Shift not found" });
+      }
+
+      const data = parsed.data;
+      
+      // Calculate payment breakdown
+      const regularPay = data.hoursWorked * data.hourlyRate;
+      const serviceFeeRate = 0.225; // 22.5%
+      const convenienceFeeRate = 0.035; // 3.5%
+      const serviceFee = regularPay * serviceFeeRate;
+      const convenienceFee = (regularPay + serviceFee) * convenienceFeeRate;
+      const adjustment = data.adjustmentMade ? (data.adjustmentAmount || 0) : 0;
+      const totalPay = regularPay + serviceFee + convenienceFee + adjustment - data.counterCoverDiscount;
+
+      // Create transaction
+      const transaction = await storage.createShiftTransaction({
+        shiftId: req.params.id,
+        professionalId: data.professionalId,
+        chargeDate: new Date().toISOString().split('T')[0],
+        hoursWorked: data.hoursWorked.toFixed(2),
+        hourlyRate: data.hourlyRate.toFixed(2),
+        mealBreakMinutes: data.mealBreakMinutes,
+        adjustmentMade: data.adjustmentMade,
+        adjustmentAmount: data.adjustmentAmount?.toFixed(2) || null,
+        adjustmentReason: data.adjustmentReason || null,
+        regularPay: regularPay.toFixed(2),
+        serviceFeeRate: serviceFeeRate.toFixed(4),
+        serviceFee: serviceFee.toFixed(2),
+        convenienceFeeRate: convenienceFeeRate.toFixed(4),
+        convenienceFee: convenienceFee.toFixed(2),
+        counterCoverDiscount: data.counterCoverDiscount.toFixed(2),
+        totalPay: totalPay.toFixed(2),
+        status: "pending",
+      });
+
+      // Update shift status to completed
+      await storage.updateShift(req.params.id, {
+        status: "completed",
+        assignedProfessionalId: data.professionalId,
+      });
+
+      res.status(201).json(transaction);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      console.error("Error completing shift:", error);
+      res.status(500).json({ error: "Failed to complete shift" });
+    }
+  });
+
+  // Charge a pending transaction
+  app.post("/api/shift-transactions/:id/charge", async (req, res) => {
+    try {
+      const transaction = await storage.getShiftTransaction(req.params.id);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transaction not found" });
+      }
+
+      if (transaction.status !== "pending") {
+        return res.status(400).json({ error: "Transaction is not pending" });
+      }
+
+      // For now, just mark as charged (Stripe integration can be added later)
+      const updated = await storage.updateShiftTransaction(req.params.id, {
+        status: "charged",
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error charging transaction:", error);
+      res.status(500).json({ error: "Failed to charge transaction" });
+    }
+  });
+
   // Professionals
   app.get("/api/professionals", async (req, res) => {
     try {

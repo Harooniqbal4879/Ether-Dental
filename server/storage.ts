@@ -12,6 +12,7 @@ import {
   professionals,
   professionalBadges,
   roleSpecialties,
+  shiftTransactions,
   type Patient,
   type InsertPatient,
   type InsuranceCarrier,
@@ -41,6 +42,9 @@ import {
   type ProfessionalWithBadges,
   type RoleSpecialty,
   type InsertRoleSpecialty,
+  type ShiftTransaction,
+  type InsertShiftTransaction,
+  type ShiftTransactionWithDetails,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -128,6 +132,15 @@ export interface IStorage {
   getRoleSpecialties(role?: string): Promise<RoleSpecialty[]>;
   createRoleSpecialty(roleSpecialty: InsertRoleSpecialty): Promise<RoleSpecialty>;
   deleteRoleSpecialty(id: string): Promise<boolean>;
+
+  // Shift Transactions
+  getShiftTransactions(filters?: { startDate?: string; endDate?: string; status?: string }): Promise<ShiftTransactionWithDetails[]>;
+  getShiftTransaction(id: string): Promise<ShiftTransactionWithDetails | undefined>;
+  getShiftTransactionByShiftId(shiftId: string): Promise<ShiftTransactionWithDetails | undefined>;
+  createShiftTransaction(transaction: InsertShiftTransaction): Promise<ShiftTransaction>;
+  updateShiftTransaction(id: string, data: Partial<ShiftTransaction>): Promise<ShiftTransaction | undefined>;
+  getShift(id: string): Promise<StaffShift | undefined>;
+  updateShift(id: string, data: Partial<StaffShift>): Promise<StaffShift | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -746,6 +759,86 @@ export class DatabaseStorage implements IStorage {
   async deleteRoleSpecialty(id: string): Promise<boolean> {
     await db.delete(roleSpecialties).where(eq(roleSpecialties.id, id));
     return true;
+  }
+
+  // Shift Transactions
+  async getShiftTransactions(filters?: { startDate?: string; endDate?: string; status?: string }): Promise<ShiftTransactionWithDetails[]> {
+    let query = db.select().from(shiftTransactions);
+    
+    const conditions = [];
+    if (filters?.startDate) {
+      conditions.push(gte(shiftTransactions.chargeDate, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(lte(shiftTransactions.chargeDate, filters.endDate));
+    }
+    if (filters?.status) {
+      conditions.push(eq(shiftTransactions.status, filters.status));
+    }
+    
+    const transactions = conditions.length > 0 
+      ? await db.select().from(shiftTransactions).where(and(...conditions)).orderBy(desc(shiftTransactions.createdAt))
+      : await db.select().from(shiftTransactions).orderBy(desc(shiftTransactions.createdAt));
+    
+    const result: ShiftTransactionWithDetails[] = [];
+    for (const tx of transactions) {
+      const [shift] = await db.select().from(staffShifts).where(eq(staffShifts.id, tx.shiftId));
+      const [professional] = await db.select().from(professionals).where(eq(professionals.id, tx.professionalId));
+      if (shift && professional) {
+        result.push({ ...tx, shift, professional });
+      }
+    }
+    return result;
+  }
+
+  async getShiftTransaction(id: string): Promise<ShiftTransactionWithDetails | undefined> {
+    const [tx] = await db.select().from(shiftTransactions).where(eq(shiftTransactions.id, id));
+    if (!tx) return undefined;
+    
+    const [shift] = await db.select().from(staffShifts).where(eq(staffShifts.id, tx.shiftId));
+    const [professional] = await db.select().from(professionals).where(eq(professionals.id, tx.professionalId));
+    
+    if (!shift || !professional) return undefined;
+    return { ...tx, shift, professional };
+  }
+
+  async getShiftTransactionByShiftId(shiftId: string): Promise<ShiftTransactionWithDetails | undefined> {
+    const [tx] = await db.select().from(shiftTransactions).where(eq(shiftTransactions.shiftId, shiftId));
+    if (!tx) return undefined;
+    
+    const [shift] = await db.select().from(staffShifts).where(eq(staffShifts.id, tx.shiftId));
+    const [professional] = await db.select().from(professionals).where(eq(professionals.id, tx.professionalId));
+    
+    if (!shift || !professional) return undefined;
+    return { ...tx, shift, professional };
+  }
+
+  async createShiftTransaction(transaction: InsertShiftTransaction): Promise<ShiftTransaction> {
+    const [created] = await db.insert(shiftTransactions).values(transaction).returning();
+    return created;
+  }
+
+  async updateShiftTransaction(id: string, data: Partial<ShiftTransaction>): Promise<ShiftTransaction | undefined> {
+    const [updated] = await db
+      .update(shiftTransactions)
+      .set(data)
+      .where(eq(shiftTransactions.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getShift(id: string): Promise<StaffShift | undefined> {
+    const [shift] = await db.select().from(staffShifts).where(eq(staffShifts.id, id));
+    return shift;
+  }
+
+  async updateShift(id: string, data: Partial<StaffShift>): Promise<StaffShift | undefined> {
+    const [updated] = await db
+      .update(staffShifts)
+      .set(data)
+      .where(eq(staffShifts.id, id))
+      .returning();
+    return updated;
   }
 }
 
