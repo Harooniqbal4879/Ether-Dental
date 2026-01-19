@@ -9,6 +9,11 @@ import {
   Clock,
   ArrowRight,
   Calendar,
+  UserCheck,
+  Sparkles,
+  Settings,
+  Plus,
+  CreditCard,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -49,8 +54,8 @@ export default function Dashboard() {
   return (
     <div className="space-y-6 p-6">
       <PageHeader
-        title="Dashboard"
-        description="Overview of your practice's insurance verification status"
+        title="Welcome to EtherAI"
+        description="Your dental practice management hub - track verifications, manage patients, and streamline operations"
         actions={
           <Button asChild data-testid="button-view-all-verifications">
             <Link href="/verifications">
@@ -71,37 +76,104 @@ export default function Dashboard() {
           </>
         ) : (
           <>
-            <StatCard
-              title="Total Patients"
-              value={stats?.totalPatients ?? 0}
-              icon={Users}
-              description="Active in system"
-            />
-            <StatCard
-              title="Pending Verifications"
-              value={stats?.pendingVerifications ?? 0}
-              icon={AlertCircle}
-              description="Need attention"
-              className={
-                (stats?.pendingVerifications ?? 0) > 0
-                  ? "border-amber-200 dark:border-amber-900/50"
-                  : ""
-              }
-            />
-            <StatCard
-              title="Completed Today"
-              value={stats?.completedToday ?? 0}
-              icon={CheckCircle}
-              description="Successful verifications"
-            />
-            <StatCard
-              title="Upcoming Appointments"
-              value={stats?.upcomingAppointments ?? 0}
-              icon={Calendar}
-              description="Next 7 days"
-            />
+            <Link href="/patients">
+              <StatCard
+                title="Total Patients"
+                value={stats?.totalPatients ?? 0}
+                icon={Users}
+                description="Active in system"
+                className="cursor-pointer hover-elevate"
+              />
+            </Link>
+            <Link href="/verifications">
+              <StatCard
+                title="Pending Verifications"
+                value={stats?.pendingVerifications ?? 0}
+                icon={AlertCircle}
+                description="Need attention"
+                className={`cursor-pointer hover-elevate ${
+                  (stats?.pendingVerifications ?? 0) > 0
+                    ? "border-amber-200 dark:border-amber-900/50"
+                    : ""
+                }`}
+              />
+            </Link>
+            <Link href="/verifications">
+              <StatCard
+                title="Completed Today"
+                value={stats?.completedToday ?? 0}
+                icon={CheckCircle}
+                description="Successful verifications"
+                className="cursor-pointer hover-elevate"
+              />
+            </Link>
+            <Link href="/appointments">
+              <StatCard
+                title="Upcoming Appointments"
+                value={stats?.upcomingAppointments ?? 0}
+                icon={Calendar}
+                description="Next 7 days"
+                className="cursor-pointer hover-elevate"
+              />
+            </Link>
           </>
         )}
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Link href="/patients/new">
+          <Card className="hover-elevate cursor-pointer transition-all" data-testid="card-quick-add-patient">
+            <CardContent className="flex items-center gap-4 p-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
+                <Plus className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="font-medium">Add Patient</p>
+                <p className="text-sm text-muted-foreground">Register new patient</p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/staffing">
+          <Card className="hover-elevate cursor-pointer transition-all" data-testid="card-quick-staffing">
+            <CardContent className="flex items-center gap-4 p-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-blue-100 dark:bg-blue-900/30">
+                <UserCheck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <p className="font-medium">Staffing</p>
+                <p className="text-sm text-muted-foreground">Manage shifts & team</p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/services">
+          <Card className="hover-elevate cursor-pointer transition-all" data-testid="card-quick-services">
+            <CardContent className="flex items-center gap-4 p-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-purple-100 dark:bg-purple-900/30">
+                <Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div>
+                <p className="font-medium">Services</p>
+                <p className="text-sm text-muted-foreground">Billing & subscriptions</p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/settings">
+          <Card className="hover-elevate cursor-pointer transition-all" data-testid="card-quick-settings">
+            <CardContent className="flex items-center gap-4 p-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted">
+                <Settings className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="font-medium">Settings</p>
+                <p className="text-sm text-muted-foreground">Office & practice info</p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
