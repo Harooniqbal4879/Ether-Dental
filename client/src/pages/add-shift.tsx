@@ -158,7 +158,10 @@ export default function AddShiftPage() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === 'string' && key.startsWith('/api/shifts');
+      }});
       toast({
         title: "Shifts posted",
         description: `Successfully posted ${selectedDates.size} shift${selectedDates.size !== 1 ? 's' : ''}.`,

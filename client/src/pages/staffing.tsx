@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -25,8 +26,10 @@ import {
   Stethoscope,
   UserCog,
   Briefcase,
+  Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { StaffShift } from "@shared/schema";
 
 const STAFF_ROLES = {
   all: { label: "All Roles", category: "all" },
@@ -49,6 +52,18 @@ const ROLE_BADGE_COLORS: Record<StaffRole, string> = {
   front_desk: "bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200",
   billing: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
 };
+
+function getRoleBadgeColor(role: string): string {
+  const roleMap: Record<string, string> = {
+    "Dentist": "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+    "Hygienist": "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+    "Dental Assistant": "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
+    "Office Coordinator": "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+    "Front Desk": "bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200",
+    "Billing Staff": "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+  };
+  return roleMap[role] || "bg-muted text-muted-foreground";
+}
 
 const DAYS_OF_WEEK = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const DAYS_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
@@ -91,6 +106,23 @@ function CalendarView() {
   
   const monthName = new Date(currentYear, currentMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   const days = getMonthData(currentYear, currentMonth);
+  
+  const startDate = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`;
+  const endDate = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${new Date(currentYear, currentMonth + 1, 0).getDate()}`;
+  
+  const { data: shifts = [], isLoading, isError } = useQuery<StaffShift[]>({
+    queryKey: [`/api/shifts?startDate=${startDate}&endDate=${endDate}`],
+  });
+  
+  const shiftsByDate = useMemo(() => {
+    const map = new Map<string, StaffShift[]>();
+    for (const shift of shifts) {
+      const existing = map.get(shift.date) || [];
+      existing.push(shift);
+      map.set(shift.date, existing);
+    }
+    return map;
+  }, [shifts]);
   
   const goToPrevMonth = () => {
     if (currentMonth === 0) {
@@ -138,6 +170,12 @@ function CalendarView() {
         </Button>
       </div>
       
+      {isError && (
+        <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-lg" data-testid="error-loading-shifts">
+          Failed to load shifts. Please try refreshing the page.
+        </div>
+      )}
+      
       <div className="border rounded-lg overflow-hidden">
         <div className="grid grid-cols-7 bg-muted/30">
           {DAYS_OF_WEEK.map((day) => (
@@ -147,33 +185,70 @@ function CalendarView() {
           ))}
         </div>
         <div className="grid grid-cols-7">
-          {days.map((day, index) => (
-            <div
-              key={index}
-              className={cn(
-                "min-h-[100px] p-2 border-b border-r last:border-r-0",
-                !day.currentMonth && "bg-muted/20",
-                day.isToday && "bg-primary/5"
-              )}
-              data-testid={day.currentMonth ? `calendar-day-${day.date}` : undefined}
-            >
-              <div className="flex items-start justify-between">
-                <span
-                  className={cn(
-                    "inline-flex h-7 w-7 items-center justify-center rounded-full text-sm",
-                    !day.currentMonth && "text-muted-foreground",
-                    day.isToday && "bg-primary text-primary-foreground font-medium"
+          {days.map((day, index) => {
+            const dateStr = day.currentMonth 
+              ? `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day.date).padStart(2, '0')}`
+              : null;
+            const dayShifts = dateStr ? shiftsByDate.get(dateStr) || [] : [];
+            const showLoadingSkeleton = isLoading && day.currentMonth;
+            
+            return (
+              <div
+                key={index}
+                className={cn(
+                  "min-h-[100px] p-2 border-b border-r last:border-r-0",
+                  !day.currentMonth && "bg-muted/20",
+                  day.isToday && "bg-primary/5"
+                )}
+                data-testid={day.currentMonth ? `calendar-day-${day.date}` : undefined}
+              >
+                <div className="flex items-start justify-between">
+                  <span
+                    className={cn(
+                      "inline-flex h-7 w-7 items-center justify-center rounded-full text-sm",
+                      !day.currentMonth && "text-muted-foreground",
+                      day.isToday && "bg-primary text-primary-foreground font-medium"
+                    )}
+                    data-testid={day.isToday ? "text-today-date" : `text-day-${day.date}`}
+                  >
+                    {day.date}
+                  </span>
+                  {day.holiday && (
+                    <span className="text-xs text-purple-600 dark:text-purple-400" data-testid={`text-holiday-${day.date}`}>{day.holiday}</span>
                   )}
-                  data-testid={day.isToday ? "text-today-date" : `text-day-${day.date}`}
-                >
-                  {day.date}
-                </span>
-                {day.holiday && (
-                  <span className="text-xs text-purple-600 dark:text-purple-400" data-testid={`text-holiday-${day.date}`}>{day.holiday}</span>
+                </div>
+                {showLoadingSkeleton && (
+                  <div className="mt-1 space-y-1 animate-pulse">
+                    <div className="h-4 bg-muted rounded w-full" />
+                  </div>
+                )}
+                {!isLoading && dayShifts.length > 0 && (
+                  <div className="mt-1 space-y-1">
+                    {dayShifts.slice(0, 2).map((shift) => (
+                      <div 
+                        key={shift.id} 
+                        className={cn(
+                          "text-xs px-1.5 py-0.5 rounded truncate",
+                          getRoleBadgeColor(shift.role)
+                        )}
+                        data-testid={`shift-${shift.id}`}
+                      >
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-3 w-3 flex-shrink-0" />
+                          <span className="truncate">{shift.arrivalTime}</span>
+                        </div>
+                      </div>
+                    ))}
+                    {dayShifts.length > 2 && (
+                      <div className="text-xs text-muted-foreground pl-1" data-testid={`more-shifts-${day.date}`}>
+                        +{dayShifts.length - 2} more
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
