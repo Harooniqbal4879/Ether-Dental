@@ -133,7 +133,7 @@ function ShiftDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg" data-testid="dialog-shift-detail">
+      <DialogContent className="max-w-lg max-h-[85vh] flex flex-col" data-testid="dialog-shift-detail">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CalendarIcon className="h-5 w-5" />
@@ -142,7 +142,7 @@ function ShiftDetailDialog({
           <DialogDescription>{formattedDate}</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 overflow-y-auto pr-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Badge className={cn("text-xs", getRoleBadgeColor(shift.role))} data-testid="badge-shift-role">
