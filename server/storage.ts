@@ -6,6 +6,8 @@ import {
   benefits,
   appointments,
   clearinghouseConfigs,
+  patientBilling,
+  patientPayments,
   type Patient,
   type InsertPatient,
   type InsuranceCarrier,
@@ -22,6 +24,10 @@ import {
   type VerificationWithDetails,
   type ClearinghouseConfig,
   type InsertClearinghouseConfig,
+  type PatientBilling,
+  type InsertPatientBilling,
+  type PatientPayment,
+  type InsertPatientPayment,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -72,6 +78,21 @@ export interface IStorage {
   updateClearinghouseConfig(id: string, data: Partial<ClearinghouseConfig>): Promise<ClearinghouseConfig | undefined>;
   deleteClearinghouseConfig(id: string): Promise<boolean>;
   testClearinghouseConnection(id: string): Promise<{ success: boolean; message: string }>;
+
+  // Patient Billing
+  getPatientBilling(patientId: string): Promise<(PatientBilling & { patient: Patient }) | undefined>;
+  createPatientBilling(billing: InsertPatientBilling): Promise<PatientBilling>;
+  updatePatientBilling(patientId: string, data: Partial<PatientBilling>): Promise<PatientBilling | undefined>;
+  getPatientPayments(patientId: string): Promise<PatientPayment[]>;
+  getPatientPaymentsBySessionId(sessionId: string): Promise<PatientPayment[]>;
+  createPatientPayment(payment: InsertPatientPayment): Promise<PatientPayment>;
+  updatePaymentBySessionId(sessionId: string, data: Partial<PatientPayment>): Promise<PatientPayment | undefined>;
+  
+  // Atomic payment completion - only updates if transitioning from pending to completed
+  completePayment(sessionId: string, paymentIntentId: string, paymentAmount: number): Promise<boolean>;
+  
+  // Reconcile or create a payment record for a session that may be missing
+  reconcilePayment(sessionId: string, patientId: string, amount: string): Promise<PatientPayment>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -407,6 +428,176 @@ export class DatabaseStorage implements IStorage {
         ? "Connection successful - EDI 270/271 test passed" 
         : "Connection failed - please verify your credentials",
     };
+  }
+
+  // Patient Billing
+  async getPatientBilling(patientId: string): Promise<(PatientBilling & { patient: Patient }) | undefined> {
+    const [billing] = await db
+      .select()
+      .from(patientBilling)
+      .where(eq(patientBilling.patientId, patientId));
+    
+    if (!billing) {
+      // Create billing record if it doesn't exist
+      const patient = await this.getPatient(patientId);
+      if (!patient) return undefined;
+      
+      const [newBilling] = await db
+        .insert(patientBilling)
+        .values({ patientId, totalBalance: "0.00", patientPortion: "0.00", insurancePortion: "0.00" })
+        .returning();
+      
+      return { ...newBilling, patient };
+    }
+    
+    const patient = await this.getPatient(patientId);
+    if (!patient) return undefined;
+    
+    return { ...billing, patient };
+  }
+
+  async createPatientBilling(billing: InsertPatientBilling): Promise<PatientBilling> {
+    const [created] = await db.insert(patientBilling).values(billing).returning();
+    return created;
+  }
+
+  async updatePatientBilling(patientId: string, data: Partial<PatientBilling>): Promise<PatientBilling | undefined> {
+    const [updated] = await db
+      .update(patientBilling)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(patientBilling.patientId, patientId))
+      .returning();
+    return updated;
+  }
+
+  async getPatientPayments(patientId: string): Promise<PatientPayment[]> {
+    return db
+      .select()
+      .from(patientPayments)
+      .where(eq(patientPayments.patientId, patientId))
+      .orderBy(desc(patientPayments.createdAt));
+  }
+
+  async getPatientPaymentsBySessionId(sessionId: string): Promise<PatientPayment[]> {
+    return db
+      .select()
+      .from(patientPayments)
+      .where(eq(patientPayments.stripeCheckoutSessionId, sessionId));
+  }
+
+  async createPatientPayment(payment: InsertPatientPayment): Promise<PatientPayment> {
+    const [created] = await db.insert(patientPayments).values(payment).returning();
+    return created;
+  }
+
+  async updatePaymentBySessionId(sessionId: string, data: Partial<PatientPayment>): Promise<PatientPayment | undefined> {
+    const [updated] = await db
+      .update(patientPayments)
+      .set({ ...data, completedAt: data.status === 'completed' ? new Date() : undefined })
+      .where(eq(patientPayments.stripeCheckoutSessionId, sessionId))
+      .returning();
+    return updated;
+  }
+
+  // Atomic payment completion - only updates if transitioning from pending to completed
+  // Returns true if payment was completed, false if already completed or not found
+  // Uses database transaction for atomicity and affected-row check for idempotency
+  async completePayment(sessionId: string, paymentIntentId: string, paymentAmount: number): Promise<boolean> {
+    // Find the payment record
+    const payments = await this.getPatientPaymentsBySessionId(sessionId);
+    const payment = payments?.[0];
+
+    if (!payment) {
+      console.log(`No payment record found for session ${sessionId}`);
+      return false;
+    }
+
+    // Idempotency: only complete if currently pending
+    if (payment.status === 'completed') {
+      console.log(`Payment ${sessionId} already completed - skipping`);
+      return false;
+    }
+
+    // Use a transaction to ensure atomicity of status update + balance update
+    try {
+      const result = await db.transaction(async (tx) => {
+        // Atomic update: only update if status is still 'pending'
+        // This prevents race conditions where both webhook and verify-payment try to update
+        const updated = await tx
+          .update(patientPayments)
+          .set({
+            status: 'completed',
+            stripePaymentIntentId: paymentIntentId,
+            paymentMethod: 'card',
+            completedAt: new Date(),
+          })
+          .where(and(
+            eq(patientPayments.stripeCheckoutSessionId, sessionId),
+            eq(patientPayments.status, 'pending') // Only update if still pending
+          ))
+          .returning();
+
+        // Check if update actually happened (affected rows > 0)
+        if (!updated || updated.length === 0) {
+          console.log(`Payment ${sessionId} was not updated (already completed by another process)`);
+          return false;
+        }
+
+        // Get billing record for balance update
+        const [billing] = await tx
+          .select()
+          .from(patientBilling)
+          .where(eq(patientBilling.patientId, payment.patientId));
+
+        if (billing) {
+          const currentBalance = parseFloat(billing.patientPortion || "0");
+          const newBalance = Math.max(0, currentBalance - paymentAmount);
+          
+          await tx
+            .update(patientBilling)
+            .set({
+              patientPortion: newBalance.toFixed(2),
+              totalBalance: (parseFloat(billing.insurancePortion || "0") + newBalance).toFixed(2),
+              lastPaymentAt: new Date(),
+              updatedAt: new Date(),
+            })
+            .where(eq(patientBilling.patientId, payment.patientId));
+
+          console.log(`Completed payment ${sessionId}: balance $${currentBalance} -> $${newBalance}`);
+        }
+
+        return true;
+      });
+
+      return result;
+    } catch (error) {
+      console.error(`Error completing payment ${sessionId}:`, error);
+      return false;
+    }
+  }
+
+  // Reconcile or create a payment record for a session that may be missing
+  // Used by verify-payment when webhook hasn't created the record yet
+  async reconcilePayment(sessionId: string, patientId: string, amount: string): Promise<PatientPayment> {
+    const existing = await this.getPatientPaymentsBySessionId(sessionId);
+    if (existing && existing.length > 0) {
+      return existing[0];
+    }
+
+    // Create the payment record if missing
+    const [created] = await db
+      .insert(patientPayments)
+      .values({
+        patientId,
+        amount,
+        status: 'pending',
+        stripeCheckoutSessionId: sessionId,
+        description: 'Reconciled payment',
+      })
+      .returning();
+    
+    console.log(`Reconciled missing payment record for session ${sessionId}`);
+    return created;
   }
 }
 

@@ -18,9 +18,10 @@ import Carriers from "@/pages/carriers";
 import Settings from "@/pages/settings";
 import Staffing from "@/pages/staffing";
 import Services from "@/pages/services";
+import PatientPortal from "@/pages/patient-portal";
 import NotFound from "@/pages/not-found";
 
-function Router() {
+function MainRouter() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
@@ -38,33 +39,47 @@ function Router() {
   );
 }
 
-function App() {
+function MainLayout() {
   const sidebarStyle = {
     "--sidebar-width": "18rem",
     "--sidebar-width-icon": "4rem",
   };
 
   return (
+    <PersonaProvider>
+      <SidebarProvider style={sidebarStyle as React.CSSProperties}>
+        <div className="flex h-screen w-full">
+          <AppSidebar />
+          <SidebarInset className="flex flex-1 flex-col overflow-hidden">
+            <header className="sticky top-0 z-50 flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background px-4">
+              <SidebarTrigger data-testid="button-sidebar-toggle" />
+              <ThemeToggle />
+            </header>
+            <main className="flex-1 overflow-auto">
+              <MainRouter />
+            </main>
+          </SidebarInset>
+        </div>
+      </SidebarProvider>
+      <Toaster />
+    </PersonaProvider>
+  );
+}
+
+function App() {
+  return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="light" storageKey="dental-verify-theme">
         <TooltipProvider>
-          <PersonaProvider>
-            <SidebarProvider style={sidebarStyle as React.CSSProperties}>
-              <div className="flex h-screen w-full">
-                <AppSidebar />
-                <SidebarInset className="flex flex-1 flex-col overflow-hidden">
-                  <header className="sticky top-0 z-50 flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background px-4">
-                    <SidebarTrigger data-testid="button-sidebar-toggle" />
-                    <ThemeToggle />
-                  </header>
-                  <main className="flex-1 overflow-auto">
-                    <Router />
-                  </main>
-                </SidebarInset>
-              </div>
-            </SidebarProvider>
-            <Toaster />
-          </PersonaProvider>
+          <Switch>
+            <Route path="/portal">
+              <PatientPortal />
+              <Toaster />
+            </Route>
+            <Route>
+              <MainLayout />
+            </Route>
+          </Switch>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>

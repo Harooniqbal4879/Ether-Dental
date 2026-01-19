@@ -122,6 +122,10 @@ The Settings page follows the Teero app design pattern with 4 tabs:
 4. **Billing** - Subscription management, payment methods, billing history
 
 ### Recent Changes
+- Added Patient Portal (`/portal`) for patients to view balances and make credit card payments via Stripe Checkout
+- Integrated Stripe payment processing with proper webhook handling
+- Added `patient_billing` and `patient_payments` database tables for tracking patient balances and payment history
+- Patient Portal features: balance breakdown (total, insurance portion, patient portion), payment history, secure Stripe Checkout integration
 - Added Services page with hybrid billing model (self-service + remote services)
 - Three service offerings: Insurance Verification, Insurance Billing, Patient Billing
 - Pricing tiers based on production/collections volume

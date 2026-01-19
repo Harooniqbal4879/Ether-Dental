@@ -221,3 +221,71 @@ export const ClearinghouseProviders = {
   OFFICE_ALLY: "office_ally",
   WAYSTAR: "waystar",
 } as const;
+
+// Patient Billing - tracks patient balances and payment history
+export const patientBilling = pgTable("patient_billing", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  patientId: varchar("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
+  totalBalance: decimal("total_balance", { precision: 10, scale: 2 }).default("0.00"),
+  insurancePortion: decimal("insurance_portion", { precision: 10, scale: 2 }).default("0.00"),
+  patientPortion: decimal("patient_portion", { precision: 10, scale: 2 }).default("0.00"),
+  stripeCustomerId: text("stripe_customer_id"),
+  lastPaymentAt: timestamp("last_payment_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const patientBillingRelations = relations(patientBilling, ({ one }) => ({
+  patient: one(patients, {
+    fields: [patientBilling.patientId],
+    references: [patients.id],
+  }),
+}));
+
+export const insertPatientBillingSchema = createInsertSchema(patientBilling).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+export type InsertPatientBilling = z.infer<typeof insertPatientBillingSchema>;
+export type PatientBilling = typeof patientBilling.$inferSelect;
+
+// Patient Payments - individual payment transactions
+export const patientPayments = pgTable("patient_payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  patientId: varchar("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
+  billingId: varchar("billing_id").references(() => patientBilling.id),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  status: text("status").notNull().default("pending"), // pending, completed, failed, refunded
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  stripeCheckoutSessionId: text("stripe_checkout_session_id"),
+  paymentMethod: text("payment_method"), // card, bank_transfer
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const patientPaymentsRelations = relations(patientPayments, ({ one }) => ({
+  patient: one(patients, {
+    fields: [patientPayments.patientId],
+    references: [patients.id],
+  }),
+  billing: one(patientBilling, {
+    fields: [patientPayments.billingId],
+    references: [patientBilling.id],
+  }),
+}));
+
+export const insertPatientPaymentSchema = createInsertSchema(patientPayments).omit({ 
+  id: true, 
+  createdAt: true,
+  completedAt: true 
+});
+export type InsertPatientPayment = z.infer<typeof insertPatientPaymentSchema>;
+export type PatientPayment = typeof patientPayments.$inferSelect;
+
+// Patient Billing with details
+export type PatientBillingWithDetails = PatientBilling & {
+  patient: Patient;
+  payments?: PatientPayment[];
+};

@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertPatientSchema, insertInsuranceCarrierSchema, insertInsurancePolicySchema, insertClearinghouseConfigSchema } from "@shared/schema";
 import { z } from "zod";
+import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -335,6 +336,152 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error testing clearinghouse connection:", error);
       res.status(500).json({ error: "Failed to test connection" });
+    }
+  });
+
+  // Patient Portal Routes
+  
+  // Get Stripe publishable key for frontend
+  app.get("/api/stripe/publishable-key", async (req, res) => {
+    try {
+      const publishableKey = await getStripePublishableKey();
+      res.json({ publishableKey });
+    } catch (error) {
+      console.error("Error getting Stripe publishable key:", error);
+      res.status(500).json({ error: "Failed to get Stripe configuration" });
+    }
+  });
+
+  // Get patient billing info for portal (by email lookup for demo)
+  app.get("/api/portal/billing/:patientId", async (req, res) => {
+    try {
+      const billing = await storage.getPatientBilling(req.params.patientId);
+      if (!billing) {
+        return res.status(404).json({ error: "Billing information not found" });
+      }
+      res.json(billing);
+    } catch (error) {
+      console.error("Error fetching patient billing:", error);
+      res.status(500).json({ error: "Failed to fetch billing information" });
+    }
+  });
+
+  // Get patient payment history
+  app.get("/api/portal/payments/:patientId", async (req, res) => {
+    try {
+      const payments = await storage.getPatientPayments(req.params.patientId);
+      res.json(payments);
+    } catch (error) {
+      console.error("Error fetching payment history:", error);
+      res.status(500).json({ error: "Failed to fetch payment history" });
+    }
+  });
+
+  // Create Stripe checkout session for patient payment
+  const checkoutSchema = z.object({
+    patientId: z.string().min(1, "Patient ID is required"),
+    amount: z.coerce.number().positive("Amount must be positive").max(100000, "Amount cannot exceed $100,000"),
+    description: z.string().optional(),
+  });
+
+  app.post("/api/portal/create-checkout", async (req, res) => {
+    try {
+      const parsed = checkoutSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.errors[0].message });
+      }
+
+      const { patientId, amount, description } = parsed.data;
+
+      const patient = await storage.getPatient(patientId);
+      if (!patient) {
+        return res.status(404).json({ error: "Patient not found" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      
+      // Build base URL - use request origin as fallback
+      const replitDomain = process.env.REPLIT_DOMAINS?.split(',')[0];
+      const baseUrl = replitDomain 
+        ? `https://${replitDomain}` 
+        : `${req.protocol}://${req.get('host')}`;
+
+      // Normalize amount to fixed 2 decimal places
+      const normalizedAmount = amount.toFixed(2);
+
+      // Create checkout session for one-time payment
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [{
+          price_data: {
+            currency: 'usd',
+            unit_amount: Math.round(amount * 100), // Convert to cents
+            product_data: {
+              name: 'Patient Balance Payment',
+              description: description || `Payment for ${patient.firstName} ${patient.lastName}`,
+            },
+          },
+          quantity: 1,
+        }],
+        mode: 'payment',
+        success_url: `${baseUrl}/portal?success=true&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${baseUrl}/portal?canceled=true`,
+        customer_email: patient.email || undefined,
+        metadata: {
+          patientId,
+          type: 'patient_balance_payment',
+        },
+      });
+
+      // Record pending payment
+      await storage.createPatientPayment({
+        patientId,
+        amount: normalizedAmount,
+        status: 'pending',
+        stripeCheckoutSessionId: session.id,
+        description: description || 'Balance payment',
+      });
+
+      res.json({ url: session.url, sessionId: session.id });
+    } catch (error) {
+      console.error("Error creating checkout session:", error);
+      res.status(500).json({ error: "Failed to create payment session" });
+    }
+  });
+
+  // Verify payment status after checkout
+  // This is called when user returns from Stripe checkout as a fallback
+  // Reconciles missing payment records and uses atomic completePayment
+  app.get("/api/portal/verify-payment/:sessionId", async (req, res) => {
+    try {
+      const stripe = await getUncachableStripeClient();
+      const session = await stripe.checkout.sessions.retrieve(req.params.sessionId);
+      
+      if (session.payment_status === 'paid') {
+        const paymentAmount = session.amount_total ? session.amount_total / 100 : 0;
+        const paymentIntentId = session.payment_intent as string || '';
+        const patientId = session.metadata?.patientId;
+        
+        // Reconcile payment record if missing (e.g., webhook didn't fire)
+        if (patientId && paymentAmount > 0) {
+          await storage.reconcilePayment(
+            req.params.sessionId,
+            patientId,
+            paymentAmount.toFixed(2)
+          );
+        }
+        
+        // Use centralized atomic payment completion (idempotent)
+        await storage.completePayment(req.params.sessionId, paymentIntentId, paymentAmount);
+      }
+      
+      res.json({
+        status: session.payment_status,
+        amount: session.amount_total ? session.amount_total / 100 : 0,
+      });
+    } catch (error) {
+      console.error("Error verifying payment:", error);
+      res.status(500).json({ error: "Failed to verify payment" });
     }
   });
 
