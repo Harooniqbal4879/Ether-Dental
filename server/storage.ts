@@ -8,6 +8,7 @@ import {
   clearinghouseConfigs,
   patientBilling,
   patientPayments,
+  staffShifts,
   type Patient,
   type InsertPatient,
   type InsuranceCarrier,
@@ -28,6 +29,8 @@ import {
   type InsertPatientBilling,
   type PatientPayment,
   type InsertPatientPayment,
+  type StaffShift,
+  type InsertStaffShift,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -93,6 +96,12 @@ export interface IStorage {
   
   // Reconcile or create a payment record for a session that may be missing
   reconcilePayment(sessionId: string, patientId: string, amount: string): Promise<PatientPayment>;
+
+  // Staff Shifts
+  getShifts(startDate: string, endDate: string): Promise<StaffShift[]>;
+  getShiftsByDate(date: string): Promise<StaffShift[]>;
+  createShift(shift: InsertStaffShift): Promise<StaffShift>;
+  createShifts(shifts: InsertStaffShift[]): Promise<StaffShift[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -598,6 +607,32 @@ export class DatabaseStorage implements IStorage {
     
     console.log(`Reconciled missing payment record for session ${sessionId}`);
     return created;
+  }
+
+  // Staff Shifts
+  async getShifts(startDate: string, endDate: string): Promise<StaffShift[]> {
+    return db
+      .select()
+      .from(staffShifts)
+      .where(and(gte(staffShifts.date, startDate), lte(staffShifts.date, endDate)))
+      .orderBy(staffShifts.date);
+  }
+
+  async getShiftsByDate(date: string): Promise<StaffShift[]> {
+    return db
+      .select()
+      .from(staffShifts)
+      .where(eq(staffShifts.date, date));
+  }
+
+  async createShift(shift: InsertStaffShift): Promise<StaffShift> {
+    const [created] = await db.insert(staffShifts).values(shift).returning();
+    return created;
+  }
+
+  async createShifts(shifts: InsertStaffShift[]): Promise<StaffShift[]> {
+    if (shifts.length === 0) return [];
+    return db.insert(staffShifts).values(shifts).returning();
   }
 }
 

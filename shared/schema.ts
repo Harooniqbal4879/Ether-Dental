@@ -289,3 +289,37 @@ export type PatientBillingWithDetails = PatientBilling & {
   patient: Patient;
   payments?: PatientPayment[];
 };
+
+// Staff Shifts - for staffing management
+export const staffShifts = pgTable("staff_shifts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  date: text("date").notNull(), // YYYY-MM-DD format
+  role: text("role").notNull(), // Dentist, Hygienist, Dental Assistant, etc.
+  arrivalTime: text("arrival_time").notNull(), // e.g. "8:30 AM"
+  firstPatientTime: text("first_patient_time").notNull(), // e.g. "9:00 AM"
+  endTime: text("end_time").notNull(), // e.g. "5:00 PM"
+  breakDuration: text("break_duration").notNull(), // e.g. "60 min"
+  pricingMode: text("pricing_mode").notNull(), // "fixed" or "smart"
+  minHourlyRate: decimal("min_hourly_rate", { precision: 10, scale: 2 }),
+  maxHourlyRate: decimal("max_hourly_rate", { precision: 10, scale: 2 }),
+  fixedHourlyRate: decimal("fixed_hourly_rate", { precision: 10, scale: 2 }),
+  status: text("status").notNull().default("open"), // open, filled, cancelled
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertStaffShiftSchema = createInsertSchema(staffShifts).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertStaffShift = z.infer<typeof insertStaffShiftSchema>;
+export type StaffShift = typeof staffShifts.$inferSelect;
+
+// Staff Roles enum for UI
+export const StaffRoles = {
+  DENTIST: "Dentist",
+  HYGIENIST: "Hygienist",
+  DENTAL_ASSISTANT: "Dental Assistant",
+  OFFICE_COORDINATOR: "Office Coordinator",
+  FRONT_DESK: "Front Desk",
+  BILLING_STAFF: "Billing Staff",
+} as const;
