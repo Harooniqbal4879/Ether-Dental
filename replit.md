@@ -28,14 +28,17 @@ This platform enables dental practices to:
 │   │   ├── app-sidebar.tsx  # Main navigation sidebar
 │   │   └── theme-toggle.tsx # Light/dark mode toggle
 │   ├── pages/
-│   │   ├── dashboard.tsx    # Main dashboard with stats and verifications
-│   │   ├── patients.tsx     # Patient list view
+│   │   ├── dashboard.tsx    # Main dashboard with stats and quick actions
+│   │   ├── patients.tsx     # Patients page with 3 tabs (Patients, Verifications, Appointments)
 │   │   ├── patient-detail.tsx # Individual patient details with benefits
-│   │   ├── appointments.tsx # Upcoming appointments view
 │   │   ├── carriers.tsx     # Insurance carrier management
-│   │   └── settings.tsx     # Practice settings
+│   │   ├── settings.tsx     # Practice settings (5 tabs)
+│   │   ├── staffing.tsx     # Staffing calendar and management
+│   │   ├── services.tsx     # Service offerings and subscriptions
+│   │   └── patient-portal.tsx # Patient payment portal
 │   ├── lib/
-│   │   └── queryClient.ts   # React Query configuration
+│   │   ├── queryClient.ts   # React Query configuration
+│   │   └── persona-context.tsx # Role-based persona management
 │   └── App.tsx              # Main app with routing and providers
 ├── server/
 │   ├── routes.ts            # API endpoints
@@ -46,6 +49,19 @@ This platform enables dental practices to:
 │   └── schema.ts            # Drizzle schema and TypeScript types
 └── design_guidelines.md     # UI/UX design system documentation
 ```
+
+### Navigation Structure
+
+The sidebar navigation is organized as follows:
+- **Dashboard** - Main hub with stats and quick actions
+- **Patients** - Tabbed view with 3 sub-sections:
+  - Patients tab (/patients) - Patient list and management
+  - Verifications tab (/patients?tab=verifications) - Insurance verification tracking
+  - Appointments tab (/patients?tab=appointments) - Upcoming appointments
+- **Staffing** - Multi-role shift management
+- **Services** - Subscription service offerings
+- **Patient Portal** - Patient payment interface (also accessible via Patient persona)
+- **Settings** - Practice configuration (5 tabs including Carriers)
 
 ### Data Models
 
@@ -141,6 +157,11 @@ The Add Shift page (`/staffing/add-shift`) allows practice managers to create ne
 - Post shifts button with Terms of Service and Privacy Policy links
 
 ### Recent Changes
+- Consolidated Verifications and Appointments into Patients page as tabs with URL-based navigation (/patients?tab=verifications, /patients?tab=appointments)
+- Added Insurance Carriers management as 5th tab in Settings page, removed from standalone navigation
+- Rebranded application from "DentalVerify" to "EtherAI - Dental Practice Management System" throughout UI
+- Enhanced Dashboard with clickable stat cards linking to respective pages and quick action cards for key features (Add Patient, Staffing, Services, Settings)
+- Added Patient persona with limited access to Patient Portal only, accessible via sidebar persona switcher
 - Connected Add Shift form to backend API with database persistence
 - Shifts now display on the staffing calendar with role-colored badges and arrival times
 - Added `staff_shifts` database table for storing shift postings
