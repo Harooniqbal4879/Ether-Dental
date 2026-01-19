@@ -228,12 +228,13 @@ function CalendarView() {
                       <div 
                         key={shift.id} 
                         className={cn(
-                          "text-xs px-1.5 py-0.5 rounded truncate",
+                          "text-xs px-1.5 py-0.5 rounded",
                           getRoleBadgeColor(shift.role)
                         )}
                         data-testid={`shift-${shift.id}`}
                       >
-                        <div className="flex items-center gap-1">
+                        <div className="font-medium truncate">{shift.role}</div>
+                        <div className="flex items-center gap-1 opacity-80">
                           <Clock className="h-3 w-3 flex-shrink-0" />
                           <span className="truncate">{shift.arrivalTime}</span>
                         </div>
