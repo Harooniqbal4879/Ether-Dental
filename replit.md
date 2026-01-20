@@ -40,3 +40,34 @@ The Platform Settings page (`/platform-settings`) allows System Administrators t
 - Fee rates are stored as decimals (e.g., 0.12 for 12%) but displayed as percentages in the UI
 - Persona persistence is handled via localStorage to maintain access control across page reloads
 - API Endpoints: `GET/PATCH /api/settings/platform`, `GET/POST /api/settings/state-tax-rates`, `GET /api/fees/resolved`
+
+## Practice Onboarding & Registration
+The platform supports two practice onboarding flows:
+
+### Self-Service Registration (`/register`)
+- Public page accessible without authentication
+- Multi-section form with practice details, address, and owner information
+- Full Zod validation on both frontend (react-hook-form + zodResolver) and backend
+- Required fields: practice name, city, state, ZIP, phone, email, owner details, terms acceptance
+- Submissions create practices with `registrationStatus: "pending"` and `registrationSource: "self_registration"`
+- Success confirmation shows next steps and approval timeline
+
+### Practice Management (`/practices`) - System Admin Only
+- Table view of all practices with registration status and source badges
+- Status badges: Pending (yellow), Approved (green), Rejected (red)
+- Source badges: Self-Registered, Admin Added
+- Inline approve/reject actions for pending practices
+- Rejection requires mandatory reason field
+- View Details dialog with complete practice and owner information
+
+### API Endpoints
+- `POST /api/practices/register` - Public endpoint for self-registration (with Zod validation)
+- `GET /api/practices` - List all practices
+- `PATCH /api/practices/:id` - Update practice (for approval/rejection)
+
+### Schema Fields (practices table)
+- `registrationStatus`: pending, approved, rejected
+- `registrationSource`: admin, self_registration
+- `ownerFirstName`, `ownerLastName`, `ownerEmail`, `ownerPhone`: Owner contact info
+- `approvedBy`, `approvedAt`: Approval tracking
+- `rejectionReason`: Required when rejecting
