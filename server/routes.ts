@@ -506,7 +506,7 @@ export async function registerRoutes(
     }
   });
 
-  // Get available shifts for mobile app (open shifts only)
+  // Get available shifts for mobile app (open shifts only) - includes practice data
   app.get("/api/shifts/available", async (req, res) => {
     try {
       const { startDate, endDate, role, locationId } = req.query;
@@ -517,7 +517,7 @@ export async function registerRoutes(
       if (typeof role === "string") filters.role = role;
       if (typeof locationId === "string") filters.locationId = locationId;
       
-      const shifts = await storage.getAvailableShifts(filters);
+      const shifts = await storage.getAvailableShiftsWithPractice(filters);
       res.json(shifts);
     } catch (error) {
       console.error("Error fetching available shifts:", error);
@@ -656,10 +656,10 @@ export async function registerRoutes(
     }
   });
 
-  // Get shift with location details (for mobile app)
+  // Get shift details with practice data (for mobile app)
   app.get("/api/shifts/:id/details", async (req, res) => {
     try {
-      const shift = await storage.getShiftWithLocation(req.params.id);
+      const shift = await storage.getShiftWithPractice(req.params.id);
       if (!shift) {
         return res.status(404).json({ error: "Shift not found" });
       }
@@ -670,7 +670,7 @@ export async function registerRoutes(
     }
   });
 
-  // Get professional's claimed shifts (for mobile app)
+  // Get professional's claimed shifts with practice data (for mobile app)
   app.get("/api/professionals/:id/shifts", async (req, res) => {
     try {
       const { status, startDate, endDate } = req.query;
@@ -680,7 +680,7 @@ export async function registerRoutes(
       if (typeof startDate === "string") filters.startDate = startDate;
       if (typeof endDate === "string") filters.endDate = endDate;
       
-      const shifts = await storage.getShiftsForProfessionalWithLocation(req.params.id, filters);
+      const shifts = await storage.getShiftsForProfessionalWithPractice(req.params.id, filters);
       res.json(shifts);
     } catch (error) {
       console.error("Error fetching professional's shifts:", error);
@@ -897,17 +897,7 @@ export async function registerRoutes(
     }
   });
 
-  // Professional shifts and transactions
-  app.get("/api/professionals/:id/shifts", async (req, res) => {
-    try {
-      const shifts = await storage.getShiftsForProfessional(req.params.id);
-      res.json(shifts);
-    } catch (error) {
-      console.error("Error fetching professional shifts:", error);
-      res.status(500).json({ error: "Failed to fetch professional shifts" });
-    }
-  });
-
+  // Professional transactions (shifts endpoint moved to mobile API section with practice data)
   app.get("/api/professionals/:id/transactions", async (req, res) => {
     try {
       const transactions = await storage.getTransactionsForProfessional(req.params.id);

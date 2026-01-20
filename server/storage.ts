@@ -40,6 +40,8 @@ import {
   type InsertPatientPayment,
   type StaffShift,
   type StaffShiftWithLocation,
+  type StaffShiftWithPractice,
+  type PracticeProfile,
   type InsertStaffShift,
   type Professional,
   type InsertProfessional,
@@ -133,6 +135,9 @@ export interface IStorage {
   getShiftsByDate(date: string): Promise<StaffShift[]>;
   getAvailableShifts(filters?: { startDate?: string; endDate?: string; role?: string; locationId?: string }): Promise<StaffShiftWithLocation[]>;
   getShiftWithLocation(id: string): Promise<StaffShiftWithLocation | undefined>;
+  getAvailableShiftsWithPractice(filters?: { startDate?: string; endDate?: string; role?: string; locationId?: string }): Promise<StaffShiftWithPractice[]>;
+  getShiftWithPractice(id: string): Promise<StaffShiftWithPractice | undefined>;
+  getShiftsForProfessionalWithPractice(professionalId: string, filters?: { status?: string; startDate?: string; endDate?: string }): Promise<StaffShiftWithPractice[]>;
   claimShift(shiftId: string, professionalId: string): Promise<{ success: boolean; shift?: StaffShift; error?: string }>;
   releaseShift(shiftId: string, professionalId: string): Promise<{ success: boolean; shift?: StaffShift; error?: string }>;
   createShift(shift: InsertStaffShift): Promise<StaffShift>;
@@ -779,6 +784,165 @@ export class DatabaseStorage implements IStorage {
     }
     
     return { ...shift, location };
+  }
+
+  private async getPracticeProfile(practiceId: string): Promise<PracticeProfile | null> {
+    const [practice] = await db.select().from(practices).where(eq(practices.id, practiceId));
+    if (!practice) return null;
+    
+    return {
+      id: practice.id,
+      name: practice.name,
+      address: practice.address,
+      city: practice.city,
+      stateCode: practice.stateCode,
+      zipCode: practice.zipCode,
+      phone: practice.phone,
+      email: practice.email,
+      website: practice.website,
+      aboutOffice: practice.aboutOffice,
+      parkingInfo: practice.parkingInfo,
+      arrivalInstructions: practice.arrivalInstructions,
+      dressCode: practice.dressCode,
+      photos: practice.photos,
+      numDentists: practice.numDentists,
+      numHygienists: practice.numHygienists,
+      numSupportStaff: practice.numSupportStaff,
+      breakRoomAvailable: practice.breakRoomAvailable,
+      refrigeratorAvailable: practice.refrigeratorAvailable,
+      microwaveAvailable: practice.microwaveAvailable,
+      practiceManagementSoftware: practice.practiceManagementSoftware,
+      xraySoftware: practice.xraySoftware,
+      hasOverheadLights: practice.hasOverheadLights,
+      preferredScrubColor: practice.preferredScrubColor,
+      clinicalAttireProvided: practice.clinicalAttireProvided,
+      useAirPolishers: practice.useAirPolishers,
+      scalerType: practice.scalerType,
+      assistedHygieneSchedule: practice.assistedHygieneSchedule,
+      rootPlaningProcedures: practice.rootPlaningProcedures,
+      seeNewPatients: practice.seeNewPatients,
+      administerLocalAnesthesia: practice.administerLocalAnesthesia,
+      workWithNitrousPatients: practice.workWithNitrousPatients,
+      appointmentLengthAdults: practice.appointmentLengthAdults,
+      appointmentLengthKids: practice.appointmentLengthKids,
+      appointmentLengthPerio: practice.appointmentLengthPerio,
+      appointmentLengthScaling: practice.appointmentLengthScaling,
+      dentalTreatmentRooms: practice.dentalTreatmentRooms,
+      dedicatedHygieneRooms: practice.dedicatedHygieneRooms,
+      hiringPermanently: practice.hiringPermanently,
+    };
+  }
+
+  async getAvailableShiftsWithPractice(filters?: { startDate?: string; endDate?: string; role?: string; locationId?: string }): Promise<StaffShiftWithPractice[]> {
+    const conditions = [eq(staffShifts.status, "open")];
+    
+    if (filters?.startDate) {
+      conditions.push(gte(staffShifts.date, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(lte(staffShifts.date, filters.endDate));
+    }
+    if (filters?.role) {
+      conditions.push(eq(staffShifts.role, filters.role));
+    }
+    if (filters?.locationId) {
+      conditions.push(eq(staffShifts.locationId, filters.locationId));
+    }
+    
+    const shifts = await db
+      .select()
+      .from(staffShifts)
+      .where(and(...conditions))
+      .orderBy(staffShifts.date);
+    
+    const result: StaffShiftWithPractice[] = [];
+    for (const shift of shifts) {
+      let location = null;
+      let practice = null;
+      
+      if (shift.locationId) {
+        const [loc] = await db.select().from(practiceLocations).where(eq(practiceLocations.id, shift.locationId));
+        location = loc || null;
+        if (loc?.practiceId) {
+          practice = await this.getPracticeProfile(loc.practiceId);
+        }
+      }
+      
+      // Fallback: if no location but practiceId exists on shift, get practice directly
+      if (!practice && shift.practiceId) {
+        practice = await this.getPracticeProfile(shift.practiceId);
+      }
+      
+      result.push({ ...shift, location, practice });
+    }
+    
+    return result;
+  }
+
+  async getShiftWithPractice(id: string): Promise<StaffShiftWithPractice | undefined> {
+    const [shift] = await db.select().from(staffShifts).where(eq(staffShifts.id, id));
+    if (!shift) return undefined;
+    
+    let location = null;
+    let practice = null;
+    
+    if (shift.locationId) {
+      const [loc] = await db.select().from(practiceLocations).where(eq(practiceLocations.id, shift.locationId));
+      location = loc || null;
+      if (loc?.practiceId) {
+        practice = await this.getPracticeProfile(loc.practiceId);
+      }
+    }
+    
+    // Fallback: if no location but practiceId exists on shift, get practice directly
+    if (!practice && shift.practiceId) {
+      practice = await this.getPracticeProfile(shift.practiceId);
+    }
+    
+    return { ...shift, location, practice };
+  }
+
+  async getShiftsForProfessionalWithPractice(professionalId: string, filters?: { status?: string; startDate?: string; endDate?: string }): Promise<StaffShiftWithPractice[]> {
+    const conditions = [eq(staffShifts.assignedProfessionalId, professionalId)];
+    
+    if (filters?.status) {
+      conditions.push(eq(staffShifts.status, filters.status));
+    }
+    if (filters?.startDate) {
+      conditions.push(gte(staffShifts.date, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(lte(staffShifts.date, filters.endDate));
+    }
+    
+    const shifts = await db
+      .select()
+      .from(staffShifts)
+      .where(and(...conditions))
+      .orderBy(staffShifts.date);
+    
+    const result: StaffShiftWithPractice[] = [];
+    for (const shift of shifts) {
+      let location = null;
+      let practice = null;
+      
+      if (shift.locationId) {
+        const [loc] = await db.select().from(practiceLocations).where(eq(practiceLocations.id, shift.locationId));
+        location = loc || null;
+        if (loc?.practiceId) {
+          practice = await this.getPracticeProfile(loc.practiceId);
+        }
+      }
+      
+      // Fallback: if no location but practiceId exists on shift, get practice directly
+      if (!practice && shift.practiceId) {
+        practice = await this.getPracticeProfile(shift.practiceId);
+      }
+      
+      result.push({ ...shift, location, practice });
+    }
+    
+    return result;
   }
 
   async claimShift(shiftId: string, professionalId: string): Promise<{ success: boolean; shift?: StaffShift; error?: string }> {

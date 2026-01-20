@@ -294,6 +294,7 @@ export type PatientBillingWithDetails = PatientBilling & {
 // Staff Shifts - for staffing management
 export const staffShifts = pgTable("staff_shifts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  practiceId: varchar("practice_id").default("practice-1"), // Links to practice for profile data
   locationId: varchar("location_id"), // Will be linked to practiceLocations after table is created
   date: text("date").notNull(), // YYYY-MM-DD format
   role: text("role").notNull(), // Dentist, Hygienist, Dental Assistant, etc.
@@ -329,6 +330,55 @@ export type StaffShift = typeof staffShifts.$inferSelect;
 // Staff Shift with location details for mobile API
 export type StaffShiftWithLocation = StaffShift & {
   location?: PracticeLocation | null;
+};
+
+// Practice profile data for mobile API
+export type PracticeProfile = {
+  id: string;
+  name: string;
+  address: string | null;
+  city: string | null;
+  stateCode: string | null;
+  zipCode: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  aboutOffice: string | null;
+  parkingInfo: string | null;
+  arrivalInstructions: string | null;
+  dressCode: string | null;
+  photos: string[] | null;
+  numDentists: number | null;
+  numHygienists: number | null;
+  numSupportStaff: number | null;
+  breakRoomAvailable: boolean | null;
+  refrigeratorAvailable: boolean | null;
+  microwaveAvailable: boolean | null;
+  practiceManagementSoftware: string | null;
+  xraySoftware: string | null;
+  hasOverheadLights: boolean | null;
+  preferredScrubColor: string | null;
+  clinicalAttireProvided: boolean | null;
+  useAirPolishers: boolean | null;
+  scalerType: string | null;
+  assistedHygieneSchedule: boolean | null;
+  rootPlaningProcedures: boolean | null;
+  seeNewPatients: boolean | null;
+  administerLocalAnesthesia: boolean | null;
+  workWithNitrousPatients: boolean | null;
+  appointmentLengthAdults: string | null;
+  appointmentLengthKids: string | null;
+  appointmentLengthPerio: string | null;
+  appointmentLengthScaling: string | null;
+  dentalTreatmentRooms: number | null;
+  dedicatedHygieneRooms: number | null;
+  hiringPermanently: boolean | null;
+};
+
+// Staff Shift with location and practice details for mobile API
+export type StaffShiftWithPractice = StaffShift & {
+  location?: PracticeLocation | null;
+  practice?: PracticeProfile | null;
 };
 
 // Shift Transactions - payment records for completed shifts
