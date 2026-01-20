@@ -1,7 +1,24 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertPatientSchema, insertInsuranceCarrierSchema, insertInsurancePolicySchema, insertClearinghouseConfigSchema, insertStaffShiftSchema, insertProfessionalSchema, insertProfessionalBadgeSchema, insertRoleSpecialtySchema } from "@shared/schema";
+import { 
+  insertPatientSchema, 
+  insertInsuranceCarrierSchema, 
+  insertInsurancePolicySchema, 
+  insertClearinghouseConfigSchema, 
+  insertStaffShiftSchema, 
+  insertProfessionalSchema, 
+  insertProfessionalBadgeSchema, 
+  insertRoleSpecialtySchema,
+  insertProfessionalPreferencesSchema,
+  insertProfessionalAvailabilitySchema,
+  insertProfessionalCertificationSchema,
+  insertProfessionalSkillSchema,
+  insertProfessionalExperienceSchema,
+  insertProfessionalEducationSchema,
+  insertProfessionalAwardSchema,
+  insertProfessionalTrainingSchema,
+} from "@shared/schema";
 import { z } from "zod";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
@@ -985,6 +1002,410 @@ export async function registerRoutes(
       }
       console.error("Error creating badge:", error);
       res.status(500).json({ error: "Failed to create badge" });
+    }
+  });
+
+  // Professional with full credentials (preferences, certifications, etc.)
+  app.get("/api/professionals/:id/full", async (req, res) => {
+    try {
+      const professional = await storage.getProfessionalWithCredentials(req.params.id);
+      if (!professional) {
+        return res.status(404).json({ error: "Professional not found" });
+      }
+      res.json(professional);
+    } catch (error) {
+      console.error("Error fetching professional with credentials:", error);
+      res.status(500).json({ error: "Failed to fetch professional" });
+    }
+  });
+
+  // Professional Preferences
+  app.get("/api/professionals/:id/preferences", async (req, res) => {
+    try {
+      const preferences = await storage.getProfessionalPreferences(req.params.id);
+      res.json(preferences || null);
+    } catch (error) {
+      console.error("Error fetching preferences:", error);
+      res.status(500).json({ error: "Failed to fetch preferences" });
+    }
+  });
+
+  app.put("/api/professionals/:id/preferences", async (req, res) => {
+    try {
+      const parsed = insertProfessionalPreferencesSchema.parse({
+        ...req.body,
+        professionalId: req.params.id,
+      });
+      const preferences = await storage.upsertProfessionalPreferences(parsed);
+      res.json(preferences);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      console.error("Error updating preferences:", error);
+      res.status(500).json({ error: "Failed to update preferences" });
+    }
+  });
+
+  // Professional Availability
+  app.get("/api/professionals/:id/availability", async (req, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      const availability = await storage.getProfessionalAvailability(
+        req.params.id,
+        typeof startDate === "string" ? startDate : undefined,
+        typeof endDate === "string" ? endDate : undefined
+      );
+      res.json(availability);
+    } catch (error) {
+      console.error("Error fetching availability:", error);
+      res.status(500).json({ error: "Failed to fetch availability" });
+    }
+  });
+
+  app.post("/api/professionals/:id/availability", async (req, res) => {
+    try {
+      const parsed = insertProfessionalAvailabilitySchema.parse({
+        ...req.body,
+        professionalId: req.params.id,
+      });
+      const availability = await storage.createProfessionalAvailability(parsed);
+      res.status(201).json(availability);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      console.error("Error creating availability:", error);
+      res.status(500).json({ error: "Failed to create availability" });
+    }
+  });
+
+  app.put("/api/availability/:id", async (req, res) => {
+    try {
+      const availability = await storage.updateProfessionalAvailability(req.params.id, req.body);
+      if (!availability) {
+        return res.status(404).json({ error: "Availability not found" });
+      }
+      res.json(availability);
+    } catch (error) {
+      console.error("Error updating availability:", error);
+      res.status(500).json({ error: "Failed to update availability" });
+    }
+  });
+
+  app.delete("/api/availability/:id", async (req, res) => {
+    try {
+      await storage.deleteProfessionalAvailability(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting availability:", error);
+      res.status(500).json({ error: "Failed to delete availability" });
+    }
+  });
+
+  // Professional Certifications
+  app.get("/api/professionals/:id/certifications", async (req, res) => {
+    try {
+      const certifications = await storage.getProfessionalCertifications(req.params.id);
+      res.json(certifications);
+    } catch (error) {
+      console.error("Error fetching certifications:", error);
+      res.status(500).json({ error: "Failed to fetch certifications" });
+    }
+  });
+
+  app.post("/api/professionals/:id/certifications", async (req, res) => {
+    try {
+      const parsed = insertProfessionalCertificationSchema.parse({
+        ...req.body,
+        professionalId: req.params.id,
+      });
+      const certification = await storage.createProfessionalCertification(parsed);
+      res.status(201).json(certification);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      console.error("Error creating certification:", error);
+      res.status(500).json({ error: "Failed to create certification" });
+    }
+  });
+
+  app.put("/api/certifications/:id", async (req, res) => {
+    try {
+      const certification = await storage.updateProfessionalCertification(req.params.id, req.body);
+      if (!certification) {
+        return res.status(404).json({ error: "Certification not found" });
+      }
+      res.json(certification);
+    } catch (error) {
+      console.error("Error updating certification:", error);
+      res.status(500).json({ error: "Failed to update certification" });
+    }
+  });
+
+  app.delete("/api/certifications/:id", async (req, res) => {
+    try {
+      await storage.deleteProfessionalCertification(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting certification:", error);
+      res.status(500).json({ error: "Failed to delete certification" });
+    }
+  });
+
+  // Professional Skills
+  app.get("/api/professionals/:id/skills", async (req, res) => {
+    try {
+      const skills = await storage.getProfessionalSkills(req.params.id);
+      res.json(skills);
+    } catch (error) {
+      console.error("Error fetching skills:", error);
+      res.status(500).json({ error: "Failed to fetch skills" });
+    }
+  });
+
+  app.post("/api/professionals/:id/skills", async (req, res) => {
+    try {
+      const parsed = insertProfessionalSkillSchema.parse({
+        ...req.body,
+        professionalId: req.params.id,
+      });
+      const skill = await storage.createProfessionalSkill(parsed);
+      res.status(201).json(skill);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      console.error("Error creating skill:", error);
+      res.status(500).json({ error: "Failed to create skill" });
+    }
+  });
+
+  app.put("/api/skills/:id", async (req, res) => {
+    try {
+      const skill = await storage.updateProfessionalSkill(req.params.id, req.body);
+      if (!skill) {
+        return res.status(404).json({ error: "Skill not found" });
+      }
+      res.json(skill);
+    } catch (error) {
+      console.error("Error updating skill:", error);
+      res.status(500).json({ error: "Failed to update skill" });
+    }
+  });
+
+  app.delete("/api/skills/:id", async (req, res) => {
+    try {
+      await storage.deleteProfessionalSkill(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting skill:", error);
+      res.status(500).json({ error: "Failed to delete skill" });
+    }
+  });
+
+  // Professional Experience
+  app.get("/api/professionals/:id/experience", async (req, res) => {
+    try {
+      const experience = await storage.getProfessionalExperience(req.params.id);
+      res.json(experience);
+    } catch (error) {
+      console.error("Error fetching experience:", error);
+      res.status(500).json({ error: "Failed to fetch experience" });
+    }
+  });
+
+  app.post("/api/professionals/:id/experience", async (req, res) => {
+    try {
+      const parsed = insertProfessionalExperienceSchema.parse({
+        ...req.body,
+        professionalId: req.params.id,
+      });
+      const experience = await storage.createProfessionalExperience(parsed);
+      res.status(201).json(experience);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      console.error("Error creating experience:", error);
+      res.status(500).json({ error: "Failed to create experience" });
+    }
+  });
+
+  app.put("/api/experience/:id", async (req, res) => {
+    try {
+      const experience = await storage.updateProfessionalExperience(req.params.id, req.body);
+      if (!experience) {
+        return res.status(404).json({ error: "Experience not found" });
+      }
+      res.json(experience);
+    } catch (error) {
+      console.error("Error updating experience:", error);
+      res.status(500).json({ error: "Failed to update experience" });
+    }
+  });
+
+  app.delete("/api/experience/:id", async (req, res) => {
+    try {
+      await storage.deleteProfessionalExperience(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting experience:", error);
+      res.status(500).json({ error: "Failed to delete experience" });
+    }
+  });
+
+  // Professional Education
+  app.get("/api/professionals/:id/education", async (req, res) => {
+    try {
+      const education = await storage.getProfessionalEducation(req.params.id);
+      res.json(education);
+    } catch (error) {
+      console.error("Error fetching education:", error);
+      res.status(500).json({ error: "Failed to fetch education" });
+    }
+  });
+
+  app.post("/api/professionals/:id/education", async (req, res) => {
+    try {
+      const parsed = insertProfessionalEducationSchema.parse({
+        ...req.body,
+        professionalId: req.params.id,
+      });
+      const education = await storage.createProfessionalEducation(parsed);
+      res.status(201).json(education);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      console.error("Error creating education:", error);
+      res.status(500).json({ error: "Failed to create education" });
+    }
+  });
+
+  app.put("/api/education/:id", async (req, res) => {
+    try {
+      const education = await storage.updateProfessionalEducation(req.params.id, req.body);
+      if (!education) {
+        return res.status(404).json({ error: "Education not found" });
+      }
+      res.json(education);
+    } catch (error) {
+      console.error("Error updating education:", error);
+      res.status(500).json({ error: "Failed to update education" });
+    }
+  });
+
+  app.delete("/api/education/:id", async (req, res) => {
+    try {
+      await storage.deleteProfessionalEducation(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting education:", error);
+      res.status(500).json({ error: "Failed to delete education" });
+    }
+  });
+
+  // Professional Awards
+  app.get("/api/professionals/:id/awards", async (req, res) => {
+    try {
+      const awards = await storage.getProfessionalAwards(req.params.id);
+      res.json(awards);
+    } catch (error) {
+      console.error("Error fetching awards:", error);
+      res.status(500).json({ error: "Failed to fetch awards" });
+    }
+  });
+
+  app.post("/api/professionals/:id/awards", async (req, res) => {
+    try {
+      const parsed = insertProfessionalAwardSchema.parse({
+        ...req.body,
+        professionalId: req.params.id,
+      });
+      const award = await storage.createProfessionalAward(parsed);
+      res.status(201).json(award);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      console.error("Error creating award:", error);
+      res.status(500).json({ error: "Failed to create award" });
+    }
+  });
+
+  app.put("/api/awards/:id", async (req, res) => {
+    try {
+      const award = await storage.updateProfessionalAward(req.params.id, req.body);
+      if (!award) {
+        return res.status(404).json({ error: "Award not found" });
+      }
+      res.json(award);
+    } catch (error) {
+      console.error("Error updating award:", error);
+      res.status(500).json({ error: "Failed to update award" });
+    }
+  });
+
+  app.delete("/api/awards/:id", async (req, res) => {
+    try {
+      await storage.deleteProfessionalAward(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting award:", error);
+      res.status(500).json({ error: "Failed to delete award" });
+    }
+  });
+
+  // Professional Training
+  app.get("/api/professionals/:id/training", async (req, res) => {
+    try {
+      const training = await storage.getProfessionalTraining(req.params.id);
+      res.json(training);
+    } catch (error) {
+      console.error("Error fetching training:", error);
+      res.status(500).json({ error: "Failed to fetch training" });
+    }
+  });
+
+  app.post("/api/professionals/:id/training", async (req, res) => {
+    try {
+      const parsed = insertProfessionalTrainingSchema.parse({
+        ...req.body,
+        professionalId: req.params.id,
+      });
+      const training = await storage.createProfessionalTraining(parsed);
+      res.status(201).json(training);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      console.error("Error creating training:", error);
+      res.status(500).json({ error: "Failed to create training" });
+    }
+  });
+
+  app.put("/api/training/:id", async (req, res) => {
+    try {
+      const training = await storage.updateProfessionalTraining(req.params.id, req.body);
+      if (!training) {
+        return res.status(404).json({ error: "Training not found" });
+      }
+      res.json(training);
+    } catch (error) {
+      console.error("Error updating training:", error);
+      res.status(500).json({ error: "Failed to update training" });
+    }
+  });
+
+  app.delete("/api/training/:id", async (req, res) => {
+    try {
+      await storage.deleteProfessionalTraining(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting training:", error);
+      res.status(500).json({ error: "Failed to delete training" });
     }
   });
 
