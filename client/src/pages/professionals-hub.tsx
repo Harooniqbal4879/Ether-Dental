@@ -1461,20 +1461,21 @@ function MyCredentialsView({ professionalId }: { professionalId: string }) {
 
 function CertificationItem({ cert, professionalId }: { cert: ProfessionalCertification; professionalId: string }) {
   const { toast } = useToast();
+  const [pendingObjectPath, setPendingObjectPath] = useState<string | null>(null);
 
   const handleUploadComplete = async (result: any) => {
     const file = result.successful?.[0];
-    if (file) {
+    if (file && pendingObjectPath) {
       try {
-        const objectPath = `/objects/uploads/${file.id}`;
         await apiRequest("PATCH", `/api/credentials/certifications/${cert.id}/document`, {
-          documentUrl: objectPath,
+          documentUrl: pendingObjectPath,
         });
-        queryClient.invalidateQueries({ queryKey: [`/api/professionals/${professionalId}/full`] });
+        queryClient.invalidateQueries({ queryKey: ["/api/professionals", professionalId, "full"] });
         toast({
           title: "Document Uploaded",
           description: "The certification document has been uploaded successfully.",
         });
+        setPendingObjectPath(null);
       } catch (error) {
         toast({
           title: "Error",
@@ -1531,10 +1532,11 @@ function CertificationItem({ cert, professionalId }: { cert: ProfessionalCertifi
               contentType: file.type,
             }),
           });
-          const { uploadURL } = await res.json();
+          const data = await res.json();
+          setPendingObjectPath(data.objectPath);
           return {
             method: "PUT" as const,
-            url: uploadURL,
+            url: data.uploadURL,
             headers: { "Content-Type": file.type },
           };
         }}
