@@ -1367,6 +1367,121 @@ export async function registerRoutes(
     }
   });
 
+  // Location Profile - GET resolved profile (location data with practice defaults as fallback)
+  app.get("/api/locations/:id/profile", async (req, res) => {
+    try {
+      const location = await storage.getLocation(req.params.id);
+      if (!location) {
+        return res.status(404).json({ error: "Location not found" });
+      }
+      
+      // Get practice defaults for fallback
+      const practice = await storage.getPractice(location.practiceId);
+      
+      // Build resolved profile: use location value if set, otherwise practice default
+      const resolvedProfile = {
+        locationId: location.id,
+        locationName: location.name,
+        address: location.address,
+        city: location.city,
+        stateCode: location.stateCode,
+        zipCode: location.zipCode,
+        phone: location.phone,
+        email: location.email,
+        aboutOffice: location.aboutOffice ?? practice?.aboutOffice ?? "",
+        parkingInfo: location.parkingInfo ?? practice?.parkingInfo ?? "",
+        arrivalInstructions: location.arrivalInstructions ?? practice?.arrivalInstructions ?? "",
+        dressCode: location.dressCode ?? practice?.dressCode ?? "",
+        photos: location.photos ?? practice?.photos ?? [],
+        numDentists: location.numDentists ?? practice?.numDentists ?? 0,
+        numHygienists: location.numHygienists ?? practice?.numHygienists ?? 0,
+        numSupportStaff: location.numSupportStaff ?? practice?.numSupportStaff ?? 0,
+        breakRoomAvailable: location.breakRoomAvailable ?? practice?.breakRoomAvailable ?? false,
+        refrigeratorAvailable: location.refrigeratorAvailable ?? practice?.refrigeratorAvailable ?? false,
+        microwaveAvailable: location.microwaveAvailable ?? practice?.microwaveAvailable ?? false,
+        practiceManagementSoftware: location.practiceManagementSoftware ?? practice?.practiceManagementSoftware ?? "",
+        xraySoftware: location.xraySoftware ?? practice?.xraySoftware ?? "",
+        hasOverheadLights: location.hasOverheadLights ?? practice?.hasOverheadLights ?? false,
+        preferredScrubColor: location.preferredScrubColor ?? practice?.preferredScrubColor ?? "",
+        clinicalAttireProvided: location.clinicalAttireProvided ?? practice?.clinicalAttireProvided ?? false,
+        useAirPolishers: location.useAirPolishers ?? practice?.useAirPolishers ?? false,
+        scalerType: location.scalerType ?? practice?.scalerType ?? "",
+        assistedHygieneSchedule: location.assistedHygieneSchedule ?? practice?.assistedHygieneSchedule ?? false,
+        rootPlaningProcedures: location.rootPlaningProcedures ?? practice?.rootPlaningProcedures ?? false,
+        seeNewPatients: location.seeNewPatients ?? practice?.seeNewPatients ?? false,
+        administerLocalAnesthesia: location.administerLocalAnesthesia ?? practice?.administerLocalAnesthesia ?? false,
+        workWithNitrousPatients: location.workWithNitrousPatients ?? practice?.workWithNitrousPatients ?? false,
+        appointmentLengthAdults: location.appointmentLengthAdults ?? practice?.appointmentLengthAdults ?? "",
+        appointmentLengthKids: location.appointmentLengthKids ?? practice?.appointmentLengthKids ?? "",
+        appointmentLengthPerio: location.appointmentLengthPerio ?? practice?.appointmentLengthPerio ?? "",
+        appointmentLengthScaling: location.appointmentLengthScaling ?? practice?.appointmentLengthScaling ?? "",
+        dentalTreatmentRooms: location.dentalTreatmentRooms ?? practice?.dentalTreatmentRooms ?? 0,
+        dedicatedHygieneRooms: location.dedicatedHygieneRooms ?? practice?.dedicatedHygieneRooms ?? 0,
+        hiringPermanently: location.hiringPermanently ?? practice?.hiringPermanently ?? false,
+      };
+      
+      res.json(resolvedProfile);
+    } catch (error) {
+      console.error("Error fetching location profile:", error);
+      res.status(500).json({ error: "Failed to fetch location profile" });
+    }
+  });
+
+  // Location Profile - PATCH to update profile fields
+  const locationProfileSchema = z.object({
+    aboutOffice: z.string().optional(),
+    parkingInfo: z.string().optional(),
+    arrivalInstructions: z.string().optional(),
+    dressCode: z.string().optional(),
+    photos: z.array(z.string()).optional(),
+    numDentists: z.number().optional(),
+    numHygienists: z.number().optional(),
+    numSupportStaff: z.number().optional(),
+    breakRoomAvailable: z.boolean().optional(),
+    refrigeratorAvailable: z.boolean().optional(),
+    microwaveAvailable: z.boolean().optional(),
+    practiceManagementSoftware: z.string().optional(),
+    xraySoftware: z.string().optional(),
+    hasOverheadLights: z.boolean().optional(),
+    preferredScrubColor: z.string().optional(),
+    clinicalAttireProvided: z.boolean().optional(),
+    useAirPolishers: z.boolean().optional(),
+    scalerType: z.string().optional(),
+    assistedHygieneSchedule: z.boolean().optional(),
+    rootPlaningProcedures: z.boolean().optional(),
+    seeNewPatients: z.boolean().optional(),
+    administerLocalAnesthesia: z.boolean().optional(),
+    workWithNitrousPatients: z.boolean().optional(),
+    appointmentLengthAdults: z.string().optional(),
+    appointmentLengthKids: z.string().optional(),
+    appointmentLengthPerio: z.string().optional(),
+    appointmentLengthScaling: z.string().optional(),
+    dentalTreatmentRooms: z.number().optional(),
+    dedicatedHygieneRooms: z.number().optional(),
+    hiringPermanently: z.boolean().optional(),
+  });
+
+  app.patch("/api/locations/:id/profile", async (req, res) => {
+    try {
+      const parseResult = locationProfileSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          error: "Validation failed", 
+          details: parseResult.error.errors 
+        });
+      }
+      
+      const location = await storage.updateLocation(req.params.id, parseResult.data);
+      if (!location) {
+        return res.status(404).json({ error: "Location not found" });
+      }
+      res.json(location);
+    } catch (error) {
+      console.error("Error updating location profile:", error);
+      res.status(500).json({ error: "Failed to update location profile" });
+    }
+  });
+
   app.delete("/api/locations/:id", async (req, res) => {
     try {
       await storage.deleteLocation(req.params.id);
