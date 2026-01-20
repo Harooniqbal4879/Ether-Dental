@@ -29,6 +29,16 @@ import {
   FileText,
   Plus,
   UserPlus,
+  Settings,
+  MapPin,
+  ShieldCheck,
+  Sparkles,
+  Trophy,
+  BookOpen,
+  Building2,
+  Edit,
+  Trash2,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -64,6 +74,14 @@ import {
 import { Label } from "@/components/ui/label";
 import {
   type ProfessionalWithBadges,
+  type ProfessionalWithCredentials,
+  type ProfessionalPreferences,
+  type ProfessionalCertification,
+  type ProfessionalSkill,
+  type ProfessionalExperience,
+  type ProfessionalEducation,
+  type ProfessionalAward,
+  type ProfessionalTraining,
   type StaffShift,
   type ShiftTransactionWithDetails,
   StaffRoles,
@@ -637,14 +655,22 @@ function ProfessionalPortalView() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsList className="grid w-full max-w-2xl grid-cols-4">
           <TabsTrigger value="shifts" data-testid="tab-shift-history">
             <Calendar className="h-4 w-4 mr-2" />
-            Shift History
+            Shifts
           </TabsTrigger>
           <TabsTrigger value="transactions" data-testid="tab-payment-transactions">
             <DollarSign className="h-4 w-4 mr-2" />
-            Payment Transactions
+            Payments
+          </TabsTrigger>
+          <TabsTrigger value="preferences" data-testid="tab-preferences">
+            <Settings className="h-4 w-4 mr-2" />
+            Preferences
+          </TabsTrigger>
+          <TabsTrigger value="credentials" data-testid="tab-credentials">
+            <ShieldCheck className="h-4 w-4 mr-2" />
+            Credentials
           </TabsTrigger>
         </TabsList>
 
@@ -655,7 +681,540 @@ function ProfessionalPortalView() {
         <TabsContent value="transactions" className="mt-6">
           <MyEarningsView professionalId={currentProfessional.id} />
         </TabsContent>
+
+        <TabsContent value="preferences" className="mt-6">
+          <MyPreferencesView professionalId={currentProfessional.id} />
+        </TabsContent>
+
+        <TabsContent value="credentials" className="mt-6">
+          <MyCredentialsView professionalId={currentProfessional.id} />
+        </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function MyPreferencesView({ professionalId }: { professionalId: string }) {
+  const { toast } = useToast();
+
+  const { data: preferences, isLoading } = useQuery<ProfessionalPreferences | null>({
+    queryKey: ["/api/professionals", professionalId, "preferences"],
+  });
+
+  const updatePreferencesMutation = useMutation({
+    mutationFn: async (data: Partial<ProfessionalPreferences>) => {
+      const response = await apiRequest("PUT", `/api/professionals/${professionalId}/preferences`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/professionals", professionalId, "preferences"] });
+      toast({
+        title: "Preferences Updated",
+        description: "Your shift preferences have been saved.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update preferences",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const [editingPreferences, setEditingPreferences] = useState(false);
+  const [formData, setFormData] = useState({
+    preferredDays: [] as string[],
+    preferredTimeStart: "",
+    preferredTimeEnd: "",
+    minHourlyRate: "",
+    maxHourlyRate: "",
+    maxDistanceMiles: "",
+    acceptLastMinuteShifts: false,
+    acceptOvertimeShifts: false,
+  });
+
+  const handleSavePreferences = () => {
+    updatePreferencesMutation.mutate({
+      preferredDays: formData.preferredDays.length > 0 ? formData.preferredDays : null,
+      preferredTimeStart: formData.preferredTimeStart || null,
+      preferredTimeEnd: formData.preferredTimeEnd || null,
+      minHourlyRate: formData.minHourlyRate || null,
+      maxHourlyRate: formData.maxHourlyRate || null,
+      maxDistanceMiles: formData.maxDistanceMiles ? parseInt(formData.maxDistanceMiles) : null,
+      acceptLastMinuteShifts: formData.acceptLastMinuteShifts,
+      acceptOvertimeShifts: formData.acceptOvertimeShifts,
+    });
+    setEditingPreferences(false);
+  };
+
+  const daysOfWeek = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-48" />
+        <Skeleton className="h-48" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Shift Preferences</h3>
+        {!editingPreferences && (
+          <Button variant="outline" size="sm" onClick={() => {
+            setFormData({
+              preferredDays: preferences?.preferredDays || [],
+              preferredTimeStart: preferences?.preferredTimeStart || "",
+              preferredTimeEnd: preferences?.preferredTimeEnd || "",
+              minHourlyRate: preferences?.minHourlyRate || "",
+              maxHourlyRate: preferences?.maxHourlyRate || "",
+              maxDistanceMiles: preferences?.maxDistanceMiles?.toString() || "",
+              acceptLastMinuteShifts: preferences?.acceptLastMinuteShifts || false,
+              acceptOvertimeShifts: preferences?.acceptOvertimeShifts || false,
+            });
+            setEditingPreferences(true);
+          }} data-testid="button-edit-preferences">
+            <Edit className="h-4 w-4 mr-2" />
+            Edit Preferences
+          </Button>
+        )}
+      </div>
+
+      {editingPreferences ? (
+        <Card>
+          <CardContent className="pt-6 space-y-6">
+            <div>
+              <Label className="text-sm font-medium">Preferred Days</Label>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {daysOfWeek.map((day) => (
+                  <Badge
+                    key={day}
+                    variant={formData.preferredDays.includes(day) ? "default" : "outline"}
+                    className="cursor-pointer capitalize"
+                    onClick={() => {
+                      const newDays = formData.preferredDays.includes(day)
+                        ? formData.preferredDays.filter((d) => d !== day)
+                        : [...formData.preferredDays, day];
+                      setFormData({ ...formData, preferredDays: newDays });
+                    }}
+                    data-testid={`badge-day-${day}`}
+                  >
+                    {day}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="timeStart">Preferred Start Time</Label>
+                <Input
+                  id="timeStart"
+                  type="time"
+                  value={formData.preferredTimeStart}
+                  onChange={(e) => setFormData({ ...formData, preferredTimeStart: e.target.value })}
+                  data-testid="input-preferred-start-time"
+                />
+              </div>
+              <div>
+                <Label htmlFor="timeEnd">Preferred End Time</Label>
+                <Input
+                  id="timeEnd"
+                  type="time"
+                  value={formData.preferredTimeEnd}
+                  onChange={(e) => setFormData({ ...formData, preferredTimeEnd: e.target.value })}
+                  data-testid="input-preferred-end-time"
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div>
+                <Label htmlFor="minRate">Min Hourly Rate ($)</Label>
+                <Input
+                  id="minRate"
+                  type="number"
+                  step="0.01"
+                  value={formData.minHourlyRate}
+                  onChange={(e) => setFormData({ ...formData, minHourlyRate: e.target.value })}
+                  placeholder="35.00"
+                  data-testid="input-min-hourly-rate"
+                />
+              </div>
+              <div>
+                <Label htmlFor="maxRate">Max Hourly Rate ($)</Label>
+                <Input
+                  id="maxRate"
+                  type="number"
+                  step="0.01"
+                  value={formData.maxHourlyRate}
+                  onChange={(e) => setFormData({ ...formData, maxHourlyRate: e.target.value })}
+                  placeholder="75.00"
+                  data-testid="input-max-hourly-rate"
+                />
+              </div>
+              <div>
+                <Label htmlFor="maxDistance">Max Distance (miles)</Label>
+                <Input
+                  id="maxDistance"
+                  type="number"
+                  value={formData.maxDistanceMiles}
+                  onChange={(e) => setFormData({ ...formData, maxDistanceMiles: e.target.value })}
+                  placeholder="25"
+                  data-testid="input-max-distance"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.acceptLastMinuteShifts}
+                  onChange={(e) => setFormData({ ...formData, acceptLastMinuteShifts: e.target.checked })}
+                  className="rounded border-input"
+                  data-testid="checkbox-last-minute-shifts"
+                />
+                <span className="text-sm">Accept last-minute shifts</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.acceptOvertimeShifts}
+                  onChange={(e) => setFormData({ ...formData, acceptOvertimeShifts: e.target.checked })}
+                  className="rounded border-input"
+                  data-testid="checkbox-overtime-shifts"
+                />
+                <span className="text-sm">Accept overtime shifts</span>
+              </label>
+            </div>
+
+            <div className="flex gap-2 pt-4">
+              <Button onClick={handleSavePreferences} disabled={updatePreferencesMutation.isPending} data-testid="button-save-preferences">
+                {updatePreferencesMutation.isPending ? "Saving..." : "Save Preferences"}
+              </Button>
+              <Button variant="outline" onClick={() => setEditingPreferences(false)} data-testid="button-cancel-preferences">
+                Cancel
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="pt-6">
+            {!preferences ? (
+              <div className="text-center py-8">
+                <Settings className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h4 className="font-semibold mb-2">No Preferences Set</h4>
+                <p className="text-muted-foreground text-sm mb-4">
+                  Configure your shift preferences to help match you with suitable opportunities.
+                </p>
+                <Button onClick={() => setEditingPreferences(true)} data-testid="button-set-preferences">
+                  Set Preferences
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {preferences.preferredDays && preferences.preferredDays.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-2">Preferred Days</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {preferences.preferredDays.map((day) => (
+                        <Badge key={day} variant="secondary" className="capitalize">
+                          {day}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  {(preferences.preferredTimeStart || preferences.preferredTimeEnd) && (
+                    <div>
+                      <h4 className="text-sm font-medium text-muted-foreground mb-1">Preferred Hours</h4>
+                      <p className="text-sm">
+                        {preferences.preferredTimeStart || "Any"} - {preferences.preferredTimeEnd || "Any"}
+                      </p>
+                    </div>
+                  )}
+                  {(preferences.minHourlyRate || preferences.maxHourlyRate) && (
+                    <div>
+                      <h4 className="text-sm font-medium text-muted-foreground mb-1">Rate Range</h4>
+                      <p className="text-sm">
+                        ${preferences.minHourlyRate || "0"} - ${preferences.maxHourlyRate || "∞"}/hr
+                      </p>
+                    </div>
+                  )}
+                  {preferences.maxDistanceMiles && (
+                    <div>
+                      <h4 className="text-sm font-medium text-muted-foreground mb-1">Max Distance</h4>
+                      <p className="text-sm">{preferences.maxDistanceMiles} miles</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap gap-4 pt-2">
+                  {preferences.acceptLastMinuteShifts && (
+                    <Badge variant="outline">
+                      <Clock className="h-3 w-3 mr-1" />
+                      Last-minute shifts OK
+                    </Badge>
+                  )}
+                  {preferences.acceptOvertimeShifts && (
+                    <Badge variant="outline">
+                      <TrendingUp className="h-3 w-3 mr-1" />
+                      Overtime OK
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function MyCredentialsView({ professionalId }: { professionalId: string }) {
+  const { toast } = useToast();
+  const [activeCredentialTab, setActiveCredentialTab] = useState("certifications");
+
+  const { data: professionalData, isLoading } = useQuery<ProfessionalWithCredentials>({
+    queryKey: ["/api/professionals", professionalId, "full"],
+  });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-12 w-80" />
+        <Skeleton className="h-64" />
+      </div>
+    );
+  }
+
+  const { certifications = [], skills = [], experience = [], education = [], awards = [], training = [] } = professionalData || {};
+
+  return (
+    <div className="space-y-6">
+      <Tabs value={activeCredentialTab} onValueChange={setActiveCredentialTab}>
+        <TabsList className="flex flex-wrap gap-1">
+          <TabsTrigger value="certifications" className="text-xs sm:text-sm">
+            <ShieldCheck className="h-3 w-3 mr-1 sm:h-4 sm:w-4 sm:mr-2" />
+            Certifications
+          </TabsTrigger>
+          <TabsTrigger value="skills" className="text-xs sm:text-sm">
+            <Sparkles className="h-3 w-3 mr-1 sm:h-4 sm:w-4 sm:mr-2" />
+            Skills
+          </TabsTrigger>
+          <TabsTrigger value="experience" className="text-xs sm:text-sm">
+            <Building2 className="h-3 w-3 mr-1 sm:h-4 sm:w-4 sm:mr-2" />
+            Experience
+          </TabsTrigger>
+          <TabsTrigger value="education" className="text-xs sm:text-sm">
+            <GraduationCap className="h-3 w-3 mr-1 sm:h-4 sm:w-4 sm:mr-2" />
+            Education
+          </TabsTrigger>
+          <TabsTrigger value="awards" className="text-xs sm:text-sm">
+            <Trophy className="h-3 w-3 mr-1 sm:h-4 sm:w-4 sm:mr-2" />
+            Awards
+          </TabsTrigger>
+          <TabsTrigger value="training" className="text-xs sm:text-sm">
+            <BookOpen className="h-3 w-3 mr-1 sm:h-4 sm:w-4 sm:mr-2" />
+            Training
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="certifications" className="mt-4">
+          <CredentialSection
+            title="Certifications"
+            items={certifications}
+            emptyMessage="No certifications added yet"
+            renderItem={(cert: ProfessionalCertification) => (
+              <div key={cert.id} className="flex items-start justify-between p-4 border rounded-lg" data-testid={`cert-${cert.id}`}>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-medium">{cert.name}</h4>
+                    {cert.verificationStatus === "verified" && (
+                      <Badge variant="default" className="bg-green-500">Verified</Badge>
+                    )}
+                    {cert.verificationStatus === "pending" && (
+                      <Badge variant="secondary">Pending</Badge>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground">{cert.issuingAuthority}</p>
+                  {cert.expirationDate && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Expires: {new Date(cert.expirationDate).toLocaleDateString()}
+                      {new Date(cert.expirationDate) < new Date() && (
+                        <Badge variant="destructive" className="ml-2 text-xs">Expired</Badge>
+                      )}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+            professionalId={professionalId}
+            credentialType="certifications"
+          />
+        </TabsContent>
+
+        <TabsContent value="skills" className="mt-4">
+          <CredentialSection
+            title="Skills"
+            items={skills}
+            emptyMessage="No skills added yet"
+            renderItem={(skill: ProfessionalSkill) => (
+              <div key={skill.id} className="flex items-center justify-between p-4 border rounded-lg" data-testid={`skill-${skill.id}`}>
+                <div>
+                  <h4 className="font-medium">{skill.skillName}</h4>
+                  {skill.category && <p className="text-xs text-muted-foreground">{skill.category}</p>}
+                </div>
+                <Badge variant="outline">{skill.proficiencyLevel}</Badge>
+              </div>
+            )}
+            professionalId={professionalId}
+            credentialType="skills"
+          />
+        </TabsContent>
+
+        <TabsContent value="experience" className="mt-4">
+          <CredentialSection
+            title="Work Experience"
+            items={experience}
+            emptyMessage="No work experience added yet"
+            renderItem={(exp: ProfessionalExperience) => (
+              <div key={exp.id} className="p-4 border rounded-lg" data-testid={`exp-${exp.id}`}>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h4 className="font-medium">{exp.jobTitle}</h4>
+                    <p className="text-sm text-muted-foreground">{exp.employer}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {exp.startDate} - {exp.isCurrent ? "Present" : exp.endDate}
+                    </p>
+                  </div>
+                </div>
+                {exp.description && <p className="text-sm mt-2">{exp.description}</p>}
+              </div>
+            )}
+            professionalId={professionalId}
+            credentialType="experience"
+          />
+        </TabsContent>
+
+        <TabsContent value="education" className="mt-4">
+          <CredentialSection
+            title="Education"
+            items={education}
+            emptyMessage="No education records added yet"
+            renderItem={(edu: ProfessionalEducation) => (
+              <div key={edu.id} className="p-4 border rounded-lg" data-testid={`edu-${edu.id}`}>
+                <h4 className="font-medium">{edu.degree}</h4>
+                <p className="text-sm text-muted-foreground">{edu.institution}</p>
+                {edu.fieldOfStudy && <p className="text-xs text-muted-foreground">{edu.fieldOfStudy}</p>}
+                {edu.graduationDate && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Graduated: {edu.graduationDate}
+                  </p>
+                )}
+              </div>
+            )}
+            professionalId={professionalId}
+            credentialType="education"
+          />
+        </TabsContent>
+
+        <TabsContent value="awards" className="mt-4">
+          <CredentialSection
+            title="Awards & Recognitions"
+            items={awards}
+            emptyMessage="No awards added yet"
+            renderItem={(award: ProfessionalAward) => (
+              <div key={award.id} className="flex items-start gap-3 p-4 border rounded-lg" data-testid={`award-${award.id}`}>
+                <Trophy className="h-5 w-5 text-yellow-500 mt-0.5" />
+                <div>
+                  <h4 className="font-medium">{award.title}</h4>
+                  <p className="text-sm text-muted-foreground">{award.issuer}</p>
+                  {award.dateReceived && (
+                    <p className="text-xs text-muted-foreground">{award.dateReceived}</p>
+                  )}
+                </div>
+              </div>
+            )}
+            professionalId={professionalId}
+            credentialType="awards"
+          />
+        </TabsContent>
+
+        <TabsContent value="training" className="mt-4">
+          <CredentialSection
+            title="Continuing Education & Training"
+            items={training}
+            emptyMessage="No training records added yet"
+            renderItem={(t: ProfessionalTraining) => (
+              <div key={t.id} className="p-4 border rounded-lg" data-testid={`training-${t.id}`}>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h4 className="font-medium">{t.courseName}</h4>
+                    <p className="text-sm text-muted-foreground">{t.provider}</p>
+                    {t.completionDate && (
+                      <p className="text-xs text-muted-foreground">Completed: {t.completionDate}</p>
+                    )}
+                  </div>
+                  {t.ceCredits && (
+                    <Badge variant="secondary">{t.ceCredits} CE Credits</Badge>
+                  )}
+                </div>
+              </div>
+            )}
+            professionalId={professionalId}
+            credentialType="training"
+          />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+function CredentialSection<T extends { id: string }>({
+  title,
+  items,
+  emptyMessage,
+  renderItem,
+  professionalId,
+  credentialType,
+}: {
+  title: string;
+  items: T[];
+  emptyMessage: string;
+  renderItem: (item: T) => React.ReactNode;
+  professionalId: string;
+  credentialType: string;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">{title}</h3>
+      </div>
+      
+      {items.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-8">
+            <AlertCircle className="h-10 w-10 text-muted-foreground mb-3" />
+            <p className="text-muted-foreground">{emptyMessage}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Add credentials from the mobile app
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {items.map(renderItem)}
+        </div>
+      )}
     </div>
   );
 }

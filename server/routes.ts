@@ -524,6 +524,141 @@ export async function registerRoutes(
   });
 
   // Get available shifts for mobile app (open shifts only) - includes practice data
+  // Find matching professionals for a shift based on their preferences
+  app.get("/api/shifts/:id/matching-professionals", async (req, res) => {
+    try {
+      const shift = await storage.getShift(req.params.id);
+      if (!shift) {
+        return res.status(404).json({ error: "Shift not found" });
+      }
+
+      // Get all active professionals with the matching role
+      const professionals = await storage.getProfessionals({ role: shift.role });
+      const matchingProfessionals = [];
+
+      for (const professional of professionals) {
+        const preferences = await storage.getProfessionalPreferences(professional.id);
+        
+        // If no preferences set, include as potential match
+        if (!preferences) {
+          matchingProfessionals.push({
+            professional,
+            matchScore: 50, // Neutral score for no preferences
+            matchDetails: { noPreferencesSet: true },
+          });
+          continue;
+        }
+
+        let matchScore = 100;
+        const matchDetails: Record<string, any> = {};
+
+        // Check hourly rate constraints
+        if (shift.hourlyRate) {
+          const shiftRate = parseFloat(shift.hourlyRate);
+          if (preferences.minHourlyRate && shiftRate < parseFloat(preferences.minHourlyRate)) {
+            matchDetails.rateBelowMin = true;
+            matchScore -= 30;
+          }
+          if (preferences.maxHourlyRate && shiftRate > parseFloat(preferences.maxHourlyRate)) {
+            matchDetails.rateAboveMax = true;
+            matchScore -= 10; // Less penalty for rate above max
+          }
+        }
+
+        // Check day preference
+        if (preferences.preferredDays && preferences.preferredDays.length > 0 && shift.date) {
+          const shiftDay = new Date(shift.date).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+          if (!preferences.preferredDays.includes(shiftDay)) {
+            matchDetails.dayNotPreferred = true;
+            matchScore -= 15;
+          }
+        }
+
+        // Helper function to convert time string (HH:MM) to minutes
+        const timeToMinutes = (timeStr: string): number => {
+          const parts = timeStr.split(':');
+          return parseInt(parts[0]) * 60 + parseInt(parts[1] || '0');
+        };
+
+        // Check time preferences using numeric comparison
+        if (preferences.preferredTimeStart && shift.startTime) {
+          const prefStartMinutes = timeToMinutes(preferences.preferredTimeStart);
+          const shiftStartMinutes = timeToMinutes(shift.startTime);
+          if (shiftStartMinutes < prefStartMinutes) {
+            matchDetails.startsTooEarly = true;
+            matchScore -= 10;
+          }
+        }
+
+        if (preferences.preferredTimeEnd && shift.endTime) {
+          const prefEndMinutes = timeToMinutes(preferences.preferredTimeEnd);
+          const shiftEndMinutes = timeToMinutes(shift.endTime);
+          if (shiftEndMinutes > prefEndMinutes) {
+            matchDetails.endsTooLate = true;
+            matchScore -= 10;
+          }
+        }
+
+        // Check last-minute shift acceptance
+        if (shift.date) {
+          const daysUntilShift = Math.ceil((new Date(shift.date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+          if (daysUntilShift <= 2 && !preferences.acceptLastMinuteShifts) {
+            matchDetails.isLastMinute = true;
+            matchScore -= 20;
+          }
+        }
+
+        // Check shift duration against preferences
+        if (shift.startTime && shift.endTime && (preferences.preferredShiftDurationMin || preferences.preferredShiftDurationMax)) {
+          const startParts = shift.startTime.split(':');
+          const endParts = shift.endTime.split(':');
+          const startMinutes = parseInt(startParts[0]) * 60 + parseInt(startParts[1] || '0');
+          const endMinutes = parseInt(endParts[0]) * 60 + parseInt(endParts[1] || '0');
+          const durationHours = (endMinutes - startMinutes) / 60;
+
+          if (preferences.preferredShiftDurationMin && durationHours < preferences.preferredShiftDurationMin) {
+            matchDetails.shiftTooShort = true;
+            matchScore -= 10;
+          }
+          if (preferences.preferredShiftDurationMax && durationHours > preferences.preferredShiftDurationMax) {
+            matchDetails.shiftTooLong = true;
+            matchScore -= 10;
+          }
+
+          // Check overtime acceptance (shifts over 8 hours)
+          if (durationHours > 8 && !preferences.acceptOvertimeShifts) {
+            matchDetails.isOvertime = true;
+            matchScore -= 15;
+          }
+        }
+
+        // Note: Distance matching requires professional's location and shift location coordinates
+        // Currently we store maxDistanceMiles preference but need location data to calculate distance
+        // This can be enhanced when location geocoding is implemented
+        if (preferences.maxDistanceMiles && preferences.maxDistanceMiles > 0) {
+          matchDetails.distanceCheckPending = true;
+          // Future: Calculate distance between professional location and shift location
+          // and apply penalty if distance exceeds maxDistanceMiles
+        }
+
+        matchDetails.finalScore = Math.max(0, matchScore);
+        matchingProfessionals.push({
+          professional,
+          matchScore: Math.max(0, matchScore),
+          matchDetails,
+        });
+      }
+
+      // Sort by match score descending
+      matchingProfessionals.sort((a, b) => b.matchScore - a.matchScore);
+
+      res.json(matchingProfessionals);
+    } catch (error) {
+      console.error("Error finding matching professionals:", error);
+      res.status(500).json({ error: "Failed to find matching professionals" });
+    }
+  });
+
   app.get("/api/shifts/available", async (req, res) => {
     try {
       const { startDate, endDate, role, locationId } = req.query;
