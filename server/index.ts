@@ -97,6 +97,38 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
+// CORS middleware for mobile app and external API access
+app.use((req, res, next) => {
+  // Get allowed origins from environment variable (comma-separated)
+  const corsOrigins = process.env.CORS_ALLOWED_ORIGINS?.split(',').map(o => o.trim()) || [];
+  
+  const origin = req.headers.origin;
+  
+  // Allow requests with no origin (mobile apps, Postman, curl, etc.)
+  if (!origin) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  } else if (
+    corsOrigins.includes(origin) || 
+    origin.includes('.replit.app') || 
+    origin.includes('.replit.dev') ||
+    origin.startsWith('http://localhost:') ||
+    origin.startsWith('exp://')
+  ) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  
+  next();
+});
+
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
