@@ -750,6 +750,50 @@ export const practiceLocations = pgTable("practice_locations", {
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  
+  // Location-specific profile fields (override practice-level defaults)
+  aboutOffice: text("about_office"),
+  parkingInfo: text("parking_info"),
+  arrivalInstructions: text("arrival_instructions"),
+  dressCode: text("dress_code"),
+  photos: text("photos").array(),
+  
+  // Staffing info for this location
+  numDentists: integer("num_dentists"),
+  numHygienists: integer("num_hygienists"),
+  numSupportStaff: integer("num_support_staff"),
+  
+  // Amenities at this location
+  breakRoomAvailable: boolean("break_room_available"),
+  refrigeratorAvailable: boolean("refrigerator_available"),
+  microwaveAvailable: boolean("microwave_available"),
+  
+  // Software used at this location (may vary by location)
+  practiceManagementSoftware: text("practice_management_software"),
+  xraySoftware: text("xray_software"),
+  
+  // Clinical info for this location
+  hasOverheadLights: boolean("has_overhead_lights"),
+  preferredScrubColor: text("preferred_scrub_color"),
+  clinicalAttireProvided: boolean("clinical_attire_provided"),
+  useAirPolishers: boolean("use_air_polishers"),
+  scalerType: text("scaler_type"),
+  assistedHygieneSchedule: boolean("assisted_hygiene_schedule"),
+  rootPlaningProcedures: boolean("root_planing_procedures"),
+  seeNewPatients: boolean("see_new_patients"),
+  administerLocalAnesthesia: boolean("administer_local_anesthesia"),
+  workWithNitrousPatients: boolean("work_with_nitrous_patients"),
+  
+  // Appointment settings for this location
+  appointmentLengthAdults: text("appointment_length_adults"),
+  appointmentLengthKids: text("appointment_length_kids"),
+  appointmentLengthPerio: text("appointment_length_perio"),
+  appointmentLengthScaling: text("appointment_length_scaling"),
+  
+  // Room setup at this location
+  dentalTreatmentRooms: integer("dental_treatment_rooms"),
+  dedicatedHygieneRooms: integer("dedicated_hygiene_rooms"),
+  hiringPermanently: boolean("hiring_permanently"),
 });
 
 export const practiceLocationsRelations = relations(practiceLocations, ({ one }) => ({
