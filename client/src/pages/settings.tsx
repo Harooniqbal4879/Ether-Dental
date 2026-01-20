@@ -74,6 +74,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useUpload } from "@/hooks/use-upload";
+import { useLocation } from "@/lib/location-context";
 import {
   Form,
   FormControl,
@@ -509,8 +510,51 @@ interface PracticeProfile {
 
 const PRACTICE_ID = "practice-1"; // Hardcoded for now - should come from auth context
 
+// Type for resolved location profile (returned by /api/locations/:id/profile)
+type LocationProfile = {
+  locationId: string;
+  locationName: string;
+  address: string | null;
+  city: string | null;
+  stateCode: string | null;
+  zipCode: string | null;
+  phone: string | null;
+  email: string | null;
+  aboutOffice: string;
+  parkingInfo: string;
+  arrivalInstructions: string;
+  dressCode: string;
+  photos: string[];
+  numDentists: number;
+  numHygienists: number;
+  numSupportStaff: number;
+  breakRoomAvailable: boolean;
+  refrigeratorAvailable: boolean;
+  microwaveAvailable: boolean;
+  practiceManagementSoftware: string;
+  xraySoftware: string;
+  hasOverheadLights: boolean;
+  preferredScrubColor: string;
+  clinicalAttireProvided: boolean;
+  useAirPolishers: boolean;
+  scalerType: string;
+  assistedHygieneSchedule: boolean;
+  rootPlaningProcedures: boolean;
+  seeNewPatients: boolean;
+  administerLocalAnesthesia: boolean;
+  workWithNitrousPatients: boolean;
+  appointmentLengthAdults: string;
+  appointmentLengthKids: string;
+  appointmentLengthPerio: string;
+  appointmentLengthScaling: string;
+  dentalTreatmentRooms: number;
+  dedicatedHygieneRooms: number;
+  hiringPermanently: boolean;
+};
+
 function OfficeProfileTab() {
   const { toast } = useToast();
+  const { currentLocationId, currentLocation } = useLocation();
   const { uploadFile, isUploading } = useUpload({
     onError: (error) => {
       toast({
@@ -522,8 +566,10 @@ function OfficeProfileTab() {
   });
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
   
-  const { data: profile, isLoading } = useQuery<PracticeProfile>({
-    queryKey: ["/api/practices", PRACTICE_ID, "profile"],
+  // Load location-specific profile data
+  const { data: profile, isLoading } = useQuery<LocationProfile>({
+    queryKey: ["/api/locations", currentLocationId, "profile"],
+    enabled: !!currentLocationId,
   });
 
   const [officeData, setOfficeData] = useState({
@@ -545,14 +591,14 @@ function OfficeProfileTab() {
     dressCode: "",
   });
   
-  // Sync profile data to local state when it loads
+  // Sync profile data to local state when it loads or location changes
   useEffect(() => {
     if (profile) {
       setOfficeData({
-        officeName: profile.name || "",
+        officeName: profile.locationName || "",
         officeAddress: [profile.address, profile.city, profile.stateCode, profile.zipCode].filter(Boolean).join(", "),
         officePhone: profile.phone || "",
-        website: profile.website || "",
+        website: "", // Website is not part of location profile
         aboutOffice: profile.aboutOffice || "",
         parkingInfo: profile.parkingInfo || "",
         numDentists: profile.numDentists || 0,
@@ -567,7 +613,7 @@ function OfficeProfileTab() {
         dressCode: profile.dressCode || "",
       });
     }
-  }, [profile]);
+  }, [profile, currentLocationId]);
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
     const file = e.target.files?.[0];
@@ -609,15 +655,16 @@ function OfficeProfileTab() {
   };
 
   const updateProfileMutation = useMutation({
-    mutationFn: async (data: Partial<PracticeProfile>) => {
-      const res = await apiRequest("PATCH", `/api/practices/${PRACTICE_ID}/profile`, data);
+    mutationFn: async (data: Partial<LocationProfile>) => {
+      if (!currentLocationId) throw new Error("No location selected");
+      const res = await apiRequest("PATCH", `/api/locations/${currentLocationId}/profile`, data);
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/practices", PRACTICE_ID, "profile"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/locations", currentLocationId, "profile"] });
       toast({
         title: "Profile Saved",
-        description: "Your office profile has been updated successfully.",
+        description: `${currentLocation?.name || "Location"} profile has been updated successfully.`,
       });
     },
     onError: (error: Error) => {
@@ -630,8 +677,15 @@ function OfficeProfileTab() {
   });
 
   const handleSave = () => {
+    if (!currentLocationId) {
+      toast({
+        title: "No Location Selected",
+        description: "Please select a location from the sidebar to save profile data.",
+        variant: "destructive",
+      });
+      return;
+    }
     updateProfileMutation.mutate({
-      website: officeData.website,
       aboutOffice: officeData.aboutOffice,
       parkingInfo: officeData.parkingInfo,
       numDentists: officeData.numDentists,
@@ -996,11 +1050,14 @@ function OfficeProfileTab() {
 function PracticeInformationTab() {
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
+  const { currentLocationId, currentLocation } = useLocation();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [testingConfigId, setTestingConfigId] = useState<string | null>(null);
 
-  const { data: profile, isLoading: isLoadingProfile } = useQuery<PracticeProfile>({
-    queryKey: ["/api/practices", PRACTICE_ID, "profile"],
+  // Load location-specific profile data
+  const { data: profile, isLoading: isLoadingProfile } = useQuery<LocationProfile>({
+    queryKey: ["/api/locations", currentLocationId, "profile"],
+    enabled: !!currentLocationId,
   });
 
   const [practiceData, setPracticeData] = useState({
@@ -1029,7 +1086,7 @@ function PracticeInformationTab() {
     dressCode: "",
   });
 
-  // Sync profile data to local state when it loads
+  // Sync profile data to local state when it loads or location changes
   useEffect(() => {
     if (profile) {
       setPracticeData({
@@ -1058,18 +1115,19 @@ function PracticeInformationTab() {
         dressCode: profile.dressCode || "",
       });
     }
-  }, [profile]);
+  }, [profile, currentLocationId]);
 
   const updateProfileMutation = useMutation({
-    mutationFn: async (data: Partial<PracticeProfile>) => {
-      const res = await apiRequest("PATCH", `/api/practices/${PRACTICE_ID}/profile`, data);
+    mutationFn: async (data: Partial<LocationProfile>) => {
+      if (!currentLocationId) throw new Error("No location selected");
+      const res = await apiRequest("PATCH", `/api/locations/${currentLocationId}/profile`, data);
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/practices", PRACTICE_ID, "profile"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/locations", currentLocationId, "profile"] });
       toast({
         title: "Practice Info Saved",
-        description: "Your practice information has been updated successfully.",
+        description: `${currentLocation?.name || "Location"} information has been updated successfully.`,
       });
     },
     onError: (error: Error) => {
@@ -1082,6 +1140,14 @@ function PracticeInformationTab() {
   });
 
   const handleSavePracticeInfo = () => {
+    if (!currentLocationId) {
+      toast({
+        title: "No Location Selected",
+        description: "Please select a location from the sidebar to save practice data.",
+        variant: "destructive",
+      });
+      return;
+    }
     updateProfileMutation.mutate({
       practiceManagementSoftware: practiceData.practiceManagementSoftware,
       xraySoftware: practiceData.xraySoftware,

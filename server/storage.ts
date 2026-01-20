@@ -786,6 +786,58 @@ export class DatabaseStorage implements IStorage {
     return { ...shift, location };
   }
 
+  // Build a resolved profile from location data with practice defaults as fallback
+  private async getLocationProfile(locationId: string): Promise<PracticeProfile | null> {
+    const [location] = await db.select().from(practiceLocations).where(eq(practiceLocations.id, locationId));
+    if (!location) return null;
+    
+    // Get practice defaults for fallback
+    const [practice] = await db.select().from(practices).where(eq(practices.id, location.practiceId));
+    
+    return {
+      id: location.id,
+      name: location.name,
+      address: location.address,
+      city: location.city,
+      stateCode: location.stateCode,
+      zipCode: location.zipCode,
+      phone: location.phone,
+      email: location.email,
+      website: practice?.website ?? null,
+      aboutOffice: location.aboutOffice ?? practice?.aboutOffice ?? null,
+      parkingInfo: location.parkingInfo ?? practice?.parkingInfo ?? null,
+      arrivalInstructions: location.arrivalInstructions ?? practice?.arrivalInstructions ?? null,
+      dressCode: location.dressCode ?? practice?.dressCode ?? null,
+      photos: location.photos ?? practice?.photos ?? null,
+      numDentists: location.numDentists ?? practice?.numDentists ?? null,
+      numHygienists: location.numHygienists ?? practice?.numHygienists ?? null,
+      numSupportStaff: location.numSupportStaff ?? practice?.numSupportStaff ?? null,
+      breakRoomAvailable: location.breakRoomAvailable ?? practice?.breakRoomAvailable ?? null,
+      refrigeratorAvailable: location.refrigeratorAvailable ?? practice?.refrigeratorAvailable ?? null,
+      microwaveAvailable: location.microwaveAvailable ?? practice?.microwaveAvailable ?? null,
+      practiceManagementSoftware: location.practiceManagementSoftware ?? practice?.practiceManagementSoftware ?? null,
+      xraySoftware: location.xraySoftware ?? practice?.xraySoftware ?? null,
+      hasOverheadLights: location.hasOverheadLights ?? practice?.hasOverheadLights ?? null,
+      preferredScrubColor: location.preferredScrubColor ?? practice?.preferredScrubColor ?? null,
+      clinicalAttireProvided: location.clinicalAttireProvided ?? practice?.clinicalAttireProvided ?? null,
+      useAirPolishers: location.useAirPolishers ?? practice?.useAirPolishers ?? null,
+      scalerType: location.scalerType ?? practice?.scalerType ?? null,
+      assistedHygieneSchedule: location.assistedHygieneSchedule ?? practice?.assistedHygieneSchedule ?? null,
+      rootPlaningProcedures: location.rootPlaningProcedures ?? practice?.rootPlaningProcedures ?? null,
+      seeNewPatients: location.seeNewPatients ?? practice?.seeNewPatients ?? null,
+      administerLocalAnesthesia: location.administerLocalAnesthesia ?? practice?.administerLocalAnesthesia ?? null,
+      workWithNitrousPatients: location.workWithNitrousPatients ?? practice?.workWithNitrousPatients ?? null,
+      appointmentLengthAdults: location.appointmentLengthAdults ?? practice?.appointmentLengthAdults ?? null,
+      appointmentLengthKids: location.appointmentLengthKids ?? practice?.appointmentLengthKids ?? null,
+      appointmentLengthPerio: location.appointmentLengthPerio ?? practice?.appointmentLengthPerio ?? null,
+      appointmentLengthScaling: location.appointmentLengthScaling ?? practice?.appointmentLengthScaling ?? null,
+      dentalTreatmentRooms: location.dentalTreatmentRooms ?? practice?.dentalTreatmentRooms ?? null,
+      dedicatedHygieneRooms: location.dedicatedHygieneRooms ?? practice?.dedicatedHygieneRooms ?? null,
+      hiringPermanently: location.hiringPermanently ?? practice?.hiringPermanently ?? null,
+    };
+  }
+  
+  // Fallback to practice-level profile if no location
   private async getPracticeProfile(practiceId: string): Promise<PracticeProfile | null> {
     const [practice] = await db.select().from(practices).where(eq(practices.id, practiceId));
     if (!practice) return null;
@@ -863,12 +915,11 @@ export class DatabaseStorage implements IStorage {
       if (shift.locationId) {
         const [loc] = await db.select().from(practiceLocations).where(eq(practiceLocations.id, shift.locationId));
         location = loc || null;
-        if (loc?.practiceId) {
-          practice = await this.getPracticeProfile(loc.practiceId);
-        }
+        // Use location-specific profile (with practice defaults as fallback)
+        practice = await this.getLocationProfile(shift.locationId);
       }
       
-      // Fallback: if no location but practiceId exists on shift, get practice directly
+      // Fallback: if no location but practiceId exists on shift, get practice-level profile
       if (!practice && shift.practiceId) {
         practice = await this.getPracticeProfile(shift.practiceId);
       }
@@ -889,12 +940,11 @@ export class DatabaseStorage implements IStorage {
     if (shift.locationId) {
       const [loc] = await db.select().from(practiceLocations).where(eq(practiceLocations.id, shift.locationId));
       location = loc || null;
-      if (loc?.practiceId) {
-        practice = await this.getPracticeProfile(loc.practiceId);
-      }
+      // Use location-specific profile (with practice defaults as fallback)
+      practice = await this.getLocationProfile(shift.locationId);
     }
     
-    // Fallback: if no location but practiceId exists on shift, get practice directly
+    // Fallback: if no location but practiceId exists on shift, get practice-level profile
     if (!practice && shift.practiceId) {
       practice = await this.getPracticeProfile(shift.practiceId);
     }
@@ -929,12 +979,11 @@ export class DatabaseStorage implements IStorage {
       if (shift.locationId) {
         const [loc] = await db.select().from(practiceLocations).where(eq(practiceLocations.id, shift.locationId));
         location = loc || null;
-        if (loc?.practiceId) {
-          practice = await this.getPracticeProfile(loc.practiceId);
-        }
+        // Use location-specific profile (with practice defaults as fallback)
+        practice = await this.getLocationProfile(shift.locationId);
       }
       
-      // Fallback: if no location but practiceId exists on shift, get practice directly
+      // Fallback: if no location but practiceId exists on shift, get practice-level profile
       if (!practice && shift.practiceId) {
         practice = await this.getPracticeProfile(shift.practiceId);
       }
