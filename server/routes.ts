@@ -656,6 +656,58 @@ export async function registerRoutes(
     }
   });
 
+  // Check-in to a shift (mobile app)
+  app.post("/api/shifts/:id/check-in", async (req, res) => {
+    try {
+      const { method, latitude, longitude } = req.body;
+      
+      if (!method) {
+        return res.status(400).json({ error: "Check-in method is required" });
+      }
+      
+      const result = await storage.checkInShift(req.params.id, {
+        method,
+        latitude: latitude !== undefined ? parseFloat(latitude) : undefined,
+        longitude: longitude !== undefined ? parseFloat(longitude) : undefined,
+      });
+      
+      if (!result.success) {
+        return res.status(409).json({ error: result.error });
+      }
+      
+      res.json({ success: true, shift: result.shift });
+    } catch (error) {
+      console.error("Error checking in to shift:", error);
+      res.status(500).json({ error: "Failed to check in to shift" });
+    }
+  });
+
+  // Check-out from a shift (mobile app)
+  app.post("/api/shifts/:id/check-out", async (req, res) => {
+    try {
+      const { method, latitude, longitude } = req.body;
+      
+      if (!method) {
+        return res.status(400).json({ error: "Check-out method is required" });
+      }
+      
+      const result = await storage.checkOutShift(req.params.id, {
+        method,
+        latitude: latitude !== undefined ? parseFloat(latitude) : undefined,
+        longitude: longitude !== undefined ? parseFloat(longitude) : undefined,
+      });
+      
+      if (!result.success) {
+        return res.status(409).json({ error: result.error });
+      }
+      
+      res.json({ success: true, shift: result.shift });
+    } catch (error) {
+      console.error("Error checking out from shift:", error);
+      res.status(500).json({ error: "Failed to check out from shift" });
+    }
+  });
+
   // Get shift details with practice data (for mobile app)
   app.get("/api/shifts/:id/details", async (req, res) => {
     try {
@@ -1489,6 +1541,85 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error deleting location:", error);
       res.status(500).json({ error: "Failed to delete location" });
+    }
+  });
+
+  // Shift Negotiations
+  const createNegotiationSchema = z.object({
+    shiftId: z.string().min(1, "Shift ID is required"),
+    professionalId: z.string().min(1, "Professional ID is required"),
+    proposedRate: z.string().min(1, "Proposed rate is required"),
+    message: z.string().optional(),
+  });
+
+  app.post("/api/negotiations", async (req, res) => {
+    try {
+      const parsed = createNegotiationSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.errors });
+      }
+
+      const negotiation = await storage.createNegotiation({
+        id: crypto.randomUUID(),
+        ...parsed.data,
+        status: "pending",
+        createdAt: new Date(),
+      });
+      
+      res.status(201).json(negotiation);
+    } catch (error) {
+      console.error("Error creating negotiation:", error);
+      res.status(500).json({ error: "Failed to create negotiation" });
+    }
+  });
+
+  app.get("/api/shifts/:id/negotiations", async (req, res) => {
+    try {
+      const negotiations = await storage.getNegotiationsForShift(req.params.id);
+      res.json(negotiations);
+    } catch (error) {
+      console.error("Error fetching negotiations for shift:", error);
+      res.status(500).json({ error: "Failed to fetch negotiations" });
+    }
+  });
+
+  app.get("/api/professionals/:id/negotiations", async (req, res) => {
+    try {
+      const negotiations = await storage.getNegotiationsForProfessional(req.params.id);
+      res.json(negotiations);
+    } catch (error) {
+      console.error("Error fetching negotiations for professional:", error);
+      res.status(500).json({ error: "Failed to fetch negotiations" });
+    }
+  });
+
+  const updateNegotiationSchema = z.object({
+    status: z.enum(["pending", "accepted", "rejected", "expired"]).optional(),
+    practiceResponse: z.string().optional(),
+    respondedAt: z.date().optional(),
+  });
+
+  app.patch("/api/negotiations/:id", async (req, res) => {
+    try {
+      const parsed = updateNegotiationSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.errors });
+      }
+
+      const updates: Record<string, unknown> = { ...parsed.data };
+      if (parsed.data.status && (parsed.data.status === "accepted" || parsed.data.status === "rejected")) {
+        updates.respondedAt = new Date();
+      }
+
+      const negotiation = await storage.updateNegotiation(req.params.id, updates);
+      if (!negotiation) {
+        return res.status(404).json({ error: "Negotiation not found" });
+      }
+      
+      res.json(negotiation);
+    } catch (error) {
+      console.error("Error updating negotiation:", error);
+      res.status(500).json({ error: "Failed to update negotiation" });
     }
   });
 
