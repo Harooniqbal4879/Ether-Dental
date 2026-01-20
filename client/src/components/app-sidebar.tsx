@@ -1,4 +1,4 @@
-import { Link, useLocation } from "wouter";
+import { Link, useLocation as useWouterLocation } from "wouter";
 import {
   LayoutDashboard,
   Users,
@@ -12,6 +12,7 @@ import {
   Contact,
   Sliders,
   Building2,
+  MapPin,
 } from "lucide-react";
 import {
   Sidebar,
@@ -34,6 +35,7 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { usePersona, personas, type Persona } from "@/lib/persona-context";
+import { useLocation as useLocationContext } from "@/lib/location-context";
 
 const allNavItems = [
   {
@@ -96,8 +98,11 @@ const configNavItems = [
 ];
 
 export function AppSidebar() {
-  const [location] = useLocation();
+  const [routeLocation] = useWouterLocation();
   const { currentPersona, setCurrentPersona, personaInfo } = usePersona();
+  const { currentLocation, locations, setCurrentLocationId, isLoading: isLoadingLocations } = useLocationContext();
+  
+  const isPracticePersona = ["admin", "front_desk", "treatment_coordinator", "billing_manager"].includes(currentPersona);
 
   const visibleMainItems = allNavItems.filter((item) =>
     item.personas.includes(currentPersona)
@@ -124,6 +129,47 @@ export function AppSidebar() {
         </Link>
       </SidebarHeader>
 
+      {isPracticePersona && locations.length > 0 && (
+        <div className="border-b border-sidebar-border px-4 py-3">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-sm hover-elevate bg-sidebar-accent/50"
+                data-testid="button-location-switcher"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="truncate font-medium">
+                    {isLoadingLocations ? "Loading..." : (currentLocation?.name || "Select Location")}
+                  </span>
+                </div>
+                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuLabel>Switch Location</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {locations.map((loc) => (
+                <DropdownMenuItem
+                  key={loc.id}
+                  onClick={() => setCurrentLocationId(loc.id)}
+                  className="flex items-center justify-between gap-2"
+                  data-testid={`option-location-${loc.id}`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <MapPin className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{loc.name}</span>
+                  </div>
+                  {currentLocation?.id === loc.id && (
+                    <Check className="h-4 w-4 shrink-0 text-primary" />
+                  )}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
+
       <SidebarContent className="px-2 py-4">
         <SidebarGroup>
           <SidebarGroupLabel className="px-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -135,7 +181,7 @@ export function AppSidebar() {
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
-                    isActive={location === item.url || (item.url === "/staffing" && location.startsWith("/staffing"))}
+                    isActive={routeLocation === item.url || (item.url === "/staffing" && routeLocation.startsWith("/staffing"))}
                     className="px-4"
                   >
                     <Link href={item.url} data-testid={`nav-${item.title.toLowerCase().replace(" ", "-")}`}>
@@ -160,7 +206,7 @@ export function AppSidebar() {
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
                       asChild
-                      isActive={location === item.url}
+                      isActive={routeLocation === item.url}
                       className="px-4"
                     >
                       <Link href={item.url} data-testid={`nav-${item.title.toLowerCase().replace(" ", "-")}`}>

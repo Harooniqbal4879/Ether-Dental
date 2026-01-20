@@ -87,6 +87,7 @@ The platform supports practices with multiple office locations. Each practice ca
 ### Location Management
 - **Settings Page**: The Locations tab (`/settings` → Locations tab) allows Practice Admins to add, edit, and manage office locations
 - **Shift Creation**: When creating shifts at `/staffing/add-shift`, staff can select which location the shift is for
+- **Location Switcher**: Practice-related personas (Practice Admin, Front Desk, Treatment Coordinator, Billing Manager) can switch between locations using a dropdown in the sidebar navigation. The selected location persists across sessions via localStorage.
 - **Appointments**: Appointments can be linked to specific locations (future enhancement)
 
 ### API Endpoints

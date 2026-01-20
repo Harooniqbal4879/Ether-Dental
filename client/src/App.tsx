@@ -8,6 +8,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { PersonaProvider } from "@/lib/persona-context";
+import { LocationProvider } from "@/lib/location-context";
 import Dashboard from "@/pages/dashboard";
 import Patients from "@/pages/patients";
 import PatientDetail from "@/pages/patient-detail";
@@ -60,20 +61,22 @@ function MainLayout() {
 
   return (
     <PersonaProvider>
-      <SidebarProvider style={sidebarStyle as React.CSSProperties}>
-        <div className="flex h-screen w-full">
-          <AppSidebar />
-          <SidebarInset className="flex flex-1 flex-col overflow-hidden">
-            <header className="sticky top-0 z-50 flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background px-4">
-              <SidebarTrigger data-testid="button-sidebar-toggle" />
-              <ThemeToggle />
-            </header>
-            <main className="flex-1 overflow-auto">
-              <MainRouter />
-            </main>
-          </SidebarInset>
-        </div>
-      </SidebarProvider>
+      <LocationProvider>
+        <SidebarProvider style={sidebarStyle as React.CSSProperties}>
+          <div className="flex h-screen w-full">
+            <AppSidebar />
+            <SidebarInset className="flex flex-1 flex-col overflow-hidden">
+              <header className="sticky top-0 z-50 flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background px-4">
+                <SidebarTrigger data-testid="button-sidebar-toggle" />
+                <ThemeToggle />
+              </header>
+              <main className="flex-1 overflow-auto">
+                <MainRouter />
+              </main>
+            </SidebarInset>
+          </div>
+        </SidebarProvider>
+      </LocationProvider>
     </PersonaProvider>
   );
 }
