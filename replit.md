@@ -106,9 +106,9 @@ The platform provides APIs for a mobile app (Expo React Native) that allows dent
 
 ### Mobile API Endpoints
 - `GET /api/shifts/available` - List open shifts with optional filters (startDate, endDate, role, locationId)
-  - Returns: `StaffShiftWithLocation[]` - shifts with embedded location details
-- `GET /api/shifts/:id/details` - Get detailed shift information including location
-  - Returns: `StaffShiftWithLocation` - shift with embedded location object
+  - Returns: `StaffShiftWithPractice[]` - shifts with embedded location and practice profile details
+- `GET /api/shifts/:id/details` - Get detailed shift information including location and practice profile
+  - Returns: `StaffShiftWithPractice` - shift with embedded location and practice objects
 - `POST /api/shifts/:id/claim` - Claim an open shift (professional accepts)
   - Body: `{ professionalId: string }`
   - Returns: `{ success: boolean, shift?: StaffShift, error?: string }`
@@ -117,9 +117,9 @@ The platform provides APIs for a mobile app (Expo React Native) that allows dent
   - Body: `{ professionalId: string }`
   - Returns: `{ success: boolean, shift?: StaffShift, error?: string }`
   - Error codes: 409 (conflict) if not assigned to this professional or completed
-- `GET /api/professionals/:id/shifts` - Get professional's claimed/assigned shifts
+- `GET /api/professionals/:id/shifts` - Get professional's claimed/assigned shifts with practice data
   - Query params: `status` (filled, completed), `startDate`, `endDate`
-  - Returns: `StaffShiftWithLocation[]` - shifts assigned to this professional with location details
+  - Returns: `StaffShiftWithPractice[]` - shifts assigned to this professional with location and practice details
   - Use case: Professional views their upcoming schedule or shift history on mobile app
 
 ### Shift Workflow
@@ -130,3 +130,5 @@ The platform provides APIs for a mobile app (Expo React Native) that allows dent
 
 ### Type Definitions
 - `StaffShiftWithLocation`: Extends `StaffShift` with `location: PracticeLocation | null`
+- `StaffShiftWithPractice`: Extends `StaffShift` with `location: PracticeLocation | null` and `practice: PracticeProfile | null`
+- `PracticeProfile`: Contains practice info (name, address, phone, email, website, aboutOffice, parkingInfo, arrivalInstructions, dressCode, photos, staffing counts, amenities, clinical info, and appointment settings)
