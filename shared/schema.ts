@@ -82,6 +82,7 @@ export type InsurancePolicy = typeof insurancePolicies.$inferSelect;
 export const appointments = pgTable("appointments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   patientId: varchar("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
+  locationId: varchar("location_id"), // Will be linked to practiceLocations after table is created
   scheduledAt: timestamp("scheduled_at").notNull(),
   appointmentType: text("appointment_type").notNull(),
   notes: text("notes"),
@@ -293,6 +294,7 @@ export type PatientBillingWithDetails = PatientBilling & {
 // Staff Shifts - for staffing management
 export const staffShifts = pgTable("staff_shifts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  locationId: varchar("location_id"), // Will be linked to practiceLocations after table is created
   date: text("date").notNull(), // YYYY-MM-DD format
   role: text("role").notNull(), // Dentist, Hygienist, Dental Assistant, etc.
   specialties: text("specialties").array(), // Required specialties for this shift
@@ -639,6 +641,38 @@ export const practiceRegistrationSchema = z.object({
   ownerPhone: z.string().min(10, "Owner phone is required"),
 });
 export type PracticeRegistration = z.infer<typeof practiceRegistrationSchema>;
+
+// Practice Locations - Multiple office locations for a practice
+export const practiceLocations = pgTable("practice_locations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  practiceId: varchar("practice_id").notNull().references(() => practices.id, { onDelete: "cascade" }),
+  name: text("name").notNull(), // e.g., "Main Office", "Downtown Branch"
+  address: text("address"),
+  city: text("city"),
+  stateCode: varchar("state_code", { length: 2 }),
+  zipCode: text("zip_code"),
+  phone: text("phone"),
+  email: text("email"),
+  isPrimary: boolean("is_primary").default(false),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const practiceLocationsRelations = relations(practiceLocations, ({ one }) => ({
+  practice: one(practices, {
+    fields: [practiceLocations.practiceId],
+    references: [practices.id],
+  }),
+}));
+
+export const insertPracticeLocationSchema = createInsertSchema(practiceLocations).omit({ 
+  id: true, 
+  createdAt: true,
+  updatedAt: true 
+});
+export type InsertPracticeLocation = z.infer<typeof insertPracticeLocationSchema>;
+export type PracticeLocation = typeof practiceLocations.$inferSelect;
 
 // Practice Settings - Practice-specific fee overrides (inherits from platform if null)
 export const practiceSettings = pgTable("practice_settings", {
