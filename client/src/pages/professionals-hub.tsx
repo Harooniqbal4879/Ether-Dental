@@ -1,7 +1,10 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute } from "wouter";
 import { Link } from "wouter";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import {
   Star,
   CheckCircle,
@@ -24,6 +27,8 @@ import {
   TrendingUp,
   CalendarClock,
   FileText,
+  Plus,
+  UserPlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,6 +46,23 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Label } from "@/components/ui/label";
+import {
   type ProfessionalWithBadges,
   type StaffShift,
   type ShiftTransactionWithDetails,
@@ -49,6 +71,8 @@ import {
 } from "@shared/schema";
 import { PageHeader } from "@/components/page-header";
 import { usePersona } from "@/lib/persona-context";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 const badgeIcons: Record<string, React.ReactNode> = {
   perfect_attendance: <Award className="h-5 w-5" />,
@@ -80,6 +104,187 @@ const roleColors: Record<string, string> = {
   "Front Desk": "bg-pink-500",
   "Billing Staff": "bg-indigo-500",
 };
+
+const addProfessionalSchema = z.object({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  email: z.string().email("Valid email is required"),
+  phone: z.string().optional(),
+  role: z.string().min(1, "Role is required"),
+  specialty: z.string().optional(),
+});
+
+type AddProfessionalFormData = z.infer<typeof addProfessionalSchema>;
+
+function AddProfessionalDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const { toast } = useToast();
+
+  const form = useForm<AddProfessionalFormData>({
+    resolver: zodResolver(addProfessionalSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      email: "",
+      phone: "",
+      role: "",
+      specialty: "",
+    },
+  });
+
+  const createProfessionalMutation = useMutation({
+    mutationFn: async (data: AddProfessionalFormData) => {
+      const response = await apiRequest("POST", "/api/professionals", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/professionals"] });
+      toast({
+        title: "Professional Added",
+        description: "The professional has been added successfully.",
+      });
+      form.reset();
+      onOpenChange(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add professional",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onSubmit = (data: AddProfessionalFormData) => {
+    createProfessionalMutation.mutate(data);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Add New Professional</DialogTitle>
+          <DialogDescription>
+            Add a dental professional to your network. They can then log in via the mobile app.
+          </DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="firstName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>First Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="John" {...field} data-testid="input-first-name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="lastName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Last Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Doe" {...field} data-testid="input-last-name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <Input type="email" placeholder="john.doe@example.com" {...field} data-testid="input-email" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="phone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Phone (Optional)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="(555) 123-4567" {...field} data-testid="input-phone" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="role"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Role</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger data-testid="select-role">
+                        <SelectValue placeholder="Select a role" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {Object.values(StaffRoles).map((role) => (
+                        <SelectItem key={role} value={role}>
+                          {role}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="specialty"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Specialty (Optional)</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger data-testid="select-specialty">
+                        <SelectValue placeholder="Select a specialty" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {Object.values(DentalSpecialties).map((specialty) => (
+                        <SelectItem key={specialty} value={specialty}>
+                          {specialty}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="flex justify-end gap-3 pt-4">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} data-testid="button-cancel">
+                Cancel
+              </Button>
+              <Button type="submit" disabled={createProfessionalMutation.isPending} data-testid="button-add-professional-submit">
+                {createProfessionalMutation.isPending ? "Adding..." : "Add Professional"}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function formatDate(dateStr: string): string {
   const date = new Date(dateStr + "T00:00:00");
@@ -731,6 +936,7 @@ export default function ProfessionalsHub() {
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [specialtyFilter, setSpecialtyFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
 
   const { data: professionals, isLoading } = useQuery<ProfessionalWithBadges[]>({
     queryKey: ["/api/professionals"],
@@ -792,10 +998,18 @@ export default function ProfessionalsHub() {
 
   return (
     <div className="container max-w-5xl py-6 space-y-6">
-      <PageHeader
-        title="Professionals Hub"
-        description="View and manage dental professionals in your network"
-      />
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <PageHeader
+          title="Professionals Hub"
+          description="View and manage dental professionals in your network"
+        />
+        <Button onClick={() => setAddDialogOpen(true)} data-testid="button-add-professional">
+          <UserPlus className="h-4 w-4 mr-2" />
+          Add Professional
+        </Button>
+      </div>
+
+      <AddProfessionalDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />
 
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
