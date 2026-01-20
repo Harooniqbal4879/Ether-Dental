@@ -1548,8 +1548,9 @@ export async function registerRoutes(
   const createNegotiationSchema = z.object({
     shiftId: z.string().min(1, "Shift ID is required"),
     professionalId: z.string().min(1, "Professional ID is required"),
+    currentRate: z.string().min(1, "Current rate is required"),
     proposedRate: z.string().min(1, "Proposed rate is required"),
-    message: z.string().optional(),
+    reason: z.string().optional(),
   });
 
   app.post("/api/negotiations", async (req, res) => {
@@ -1560,10 +1561,11 @@ export async function registerRoutes(
       }
 
       const negotiation = await storage.createNegotiation({
-        id: crypto.randomUUID(),
-        ...parsed.data,
-        status: "pending",
-        createdAt: new Date(),
+        shiftId: parsed.data.shiftId,
+        professionalId: parsed.data.professionalId,
+        currentRate: parsed.data.currentRate,
+        proposedRate: parsed.data.proposedRate,
+        reason: parsed.data.reason ?? null,
       });
       
       res.status(201).json(negotiation);
