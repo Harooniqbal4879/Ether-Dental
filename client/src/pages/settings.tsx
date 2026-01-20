@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -463,22 +463,140 @@ function ClearinghouseConfigCard({
   );
 }
 
+// Practice profile type for API responses
+interface PracticeProfile {
+  id: string;
+  name: string;
+  address: string | null;
+  city: string | null;
+  stateCode: string | null;
+  zipCode: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  aboutOffice: string | null;
+  parkingInfo: string | null;
+  arrivalInstructions: string | null;
+  dressCode: string | null;
+  photos: string[] | null;
+  numDentists: number | null;
+  numHygienists: number | null;
+  numSupportStaff: number | null;
+  breakRoomAvailable: boolean | null;
+  refrigeratorAvailable: boolean | null;
+  microwaveAvailable: boolean | null;
+  practiceManagementSoftware: string | null;
+  xraySoftware: string | null;
+  hasOverheadLights: boolean | null;
+  preferredScrubColor: string | null;
+  clinicalAttireProvided: boolean | null;
+  useAirPolishers: boolean | null;
+  scalerType: string | null;
+  assistedHygieneSchedule: boolean | null;
+  rootPlaningProcedures: boolean | null;
+  seeNewPatients: boolean | null;
+  administerLocalAnesthesia: boolean | null;
+  workWithNitrousPatients: boolean | null;
+  appointmentLengthAdults: string | null;
+  appointmentLengthKids: string | null;
+  appointmentLengthPerio: string | null;
+  appointmentLengthScaling: string | null;
+  dentalTreatmentRooms: number | null;
+  dedicatedHygieneRooms: number | null;
+  hiringPermanently: boolean | null;
+}
+
+const PRACTICE_ID = "practice-1"; // Hardcoded for now - should come from auth context
+
 function OfficeProfileTab() {
+  const { toast } = useToast();
+  
+  const { data: profile, isLoading } = useQuery<PracticeProfile>({
+    queryKey: ["/api/practices", PRACTICE_ID, "profile"],
+  });
+
   const [officeData, setOfficeData] = useState({
-    officeName: "Sunny Pines Dental",
-    officeAddress: "123 Oak Street, Los Angeles, CA 90210",
-    officePhone: "(555) 123-4567",
-    website: "https://sunnypinesdental.com",
+    officeName: "",
+    officeAddress: "",
+    officePhone: "",
+    website: "",
     aboutOffice: "",
     parkingInfo: "",
-    numDentists: 2,
-    numHygienists: 3,
-    numSupportStaff: 4,
-    breakRoomAvailable: true,
-    refrigeratorAvailable: true,
-    microwaveAvailable: true,
+    numDentists: 0,
+    numHygienists: 0,
+    numSupportStaff: 0,
+    breakRoomAvailable: false,
+    refrigeratorAvailable: false,
+    microwaveAvailable: false,
     hiringPermanently: false,
   });
+  
+  // Sync profile data to local state when it loads
+  useEffect(() => {
+    if (profile) {
+      setOfficeData({
+        officeName: profile.name || "",
+        officeAddress: [profile.address, profile.city, profile.stateCode, profile.zipCode].filter(Boolean).join(", "),
+        officePhone: profile.phone || "",
+        website: profile.website || "",
+        aboutOffice: profile.aboutOffice || "",
+        parkingInfo: profile.parkingInfo || "",
+        numDentists: profile.numDentists || 0,
+        numHygienists: profile.numHygienists || 0,
+        numSupportStaff: profile.numSupportStaff || 0,
+        breakRoomAvailable: profile.breakRoomAvailable || false,
+        refrigeratorAvailable: profile.refrigeratorAvailable || false,
+        microwaveAvailable: profile.microwaveAvailable || false,
+        hiringPermanently: profile.hiringPermanently || false,
+      });
+    }
+  }, [profile]);
+
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data: Partial<PracticeProfile>) => {
+      const res = await apiRequest("PATCH", `/api/practices/${PRACTICE_ID}/profile`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/practices", PRACTICE_ID, "profile"] });
+      toast({
+        title: "Profile Saved",
+        description: "Your office profile has been updated successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save profile",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSave = () => {
+    updateProfileMutation.mutate({
+      website: officeData.website,
+      aboutOffice: officeData.aboutOffice,
+      parkingInfo: officeData.parkingInfo,
+      numDentists: officeData.numDentists,
+      numHygienists: officeData.numHygienists,
+      numSupportStaff: officeData.numSupportStaff,
+      breakRoomAvailable: officeData.breakRoomAvailable,
+      refrigeratorAvailable: officeData.refrigeratorAvailable,
+      microwaveAvailable: officeData.microwaveAvailable,
+      hiringPermanently: officeData.hiringPermanently,
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-48" />
+        <Skeleton className="h-64" />
+        <Skeleton className="h-48" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -538,9 +656,12 @@ function OfficeProfileTab() {
             <Input
               id="office-name"
               value={officeData.officeName}
-              onChange={(e) => setOfficeData({ ...officeData, officeName: e.target.value })}
+              readOnly
+              disabled
+              className="bg-muted"
               data-testid="input-office-name"
             />
+            <p className="text-xs text-muted-foreground">Contact support to update core practice details</p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="office-address">Office address</Label>
@@ -548,9 +669,10 @@ function OfficeProfileTab() {
               <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
                 id="office-address"
-                className="pl-10"
+                className="pl-10 bg-muted"
                 value={officeData.officeAddress}
-                onChange={(e) => setOfficeData({ ...officeData, officeAddress: e.target.value })}
+                readOnly
+                disabled
                 data-testid="input-office-address"
               />
             </div>
@@ -563,9 +685,10 @@ function OfficeProfileTab() {
                 <Input
                   id="office-phone"
                   type="tel"
-                  className="pl-10"
+                  className="pl-10 bg-muted"
                   value={officeData.officePhone}
-                  onChange={(e) => setOfficeData({ ...officeData, officePhone: e.target.value })}
+                  readOnly
+                  disabled
                   data-testid="input-office-phone"
                 />
               </div>
@@ -744,8 +867,12 @@ function OfficeProfileTab() {
       </Card>
 
       <div className="flex justify-end">
-        <Button data-testid="button-save-office-profile">
-          Save Changes
+        <Button 
+          onClick={handleSave} 
+          disabled={updateProfileMutation.isPending}
+          data-testid="button-save-office-profile"
+        >
+          {updateProfileMutation.isPending ? "Saving..." : "Save Changes"}
         </Button>
       </div>
     </div>
@@ -758,28 +885,112 @@ function PracticeInformationTab() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [testingConfigId, setTestingConfigId] = useState<string | null>(null);
 
+  const { data: profile, isLoading: isLoadingProfile } = useQuery<PracticeProfile>({
+    queryKey: ["/api/practices", PRACTICE_ID, "profile"],
+  });
+
   const [practiceData, setPracticeData] = useState({
-    npi: "1234567890",
-    taxId: "12-3456789",
-    practiceManagementSoftware: "Dentrix Ascend",
+    npi: "",
+    taxId: "",
+    practiceManagementSoftware: "",
     xraySoftware: "",
     hasOverheadLights: true,
-    preferredScrubColor: false,
+    hasPreferredScrubColor: false,
+    preferredScrubColor: "",
     clinicalAttireProvided: false,
     useAirPolishers: false,
     scalerType: "",
-    assistedHygieneSchedule: true,
+    assistedHygieneSchedule: false,
     rootPlaningProcedures: true,
     seeNewPatients: true,
     administerLocalAnesthesia: true,
-    workWithNitrousPatients: true,
-    appointmentLengthAdults: "60 min",
-    appointmentLengthKids: "35 min",
+    workWithNitrousPatients: false,
+    appointmentLengthAdults: "",
+    appointmentLengthKids: "",
     appointmentLengthPerio: "",
     appointmentLengthScaling: "",
     dentalTreatmentRooms: 0,
     dedicatedHygieneRooms: 0,
+    arrivalInstructions: "",
+    dressCode: "",
   });
+
+  // Sync profile data to local state when it loads
+  useEffect(() => {
+    if (profile) {
+      setPracticeData({
+        npi: "",
+        taxId: "",
+        practiceManagementSoftware: profile.practiceManagementSoftware || "",
+        xraySoftware: profile.xraySoftware || "",
+        hasOverheadLights: profile.hasOverheadLights ?? true,
+        hasPreferredScrubColor: !!profile.preferredScrubColor,
+        preferredScrubColor: profile.preferredScrubColor || "",
+        clinicalAttireProvided: profile.clinicalAttireProvided ?? false,
+        useAirPolishers: profile.useAirPolishers ?? false,
+        scalerType: profile.scalerType || "",
+        assistedHygieneSchedule: profile.assistedHygieneSchedule ?? false,
+        rootPlaningProcedures: profile.rootPlaningProcedures ?? true,
+        seeNewPatients: profile.seeNewPatients ?? true,
+        administerLocalAnesthesia: profile.administerLocalAnesthesia ?? true,
+        workWithNitrousPatients: profile.workWithNitrousPatients ?? false,
+        appointmentLengthAdults: profile.appointmentLengthAdults || "",
+        appointmentLengthKids: profile.appointmentLengthKids || "",
+        appointmentLengthPerio: profile.appointmentLengthPerio || "",
+        appointmentLengthScaling: profile.appointmentLengthScaling || "",
+        dentalTreatmentRooms: profile.dentalTreatmentRooms || 0,
+        dedicatedHygieneRooms: profile.dedicatedHygieneRooms || 0,
+        arrivalInstructions: profile.arrivalInstructions || "",
+        dressCode: profile.dressCode || "",
+      });
+    }
+  }, [profile]);
+
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data: Partial<PracticeProfile>) => {
+      const res = await apiRequest("PATCH", `/api/practices/${PRACTICE_ID}/profile`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/practices", PRACTICE_ID, "profile"] });
+      toast({
+        title: "Practice Info Saved",
+        description: "Your practice information has been updated successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save practice info",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSavePracticeInfo = () => {
+    updateProfileMutation.mutate({
+      practiceManagementSoftware: practiceData.practiceManagementSoftware,
+      xraySoftware: practiceData.xraySoftware,
+      hasOverheadLights: practiceData.hasOverheadLights,
+      preferredScrubColor: practiceData.preferredScrubColor,
+      clinicalAttireProvided: practiceData.clinicalAttireProvided,
+      useAirPolishers: practiceData.useAirPolishers,
+      scalerType: practiceData.scalerType,
+      assistedHygieneSchedule: practiceData.assistedHygieneSchedule,
+      rootPlaningProcedures: practiceData.rootPlaningProcedures,
+      seeNewPatients: practiceData.seeNewPatients,
+      administerLocalAnesthesia: practiceData.administerLocalAnesthesia,
+      workWithNitrousPatients: practiceData.workWithNitrousPatients,
+      appointmentLengthAdults: practiceData.appointmentLengthAdults,
+      appointmentLengthKids: practiceData.appointmentLengthKids,
+      appointmentLengthPerio: practiceData.appointmentLengthPerio,
+      appointmentLengthScaling: practiceData.appointmentLengthScaling,
+      dentalTreatmentRooms: practiceData.dentalTreatmentRooms,
+      dedicatedHygieneRooms: practiceData.dedicatedHygieneRooms,
+      arrivalInstructions: practiceData.arrivalInstructions,
+      dressCode: practiceData.dressCode,
+    });
+  };
 
   const { data: configs = [], isLoading: isLoadingConfigs } = useQuery<ClearinghouseConfig[]>({
     queryKey: ["/api/clearinghouse-configs"],
@@ -928,8 +1139,8 @@ function PracticeInformationTab() {
           <div className="flex items-center justify-between py-2">
             <span className="font-medium">Do you have a preferred scrub color?</span>
             <YesNoToggle
-              value={practiceData.preferredScrubColor}
-              onChange={(val) => setPracticeData({ ...practiceData, preferredScrubColor: val })}
+              value={practiceData.hasPreferredScrubColor}
+              onChange={(val) => setPracticeData({ ...practiceData, hasPreferredScrubColor: val })}
               testId="toggle-scrub-color"
             />
           </div>
@@ -1311,8 +1522,12 @@ function PracticeInformationTab() {
       </Card>
 
       <div className="flex justify-end">
-        <Button data-testid="button-save-practice-info">
-          Save Changes
+        <Button 
+          onClick={handleSavePracticeInfo}
+          disabled={updateProfileMutation.isPending}
+          data-testid="button-save-practice-info"
+        >
+          {updateProfileMutation.isPending ? "Saving..." : "Save Changes"}
         </Button>
       </div>
     </div>

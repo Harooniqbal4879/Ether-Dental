@@ -616,6 +616,44 @@ export const practices = pgTable("practices", {
   approvedBy: text("approved_by"),
   approvedAt: timestamp("approved_at"),
   rejectionReason: text("rejection_reason"),
+  
+  // Office Profile fields
+  website: text("website"),
+  aboutOffice: text("about_office"),
+  parkingInfo: text("parking_info"),
+  numDentists: integer("num_dentists").default(0),
+  numHygienists: integer("num_hygienists").default(0),
+  numSupportStaff: integer("num_support_staff").default(0),
+  breakRoomAvailable: boolean("break_room_available").default(false),
+  refrigeratorAvailable: boolean("refrigerator_available").default(false),
+  microwaveAvailable: boolean("microwave_available").default(false),
+  hiringPermanently: boolean("hiring_permanently").default(false),
+  photos: text("photos").array(), // Array of photo URLs
+  
+  // Practice Information fields
+  practiceManagementSoftware: text("practice_management_software"),
+  xraySoftware: text("xray_software"),
+  hasOverheadLights: boolean("has_overhead_lights").default(true),
+  preferredScrubColor: text("preferred_scrub_color"),
+  clinicalAttireProvided: boolean("clinical_attire_provided").default(false),
+  useAirPolishers: boolean("use_air_polishers").default(false),
+  scalerType: text("scaler_type"),
+  assistedHygieneSchedule: boolean("assisted_hygiene_schedule").default(false),
+  rootPlaningProcedures: boolean("root_planing_procedures").default(true),
+  seeNewPatients: boolean("see_new_patients").default(true),
+  administerLocalAnesthesia: boolean("administer_local_anesthesia").default(true),
+  workWithNitrousPatients: boolean("work_with_nitrous_patients").default(false),
+  appointmentLengthAdults: text("appointment_length_adults"),
+  appointmentLengthKids: text("appointment_length_kids"),
+  appointmentLengthPerio: text("appointment_length_perio"),
+  appointmentLengthScaling: text("appointment_length_scaling"),
+  dentalTreatmentRooms: integer("dental_treatment_rooms").default(0),
+  dedicatedHygieneRooms: integer("dedicated_hygiene_rooms").default(0),
+  
+  // Arrival/Setup instructions for hygienists
+  arrivalInstructions: text("arrival_instructions"),
+  dressCode: text("dress_code"),
+  
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

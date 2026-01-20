@@ -1130,6 +1130,146 @@ export async function registerRoutes(
     }
   });
 
+  // Practice Profile - Get detailed practice profile info for mobile app
+  app.get("/api/practices/:id/profile", async (req, res) => {
+    try {
+      const practice = await storage.getPractice(req.params.id);
+      if (!practice) {
+        return res.status(404).json({ error: "Practice not found" });
+      }
+      
+      // Return profile-focused fields for hygienists/mobile app
+      const profile = {
+        id: practice.id,
+        name: practice.name,
+        address: practice.address,
+        city: practice.city,
+        stateCode: practice.stateCode,
+        zipCode: practice.zipCode,
+        phone: practice.phone,
+        email: practice.email,
+        website: practice.website,
+        
+        // Office description
+        aboutOffice: practice.aboutOffice,
+        parkingInfo: practice.parkingInfo,
+        arrivalInstructions: practice.arrivalInstructions,
+        dressCode: practice.dressCode,
+        photos: practice.photos,
+        
+        // Team info
+        numDentists: practice.numDentists,
+        numHygienists: practice.numHygienists,
+        numSupportStaff: practice.numSupportStaff,
+        
+        // Break room amenities
+        breakRoomAvailable: practice.breakRoomAvailable,
+        refrigeratorAvailable: practice.refrigeratorAvailable,
+        microwaveAvailable: practice.microwaveAvailable,
+        
+        // Practice information
+        practiceManagementSoftware: practice.practiceManagementSoftware,
+        xraySoftware: practice.xraySoftware,
+        hasOverheadLights: practice.hasOverheadLights,
+        preferredScrubColor: practice.preferredScrubColor,
+        clinicalAttireProvided: practice.clinicalAttireProvided,
+        useAirPolishers: practice.useAirPolishers,
+        scalerType: practice.scalerType,
+        
+        // Clinical procedures
+        assistedHygieneSchedule: practice.assistedHygieneSchedule,
+        rootPlaningProcedures: practice.rootPlaningProcedures,
+        seeNewPatients: practice.seeNewPatients,
+        administerLocalAnesthesia: practice.administerLocalAnesthesia,
+        workWithNitrousPatients: practice.workWithNitrousPatients,
+        
+        // Appointment lengths
+        appointmentLengthAdults: practice.appointmentLengthAdults,
+        appointmentLengthKids: practice.appointmentLengthKids,
+        appointmentLengthPerio: practice.appointmentLengthPerio,
+        appointmentLengthScaling: practice.appointmentLengthScaling,
+        
+        // Rooms
+        dentalTreatmentRooms: practice.dentalTreatmentRooms,
+        dedicatedHygieneRooms: practice.dedicatedHygieneRooms,
+        
+        hiringPermanently: practice.hiringPermanently,
+      };
+      
+      res.json(profile);
+    } catch (error) {
+      console.error("Error fetching practice profile:", error);
+      res.status(500).json({ error: "Failed to fetch practice profile" });
+    }
+  });
+
+  // Update Practice Profile
+  app.patch("/api/practices/:id/profile", async (req, res) => {
+    try {
+      const { z } = await import("zod");
+      
+      // Zod schema for practice profile updates
+      const practiceProfileUpdateSchema = z.object({
+        website: z.string().optional().nullable(),
+        aboutOffice: z.string().optional().nullable(),
+        parkingInfo: z.string().optional().nullable(),
+        arrivalInstructions: z.string().optional().nullable(),
+        dressCode: z.string().optional().nullable(),
+        photos: z.array(z.string()).optional().nullable(),
+        numDentists: z.number().int().min(0).optional().nullable(),
+        numHygienists: z.number().int().min(0).optional().nullable(),
+        numSupportStaff: z.number().int().min(0).optional().nullable(),
+        breakRoomAvailable: z.boolean().optional().nullable(),
+        refrigeratorAvailable: z.boolean().optional().nullable(),
+        microwaveAvailable: z.boolean().optional().nullable(),
+        practiceManagementSoftware: z.string().optional().nullable(),
+        xraySoftware: z.string().optional().nullable(),
+        hasOverheadLights: z.boolean().optional().nullable(),
+        preferredScrubColor: z.string().optional().nullable(),
+        clinicalAttireProvided: z.boolean().optional().nullable(),
+        useAirPolishers: z.boolean().optional().nullable(),
+        scalerType: z.string().optional().nullable(),
+        assistedHygieneSchedule: z.boolean().optional().nullable(),
+        rootPlaningProcedures: z.boolean().optional().nullable(),
+        seeNewPatients: z.boolean().optional().nullable(),
+        administerLocalAnesthesia: z.boolean().optional().nullable(),
+        workWithNitrousPatients: z.boolean().optional().nullable(),
+        appointmentLengthAdults: z.string().optional().nullable(),
+        appointmentLengthKids: z.string().optional().nullable(),
+        appointmentLengthPerio: z.string().optional().nullable(),
+        appointmentLengthScaling: z.string().optional().nullable(),
+        dentalTreatmentRooms: z.number().int().min(0).optional().nullable(),
+        dedicatedHygieneRooms: z.number().int().min(0).optional().nullable(),
+        hiringPermanently: z.boolean().optional().nullable(),
+      }).strict();
+      
+      const parseResult = practiceProfileUpdateSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          error: "Validation failed", 
+          details: parseResult.error.errors 
+        });
+      }
+      
+      // Filter out undefined values
+      const updates: Record<string, any> = {};
+      for (const [key, value] of Object.entries(parseResult.data)) {
+        if (value !== undefined) {
+          updates[key] = value;
+        }
+      }
+      
+      const practice = await storage.updatePractice(req.params.id, updates);
+      if (!practice) {
+        return res.status(404).json({ error: "Practice not found" });
+      }
+      res.json(practice);
+    } catch (error) {
+      console.error("Error updating practice profile:", error);
+      res.status(500).json({ error: "Failed to update practice profile" });
+    }
+  });
+
   // Practice Settings
   app.get("/api/practices/:id/settings", async (req, res) => {
     try {
