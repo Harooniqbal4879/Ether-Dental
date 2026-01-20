@@ -19,6 +19,7 @@ import AddShift from "@/pages/add-shift";
 import Services from "@/pages/services";
 import PatientPortal from "@/pages/patient-portal";
 import ProfessionalsHub from "@/pages/professionals-hub";
+import PlatformSettings from "@/pages/platform-settings";
 import NotFound from "@/pages/not-found";
 
 function MainRouter() {
@@ -42,6 +43,7 @@ function MainRouter() {
       <Route path="/portal" component={PatientPortal} />
       <Route path="/professionals" component={ProfessionalsHub} />
       <Route path="/professionals/:id" component={ProfessionalsHub} />
+      <Route path="/platform-settings" component={PlatformSettings} />
       <Route component={NotFound} />
     </Switch>
   );

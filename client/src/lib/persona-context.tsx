@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 
 export type Persona = 
   | "system_admin"
@@ -69,8 +69,31 @@ interface PersonaContextType {
 
 const PersonaContext = createContext<PersonaContextType | undefined>(undefined);
 
+const PERSONA_STORAGE_KEY = "etherAI_persona";
+
+function getStoredPersona(): Persona {
+  try {
+    const stored = localStorage.getItem(PERSONA_STORAGE_KEY);
+    if (stored && personas.some(p => p.id === stored)) {
+      return stored as Persona;
+    }
+  } catch (e) {
+    // localStorage not available
+  }
+  return "admin";
+}
+
 export function PersonaProvider({ children }: { children: ReactNode }) {
-  const [currentPersona, setCurrentPersona] = useState<Persona>("admin");
+  const [currentPersona, setCurrentPersonaState] = useState<Persona>(getStoredPersona);
+  
+  const setCurrentPersona = (persona: Persona) => {
+    setCurrentPersonaState(persona);
+    try {
+      localStorage.setItem(PERSONA_STORAGE_KEY, persona);
+    } catch (e) {
+      // localStorage not available
+    }
+  };
   
   const personaInfo = personas.find((p) => p.id === currentPersona) || personas[0];
 

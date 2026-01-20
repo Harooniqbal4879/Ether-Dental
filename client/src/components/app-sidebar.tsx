@@ -10,6 +10,7 @@ import {
   Sparkles,
   CreditCard,
   Contact,
+  Sliders,
 } from "lucide-react";
 import {
   Sidebar,
@@ -78,6 +79,12 @@ const configNavItems = [
     url: "/settings",
     icon: Settings,
     personas: ["system_admin", "admin"],
+  },
+  {
+    title: "Platform Settings",
+    url: "/platform-settings",
+    icon: Sliders,
+    personas: ["system_admin"],
   },
 ];
 
