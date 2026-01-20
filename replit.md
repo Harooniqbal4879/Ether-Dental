@@ -128,6 +128,50 @@ The platform provides APIs for a mobile app (Expo React Native) that allows dent
 3. Professional can release shift via POST `/api/shifts/:id/release` (status returns to "open")
 4. Practice completes shift after work is done (status: "completed") - cannot be released
 
+### Shift Check-In/Out Tracking
+Professionals can record their arrival and departure times via the mobile app with GPS location verification.
+
+#### Check-In/Out API Endpoints
+- `POST /api/shifts/:id/check-in` - Record shift check-in
+  - Body: `{ method: string, latitude?: number, longitude?: number }`
+  - Requires shift status "filled"
+  - Returns: `{ success: boolean, shift?: StaffShift, error?: string }`
+  - Error: 409 if shift not filled or already checked in
+- `POST /api/shifts/:id/check-out` - Record shift check-out
+  - Body: `{ method: string, latitude?: number, longitude?: number }`
+  - Requires prior check-in
+  - Returns: `{ success: boolean, shift?: StaffShift, error?: string }`
+  - Error: 409 if not checked in or already checked out
+
+#### Check-In/Out Fields (staffShifts table)
+- `checkInTime`, `checkOutTime`: Timestamps
+- `checkInMethod`, `checkOutMethod`: Method used (e.g., "gps", "manual", "qr_code")
+- `checkInLatitude`, `checkInLongitude`, `checkOutLatitude`, `checkOutLongitude`: GPS coordinates
+
+### Shift Rate Negotiations
+Professionals can propose alternative hourly rates for shifts before claiming them.
+
+#### Negotiation API Endpoints
+- `POST /api/negotiations` - Create a new rate negotiation
+  - Body: `{ shiftId: string, professionalId: string, currentRate: string, proposedRate: string, reason?: string }`
+  - Returns: Created ShiftNegotiation with status "pending"
+- `GET /api/shifts/:id/negotiations` - Get all negotiations for a shift
+  - Returns: `ShiftNegotiationWithDetails[]` - negotiations with shift and professional details
+- `GET /api/professionals/:id/negotiations` - Get all negotiations by a professional
+  - Returns: `ShiftNegotiationWithDetails[]`
+- `PATCH /api/negotiations/:id` - Update negotiation status (accept/reject)
+  - Body: `{ status?: "accepted" | "rejected" | "expired", practiceResponse?: string }`
+  - Returns: Updated ShiftNegotiation
+
+#### Shift Negotiations Schema (shift_negotiations table)
+- `id`, `shiftId`, `professionalId`: Identifiers
+- `currentRate`, `proposedRate`: Decimal rates
+- `reason`: Professional's justification
+- `status`: pending, accepted, rejected, expired
+- `practiceResponse`: Optional response message from practice
+- `respondedAt`: Timestamp when practice responded
+- `createdAt`: Creation timestamp
+
 ### Type Definitions
 - `StaffShiftWithLocation`: Extends `StaffShift` with `location: PracticeLocation | null`
 - `StaffShiftWithPractice`: Extends `StaffShift` with `location: PracticeLocation | null` and `practice: PracticeProfile | null`
