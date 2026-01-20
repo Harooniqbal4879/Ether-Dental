@@ -552,9 +552,29 @@ export async function registerRoutes(
         let matchScore = 100;
         const matchDetails: Record<string, any> = {};
 
-        // Check hourly rate constraints
-        if (shift.hourlyRate) {
-          const shiftRate = parseFloat(shift.hourlyRate);
+        // Helper function to convert time string (e.g. "8:30 AM" or "14:00") to minutes
+        const timeToMinutes = (timeStr: string): number => {
+          // Handle "HH:MM AM/PM" format
+          const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+          if (!match) return 0;
+          let hours = parseInt(match[1]);
+          const minutes = parseInt(match[2]);
+          const period = match[3]?.toUpperCase();
+          if (period === 'PM' && hours !== 12) hours += 12;
+          if (period === 'AM' && hours === 12) hours = 0;
+          return hours * 60 + minutes;
+        };
+
+        // Check hourly rate constraints - use fixedHourlyRate or average of min/max
+        const shiftRate = shift.fixedHourlyRate 
+          ? parseFloat(shift.fixedHourlyRate) 
+          : shift.minHourlyRate && shift.maxHourlyRate 
+            ? (parseFloat(shift.minHourlyRate) + parseFloat(shift.maxHourlyRate)) / 2
+            : shift.minHourlyRate 
+              ? parseFloat(shift.minHourlyRate) 
+              : null;
+
+        if (shiftRate !== null) {
           if (preferences.minHourlyRate && shiftRate < parseFloat(preferences.minHourlyRate)) {
             matchDetails.rateBelowMin = true;
             matchScore -= 30;
@@ -574,16 +594,10 @@ export async function registerRoutes(
           }
         }
 
-        // Helper function to convert time string (HH:MM) to minutes
-        const timeToMinutes = (timeStr: string): number => {
-          const parts = timeStr.split(':');
-          return parseInt(parts[0]) * 60 + parseInt(parts[1] || '0');
-        };
-
-        // Check time preferences using numeric comparison
-        if (preferences.preferredTimeStart && shift.startTime) {
+        // Check time preferences using numeric comparison (arrivalTime is the start time)
+        if (preferences.preferredTimeStart && shift.arrivalTime) {
           const prefStartMinutes = timeToMinutes(preferences.preferredTimeStart);
-          const shiftStartMinutes = timeToMinutes(shift.startTime);
+          const shiftStartMinutes = timeToMinutes(shift.arrivalTime);
           if (shiftStartMinutes < prefStartMinutes) {
             matchDetails.startsTooEarly = true;
             matchScore -= 10;
@@ -609,11 +623,9 @@ export async function registerRoutes(
         }
 
         // Check shift duration against preferences
-        if (shift.startTime && shift.endTime && (preferences.preferredShiftDurationMin || preferences.preferredShiftDurationMax)) {
-          const startParts = shift.startTime.split(':');
-          const endParts = shift.endTime.split(':');
-          const startMinutes = parseInt(startParts[0]) * 60 + parseInt(startParts[1] || '0');
-          const endMinutes = parseInt(endParts[0]) * 60 + parseInt(endParts[1] || '0');
+        if (shift.arrivalTime && shift.endTime && (preferences.preferredShiftDurationMin || preferences.preferredShiftDurationMax)) {
+          const startMinutes = timeToMinutes(shift.arrivalTime);
+          const endMinutes = timeToMinutes(shift.endTime);
           const durationHours = (endMinutes - startMinutes) / 60;
 
           if (preferences.preferredShiftDurationMin && durationHours < preferences.preferredShiftDurationMin) {
@@ -1079,6 +1091,19 @@ export async function registerRoutes(
   });
 
   app.put("/api/professionals/:id", async (req, res) => {
+    try {
+      const professional = await storage.updateProfessional(req.params.id, req.body);
+      if (!professional) {
+        return res.status(404).json({ error: "Professional not found" });
+      }
+      res.json(professional);
+    } catch (error) {
+      console.error("Error updating professional:", error);
+      res.status(500).json({ error: "Failed to update professional" });
+    }
+  });
+
+  app.patch("/api/professionals/:id", async (req, res) => {
     try {
       const professional = await storage.updateProfessional(req.params.id, req.body);
       if (!professional) {
