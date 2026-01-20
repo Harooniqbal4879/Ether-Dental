@@ -69,7 +69,7 @@ import {
   Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ClearinghouseConfig, InsertClearinghouseConfig, InsuranceCarrier } from "@shared/schema";
+import type { ClearinghouseConfig, InsertClearinghouseConfig, InsuranceCarrier, PracticeLocation, InsertPracticeLocation, US_STATES } from "@shared/schema";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -1895,6 +1895,500 @@ const carrierFormSchema = z.object({
 
 type CarrierFormValues = z.infer<typeof carrierFormSchema>;
 
+const US_STATES_LIST = [
+  { code: "AL", name: "Alabama" },
+  { code: "AK", name: "Alaska" },
+  { code: "AZ", name: "Arizona" },
+  { code: "AR", name: "Arkansas" },
+  { code: "CA", name: "California" },
+  { code: "CO", name: "Colorado" },
+  { code: "CT", name: "Connecticut" },
+  { code: "DE", name: "Delaware" },
+  { code: "FL", name: "Florida" },
+  { code: "GA", name: "Georgia" },
+  { code: "HI", name: "Hawaii" },
+  { code: "ID", name: "Idaho" },
+  { code: "IL", name: "Illinois" },
+  { code: "IN", name: "Indiana" },
+  { code: "IA", name: "Iowa" },
+  { code: "KS", name: "Kansas" },
+  { code: "KY", name: "Kentucky" },
+  { code: "LA", name: "Louisiana" },
+  { code: "ME", name: "Maine" },
+  { code: "MD", name: "Maryland" },
+  { code: "MA", name: "Massachusetts" },
+  { code: "MI", name: "Michigan" },
+  { code: "MN", name: "Minnesota" },
+  { code: "MS", name: "Mississippi" },
+  { code: "MO", name: "Missouri" },
+  { code: "MT", name: "Montana" },
+  { code: "NE", name: "Nebraska" },
+  { code: "NV", name: "Nevada" },
+  { code: "NH", name: "New Hampshire" },
+  { code: "NJ", name: "New Jersey" },
+  { code: "NM", name: "New Mexico" },
+  { code: "NY", name: "New York" },
+  { code: "NC", name: "North Carolina" },
+  { code: "ND", name: "North Dakota" },
+  { code: "OH", name: "Ohio" },
+  { code: "OK", name: "Oklahoma" },
+  { code: "OR", name: "Oregon" },
+  { code: "PA", name: "Pennsylvania" },
+  { code: "RI", name: "Rhode Island" },
+  { code: "SC", name: "South Carolina" },
+  { code: "SD", name: "South Dakota" },
+  { code: "TN", name: "Tennessee" },
+  { code: "TX", name: "Texas" },
+  { code: "UT", name: "Utah" },
+  { code: "VT", name: "Vermont" },
+  { code: "VA", name: "Virginia" },
+  { code: "WA", name: "Washington" },
+  { code: "WV", name: "West Virginia" },
+  { code: "WI", name: "Wisconsin" },
+  { code: "WY", name: "Wyoming" },
+  { code: "DC", name: "District of Columbia" },
+];
+
+const locationFormSchema = z.object({
+  name: z.string().min(1, "Location name is required"),
+  address: z.string().optional(),
+  city: z.string().optional(),
+  stateCode: z.string().optional(),
+  zipCode: z.string().optional(),
+  phone: z.string().optional(),
+  email: z.string().email().optional().or(z.literal("")),
+  isPrimary: z.boolean().default(false),
+  isActive: z.boolean().default(true),
+});
+
+type LocationFormValues = z.infer<typeof locationFormSchema>;
+
+function LocationsTab() {
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingLocation, setEditingLocation] = useState<PracticeLocation | null>(null);
+  const { toast } = useToast();
+
+  const practiceId = "practice-1";
+
+  const { data: locations, isLoading } = useQuery<PracticeLocation[]>({
+    queryKey: ["/api/practices", practiceId, "locations"],
+  });
+
+  const form = useForm<LocationFormValues>({
+    resolver: zodResolver(locationFormSchema),
+    defaultValues: {
+      name: "",
+      address: "",
+      city: "",
+      stateCode: "",
+      zipCode: "",
+      phone: "",
+      email: "",
+      isPrimary: false,
+      isActive: true,
+    },
+  });
+
+  const createLocationMutation = useMutation({
+    mutationFn: async (data: LocationFormValues) => {
+      return apiRequest("POST", `/api/practices/${practiceId}/locations`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/practices", practiceId, "locations"] });
+      toast({
+        title: "Location added",
+        description: "The location has been added successfully.",
+      });
+      setIsDialogOpen(false);
+      form.reset();
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to add location. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateLocationMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<LocationFormValues> }) => {
+      return apiRequest("PATCH", `/api/locations/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/practices", practiceId, "locations"] });
+      toast({
+        title: "Location updated",
+        description: "The location has been updated successfully.",
+      });
+      setIsDialogOpen(false);
+      setEditingLocation(null);
+      form.reset();
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update location. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteLocationMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/locations/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/practices", practiceId, "locations"] });
+      toast({
+        title: "Location deleted",
+        description: "The location has been deleted successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete location. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleEditLocation = (location: PracticeLocation) => {
+    setEditingLocation(location);
+    form.reset({
+      name: location.name,
+      address: location.address || "",
+      city: location.city || "",
+      stateCode: location.stateCode || "",
+      zipCode: location.zipCode || "",
+      phone: location.phone || "",
+      email: location.email || "",
+      isPrimary: location.isPrimary || false,
+      isActive: location.isActive ?? true,
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    setIsDialogOpen(false);
+    setEditingLocation(null);
+    form.reset();
+  };
+
+  const onSubmit = (data: LocationFormValues) => {
+    if (editingLocation) {
+      updateLocationMutation.mutate({ id: editingLocation.id, data });
+    } else {
+      createLocationMutation.mutate(data);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-semibold">Office Locations</h3>
+          <p className="text-sm text-muted-foreground">
+            Manage your practice locations. Shifts and appointments will be associated with specific locations.
+          </p>
+        </div>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => {
+          if (!open) handleCloseDialog();
+          else setIsDialogOpen(true);
+        }}>
+          <DialogTrigger asChild>
+            <Button data-testid="button-add-location">
+              <Plus className="mr-2 h-4 w-4" />
+              Add Location
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>{editingLocation ? "Edit Location" : "Add New Location"}</DialogTitle>
+              <DialogDescription>
+                {editingLocation ? "Update the location details below." : "Add a new office location for your practice."}
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Location Name *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., Main Office, Downtown Branch" {...field} data-testid="input-location-name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Street Address</FormLabel>
+                      <FormControl>
+                        <Input placeholder="123 Main St" {...field} data-testid="input-location-address" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="city"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>City</FormLabel>
+                        <FormControl>
+                          <Input placeholder="City" {...field} data-testid="input-location-city" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="stateCode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>State</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-location-state">
+                              <SelectValue placeholder="State" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {US_STATES_LIST.map((state) => (
+                              <SelectItem key={state.code} value={state.code}>
+                                {state.code}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="zipCode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>ZIP Code</FormLabel>
+                        <FormControl>
+                          <Input placeholder="12345" {...field} data-testid="input-location-zip" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="phone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Phone</FormLabel>
+                        <FormControl>
+                          <Input placeholder="(555) 123-4567" {...field} data-testid="input-location-phone" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input placeholder="location@practice.com" {...field} data-testid="input-location-email" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between gap-4">
+                  <FormField
+                    control={form.control}
+                    name="isPrimary"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center gap-2">
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-location-primary"
+                          />
+                        </FormControl>
+                        <FormLabel className="!mt-0">Primary Location</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="isActive"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center gap-2">
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-location-active"
+                          />
+                        </FormControl>
+                        <FormLabel className="!mt-0">Active</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button type="button" variant="outline" onClick={handleCloseDialog} data-testid="button-cancel-location">
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={createLocationMutation.isPending || updateLocationMutation.isPending}
+                    data-testid="button-save-location"
+                  >
+                    {(createLocationMutation.isPending || updateLocationMutation.isPending) && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    {editingLocation ? "Save Changes" : "Add Location"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-24 w-full" />
+          ))}
+        </div>
+      ) : locations && locations.length > 0 ? (
+        <div className="space-y-4">
+          {locations.map((location) => (
+            <Card key={location.id} className={cn(!location.isActive && "opacity-60")}>
+              <CardContent className="flex items-center justify-between p-4">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                    <MapPin className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-medium">{location.name}</h4>
+                      {location.isPrimary && (
+                        <Badge variant="secondary" className="text-xs">Primary</Badge>
+                      )}
+                      {!location.isActive && (
+                        <Badge variant="outline" className="text-xs text-muted-foreground">Inactive</Badge>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {[location.address, location.city, location.stateCode, location.zipCode]
+                        .filter(Boolean)
+                        .join(", ") || "No address provided"}
+                    </p>
+                    <div className="flex gap-4 mt-1 text-sm text-muted-foreground">
+                      {location.phone && (
+                        <span className="flex items-center gap-1">
+                          <Phone className="h-3 w-3" />
+                          {location.phone}
+                        </span>
+                      )}
+                      {location.email && (
+                        <span className="flex items-center gap-1">
+                          <Globe className="h-3 w-3" />
+                          {location.email}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleEditLocation(location)}
+                    data-testid={`button-edit-location-${location.id}`}
+                  >
+                    Edit
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="text-destructive hover:text-destructive"
+                        data-testid={`button-delete-location-${location.id}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Location</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to delete "{location.name}"? This action cannot be undone.
+                          Any shifts or appointments associated with this location may be affected.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => deleteLocationMutation.mutate(location.id)}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <EmptyState
+          icon={MapPin}
+          title="No locations"
+          description="Add your first office location to get started."
+          action={
+            <Button onClick={() => setIsDialogOpen(true)} data-testid="button-add-first-location">
+              <Plus className="mr-2 h-4 w-4" />
+              Add Location
+            </Button>
+          }
+        />
+      )}
+    </div>
+  );
+}
+
 function InsuranceCarriersTab() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -2173,6 +2667,7 @@ export default function Settings() {
   const tabCounts = {
     "office-profile": 3,
     "practice-info": 9,
+    "locations": 0,
     "staffing": 5,
     "billing": 1,
     "carriers": 0,
@@ -2194,7 +2689,7 @@ export default function Settings() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="office-profile" className="flex items-center gap-2" data-testid="tab-office-profile">
             Office profile
             <Badge variant="secondary" className="h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
@@ -2206,6 +2701,10 @@ export default function Settings() {
             <Badge variant="secondary" className="h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
               {tabCounts["practice-info"]}
             </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="locations" className="flex items-center gap-2" data-testid="tab-locations">
+            <MapPin className="h-4 w-4" />
+            Locations
           </TabsTrigger>
           <TabsTrigger value="carriers" className="flex items-center gap-2" data-testid="tab-carriers">
             Carriers
@@ -2230,6 +2729,10 @@ export default function Settings() {
 
         <TabsContent value="practice-info">
           <PracticeInformationTab />
+        </TabsContent>
+
+        <TabsContent value="locations">
+          <LocationsTab />
         </TabsContent>
 
         <TabsContent value="carriers">
