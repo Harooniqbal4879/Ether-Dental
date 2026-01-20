@@ -502,10 +502,30 @@ export async function registerRoutes(
     }
   });
 
+  // Get available shifts for mobile app (open shifts only)
+  app.get("/api/shifts/available", async (req, res) => {
+    try {
+      const { startDate, endDate, role, locationId } = req.query;
+      
+      const filters: { startDate?: string; endDate?: string; role?: string; locationId?: string } = {};
+      if (typeof startDate === "string") filters.startDate = startDate;
+      if (typeof endDate === "string") filters.endDate = endDate;
+      if (typeof role === "string") filters.role = role;
+      if (typeof locationId === "string") filters.locationId = locationId;
+      
+      const shifts = await storage.getAvailableShifts(filters);
+      res.json(shifts);
+    } catch (error) {
+      console.error("Error fetching available shifts:", error);
+      res.status(500).json({ error: "Failed to fetch available shifts" });
+    }
+  });
+
   // Create shifts (accepts array of shift data with multiple dates)
   const createShiftsSchema = z.object({
     dates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).min(1, "At least one date required"),
     role: z.string().min(1),
+    locationId: z.string().optional().nullable(),
     specialties: z.array(z.string()).optional().default([]),
     arrivalTime: z.string().min(1),
     firstPatientTime: z.string().min(1),
@@ -530,6 +550,7 @@ export async function registerRoutes(
       const shiftsToCreate = dates.map((date) => ({
         date,
         role: shiftData.role,
+        locationId: shiftData.locationId || null,
         specialties: shiftData.specialties.length > 0 ? shiftData.specialties : null,
         arrivalTime: shiftData.arrivalTime,
         firstPatientTime: shiftData.firstPatientTime,
@@ -578,6 +599,70 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error updating shift:", error);
       res.status(500).json({ error: "Failed to update shift" });
+    }
+  });
+
+  // Claim shift (professional accepts an open shift)
+  const claimShiftSchema = z.object({
+    professionalId: z.string().min(1, "Professional ID is required"),
+  });
+
+  app.post("/api/shifts/:id/claim", async (req, res) => {
+    try {
+      const parsed = claimShiftSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.errors });
+      }
+
+      const result = await storage.claimShift(req.params.id, parsed.data.professionalId);
+      
+      if (!result.success) {
+        return res.status(409).json({ error: result.error });
+      }
+      
+      res.json({ success: true, shift: result.shift });
+    } catch (error) {
+      console.error("Error claiming shift:", error);
+      res.status(500).json({ error: "Failed to claim shift" });
+    }
+  });
+
+  // Release shift (professional releases a claimed shift)
+  const releaseShiftSchema = z.object({
+    professionalId: z.string().min(1, "Professional ID is required"),
+  });
+
+  app.post("/api/shifts/:id/release", async (req, res) => {
+    try {
+      const parsed = releaseShiftSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.errors });
+      }
+
+      const result = await storage.releaseShift(req.params.id, parsed.data.professionalId);
+      
+      if (!result.success) {
+        return res.status(409).json({ error: result.error });
+      }
+      
+      res.json({ success: true, shift: result.shift });
+    } catch (error) {
+      console.error("Error releasing shift:", error);
+      res.status(500).json({ error: "Failed to release shift" });
+    }
+  });
+
+  // Get shift with location details (for mobile app)
+  app.get("/api/shifts/:id/details", async (req, res) => {
+    try {
+      const shift = await storage.getShiftWithLocation(req.params.id);
+      if (!shift) {
+        return res.status(404).json({ error: "Shift not found" });
+      }
+      res.json(shift);
+    } catch (error) {
+      console.error("Error fetching shift details:", error);
+      res.status(500).json({ error: "Failed to fetch shift details" });
     }
   });
 
