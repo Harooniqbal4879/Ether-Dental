@@ -17,6 +17,7 @@ import {
   platformStateTaxRates,
   practices,
   practiceSettings,
+  practiceLocations,
   type Patient,
   type InsertPatient,
   type InsuranceCarrier,
@@ -57,6 +58,8 @@ import {
   type InsertPractice,
   type PracticeSettings,
   type InsertPracticeSettings,
+  type PracticeLocation,
+  type InsertPracticeLocation,
   type ResolvedFeeRates,
 } from "@shared/schema";
 import { db } from "./db";
@@ -184,6 +187,13 @@ export interface IStorage {
 
   // Resolved Fee Rates (with practice → platform fallback)
   getResolvedFeeRates(practiceId?: string): Promise<ResolvedFeeRates>;
+
+  // Practice Locations
+  getLocations(practiceId: string): Promise<PracticeLocation[]>;
+  getLocation(id: string): Promise<PracticeLocation | undefined>;
+  createLocation(location: InsertPracticeLocation): Promise<PracticeLocation>;
+  updateLocation(id: string, data: Partial<PracticeLocation>): Promise<PracticeLocation | undefined>;
+  deleteLocation(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1091,6 +1101,44 @@ export class DatabaseStorage implements IStorage {
       additionalTaxRate,
       totalPayrollBurden,
     };
+  }
+
+  // Practice Locations
+  async getLocations(practiceId: string): Promise<PracticeLocation[]> {
+    return db
+      .select()
+      .from(practiceLocations)
+      .where(eq(practiceLocations.practiceId, practiceId))
+      .orderBy(desc(practiceLocations.isPrimary), practiceLocations.name);
+  }
+
+  async getLocation(id: string): Promise<PracticeLocation | undefined> {
+    const [location] = await db
+      .select()
+      .from(practiceLocations)
+      .where(eq(practiceLocations.id, id));
+    return location;
+  }
+
+  async createLocation(location: InsertPracticeLocation): Promise<PracticeLocation> {
+    const [created] = await db.insert(practiceLocations).values(location).returning();
+    return created;
+  }
+
+  async updateLocation(id: string, data: Partial<PracticeLocation>): Promise<PracticeLocation | undefined> {
+    const [updated] = await db
+      .update(practiceLocations)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(practiceLocations.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteLocation(id: string): Promise<boolean> {
+    const result = await db
+      .delete(practiceLocations)
+      .where(eq(practiceLocations.id, id));
+    return true;
   }
 }
 
