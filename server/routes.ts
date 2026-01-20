@@ -968,8 +968,19 @@ export async function registerRoutes(
   // Public registration endpoint for practice self-registration (must come before :id route)
   app.post("/api/practices/register", async (req, res) => {
     try {
+      // Validate request body using the registration schema
+      const { practiceRegistrationSchema } = await import("@shared/schema");
+      const parseResult = practiceRegistrationSchema.safeParse(req.body);
+      
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          error: "Validation failed", 
+          details: parseResult.error.errors 
+        });
+      }
+      
       const practice = await storage.createPractice({
-        ...req.body,
+        ...parseResult.data,
         registrationStatus: "pending",
         registrationSource: "self_registration",
       });

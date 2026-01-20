@@ -1,15 +1,19 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Building2, Loader2, CheckCircle, ArrowLeft, Shield, Clock, Sparkles } from "lucide-react";
+import { practiceRegistrationSchema, type PracticeRegistration } from "@shared/schema";
 
 const US_STATES = [
   { code: "AL", name: "Alabama" }, { code: "AK", name: "Alaska" }, { code: "AZ", name: "Arizona" },
@@ -31,53 +35,47 @@ const US_STATES = [
   { code: "WI", name: "Wisconsin" }, { code: "WY", name: "Wyoming" }, { code: "DC", name: "District of Columbia" },
 ];
 
-interface RegistrationFormData {
-  name: string;
-  address: string;
-  city: string;
-  stateCode: string;
-  zipCode: string;
-  phone: string;
-  email: string;
-  npiNumber: string;
-  taxId: string;
-  ownerFirstName: string;
-  ownerLastName: string;
-  ownerEmail: string;
-  ownerPhone: string;
-  agreeToTerms: boolean;
-}
+// Extend registration schema with terms agreement
+const registrationFormSchema = practiceRegistrationSchema.extend({
+  agreeToTerms: z.boolean().refine((val) => val === true, {
+    message: "You must agree to the terms and conditions",
+  }),
+});
+
+type RegistrationFormData = z.infer<typeof registrationFormSchema>;
 
 export default function RegisterPracticePage() {
   const { toast } = useToast();
   const [submitted, setSubmitted] = useState(false);
-  const [formData, setFormData] = useState<RegistrationFormData>({
-    name: "",
-    address: "",
-    city: "",
-    stateCode: "",
-    zipCode: "",
-    phone: "",
-    email: "",
-    npiNumber: "",
-    taxId: "",
-    ownerFirstName: "",
-    ownerLastName: "",
-    ownerEmail: "",
-    ownerPhone: "",
-    agreeToTerms: false,
+  const [submittedEmail, setSubmittedEmail] = useState("");
+
+  const form = useForm<RegistrationFormData>({
+    resolver: zodResolver(registrationFormSchema),
+    defaultValues: {
+      name: "",
+      address: "",
+      city: "",
+      stateCode: "",
+      zipCode: "",
+      phone: "",
+      email: "",
+      npiNumber: "",
+      taxId: "",
+      ownerFirstName: "",
+      ownerLastName: "",
+      ownerEmail: "",
+      ownerPhone: "",
+      agreeToTerms: false,
+    },
   });
 
   const registerMutation = useMutation({
     mutationFn: async (data: RegistrationFormData) => {
       const { agreeToTerms, ...practiceData } = data;
-      return apiRequest("POST", "/api/practices/register", {
-        ...practiceData,
-        registrationStatus: "pending",
-        registrationSource: "self_registration",
-      });
+      return apiRequest("POST", "/api/practices/register", practiceData);
     },
     onSuccess: () => {
+      setSubmittedEmail(form.getValues("ownerEmail"));
       setSubmitted(true);
     },
     onError: (error: Error) => {
@@ -89,13 +87,8 @@ export default function RegisterPracticePage() {
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.agreeToTerms) {
-      toast({ title: "Please agree to the terms and conditions", variant: "destructive" });
-      return;
-    }
-    registerMutation.mutate(formData);
+  const onSubmit = (data: RegistrationFormData) => {
+    registerMutation.mutate(data);
   };
 
   if (submitted) {
@@ -116,7 +109,7 @@ export default function RegisterPracticePage() {
               <h4 className="font-medium">What happens next?</h4>
               <ol className="list-decimal list-inside text-sm text-muted-foreground space-y-2">
                 <li>Our team will review your registration within 1-2 business days</li>
-                <li>You'll receive an email at <strong>{formData.ownerEmail}</strong> once approved</li>
+                <li>You'll receive an email at <strong>{submittedEmail}</strong> once approved</li>
                 <li>After approval, you can log in and start using the platform</li>
               </ol>
             </div>
@@ -189,210 +182,297 @@ export default function RegisterPracticePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-8">
-                <div className="space-y-4">
-                  <h3 className="font-medium text-lg border-b pb-2">Practice Information</h3>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="md:col-span-2">
-                      <Label htmlFor="name">Practice Name *</Label>
-                      <Input
-                        id="name"
-                        data-testid="input-reg-practice-name"
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        placeholder="e.g., Sunny Pines Dental"
-                        required
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                  <div className="space-y-4">
+                    <h3 className="font-medium text-lg border-b pb-2">Practice Information</h3>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem className="md:col-span-2">
+                            <FormLabel>Practice Name *</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                data-testid="input-reg-practice-name"
+                                placeholder="e.g., Sunny Pines Dental"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                    </div>
-                    <div className="md:col-span-2">
-                      <Label htmlFor="address">Street Address</Label>
-                      <Input
-                        id="address"
-                        data-testid="input-reg-address"
-                        value={formData.address}
-                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                        placeholder="123 Main Street, Suite 100"
+                      <FormField
+                        control={form.control}
+                        name="address"
+                        render={({ field }) => (
+                          <FormItem className="md:col-span-2">
+                            <FormLabel>Street Address</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                data-testid="input-reg-address"
+                                placeholder="123 Main Street, Suite 100"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                    </div>
-                    <div>
-                      <Label htmlFor="city">City *</Label>
-                      <Input
-                        id="city"
-                        data-testid="input-reg-city"
-                        value={formData.city}
-                        onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                        placeholder="Los Angeles"
-                        required
+                      <FormField
+                        control={form.control}
+                        name="city"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>City *</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                data-testid="input-reg-city"
+                                placeholder="Los Angeles"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                    </div>
-                    <div>
-                      <Label htmlFor="stateCode">State *</Label>
-                      <Select 
-                        value={formData.stateCode} 
-                        onValueChange={(value) => setFormData({ ...formData, stateCode: value })}
-                        required
-                      >
-                        <SelectTrigger data-testid="select-reg-state">
-                          <SelectValue placeholder="Select state" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {US_STATES.map((state) => (
-                            <SelectItem key={state.code} value={state.code}>
-                              {state.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="zipCode">Zip Code *</Label>
-                      <Input
-                        id="zipCode"
-                        data-testid="input-reg-zip"
-                        value={formData.zipCode}
-                        onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
-                        placeholder="90210"
-                        required
+                      <FormField
+                        control={form.control}
+                        name="stateCode"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>State *</FormLabel>
+                            <Select value={field.value} onValueChange={field.onChange}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-reg-state">
+                                  <SelectValue placeholder="Select state" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {US_STATES.map((state) => (
+                                  <SelectItem key={state.code} value={state.code}>
+                                    {state.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                    </div>
-                    <div>
-                      <Label htmlFor="phone">Practice Phone *</Label>
-                      <Input
-                        id="phone"
-                        data-testid="input-reg-phone"
-                        value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                        placeholder="(555) 123-4567"
-                        required
+                      <FormField
+                        control={form.control}
+                        name="zipCode"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Zip Code *</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                data-testid="input-reg-zip"
+                                placeholder="90210"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                    </div>
-                    <div className="md:col-span-2">
-                      <Label htmlFor="email">Practice Email *</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        data-testid="input-reg-practice-email"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        placeholder="info@yourpractice.com"
-                        required
+                      <FormField
+                        control={form.control}
+                        name="phone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Practice Phone *</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                data-testid="input-reg-phone"
+                                placeholder="(555) 123-4567"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                    </div>
-                    <div>
-                      <Label htmlFor="npiNumber">NPI Number</Label>
-                      <Input
-                        id="npiNumber"
-                        data-testid="input-reg-npi"
-                        value={formData.npiNumber}
-                        onChange={(e) => setFormData({ ...formData, npiNumber: e.target.value })}
-                        placeholder="1234567890"
+                      <FormField
+                        control={form.control}
+                        name="email"
+                        render={({ field }) => (
+                          <FormItem className="md:col-span-2">
+                            <FormLabel>Practice Email *</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                type="email"
+                                data-testid="input-reg-practice-email"
+                                placeholder="info@yourpractice.com"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                      <p className="text-xs text-muted-foreground mt-1">10-digit National Provider Identifier</p>
-                    </div>
-                    <div>
-                      <Label htmlFor="taxId">Tax ID (EIN)</Label>
-                      <Input
-                        id="taxId"
-                        data-testid="input-reg-tax-id"
-                        value={formData.taxId}
-                        onChange={(e) => setFormData({ ...formData, taxId: e.target.value })}
-                        placeholder="12-3456789"
+                      <FormField
+                        control={form.control}
+                        name="npiNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>NPI Number</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                data-testid="input-reg-npi"
+                                placeholder="1234567890"
+                              />
+                            </FormControl>
+                            <p className="text-xs text-muted-foreground mt-1">10-digit National Provider Identifier</p>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                      <p className="text-xs text-muted-foreground mt-1">Employer Identification Number</p>
+                      <FormField
+                        control={form.control}
+                        name="taxId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Tax ID (EIN)</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                data-testid="input-reg-tax-id"
+                                placeholder="12-3456789"
+                              />
+                            </FormControl>
+                            <p className="text-xs text-muted-foreground mt-1">Employer Identification Number</p>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
                   </div>
-                </div>
 
-                <div className="space-y-4">
-                  <h3 className="font-medium text-lg border-b pb-2">Practice Owner Information</h3>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="ownerFirstName">First Name *</Label>
-                      <Input
-                        id="ownerFirstName"
-                        data-testid="input-reg-owner-first"
-                        value={formData.ownerFirstName}
-                        onChange={(e) => setFormData({ ...formData, ownerFirstName: e.target.value })}
-                        placeholder="John"
-                        required
+                  <div className="space-y-4">
+                    <h3 className="font-medium text-lg border-b pb-2">Practice Owner Information</h3>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="ownerFirstName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>First Name *</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                data-testid="input-reg-owner-first"
+                                placeholder="John"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                    </div>
-                    <div>
-                      <Label htmlFor="ownerLastName">Last Name *</Label>
-                      <Input
-                        id="ownerLastName"
-                        data-testid="input-reg-owner-last"
-                        value={formData.ownerLastName}
-                        onChange={(e) => setFormData({ ...formData, ownerLastName: e.target.value })}
-                        placeholder="Doe"
-                        required
+                      <FormField
+                        control={form.control}
+                        name="ownerLastName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Last Name *</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                data-testid="input-reg-owner-last"
+                                placeholder="Doe"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                    </div>
-                    <div>
-                      <Label htmlFor="ownerEmail">Email Address *</Label>
-                      <Input
-                        id="ownerEmail"
-                        type="email"
-                        data-testid="input-reg-owner-email"
-                        value={formData.ownerEmail}
-                        onChange={(e) => setFormData({ ...formData, ownerEmail: e.target.value })}
-                        placeholder="john.doe@example.com"
-                        required
+                      <FormField
+                        control={form.control}
+                        name="ownerEmail"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Email Address *</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                type="email"
+                                data-testid="input-reg-owner-email"
+                                placeholder="john.doe@example.com"
+                              />
+                            </FormControl>
+                            <p className="text-xs text-muted-foreground mt-1">We'll send approval notifications here</p>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                      <p className="text-xs text-muted-foreground mt-1">We'll send approval notifications here</p>
-                    </div>
-                    <div>
-                      <Label htmlFor="ownerPhone">Phone Number *</Label>
-                      <Input
-                        id="ownerPhone"
-                        data-testid="input-reg-owner-phone"
-                        value={formData.ownerPhone}
-                        onChange={(e) => setFormData({ ...formData, ownerPhone: e.target.value })}
-                        placeholder="(555) 987-6543"
-                        required
+                      <FormField
+                        control={form.control}
+                        name="ownerPhone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Phone Number *</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                data-testid="input-reg-owner-phone"
+                                placeholder="(555) 987-6543"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
                     </div>
                   </div>
-                </div>
 
-                <div className="space-y-4">
-                  <div className="flex items-start space-x-3 p-4 bg-muted/50 rounded-lg">
-                    <Checkbox 
-                      id="terms" 
-                      checked={formData.agreeToTerms}
-                      onCheckedChange={(checked) => setFormData({ ...formData, agreeToTerms: checked as boolean })}
-                      data-testid="checkbox-agree-terms"
+                  <div className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="agreeToTerms"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 p-4 bg-muted/50 rounded-lg">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                              data-testid="checkbox-agree-terms"
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel className="text-sm font-medium leading-none">
+                              I agree to the Terms of Service and Privacy Policy *
+                            </FormLabel>
+                            <p className="text-xs text-muted-foreground">
+                              By registering, you agree to our terms of service, privacy policy, and HIPAA Business Associate Agreement.
+                            </p>
+                            <FormMessage />
+                          </div>
+                        </FormItem>
+                      )}
                     />
-                    <div className="grid gap-1.5 leading-none">
-                      <label
-                        htmlFor="terms"
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        I agree to the Terms of Service and Privacy Policy *
-                      </label>
-                      <p className="text-xs text-muted-foreground">
-                        By registering, you agree to our terms of service, privacy policy, and HIPAA Business Associate Agreement.
-                      </p>
-                    </div>
                   </div>
-                </div>
 
-                <div className="flex justify-end gap-4">
-                  <Link href="/">
-                    <Button type="button" variant="outline">
-                      Cancel
+                  <div className="flex justify-end gap-4">
+                    <Link href="/">
+                      <Button type="button" variant="outline">
+                        Cancel
+                      </Button>
+                    </Link>
+                    <Button 
+                      type="submit" 
+                      disabled={registerMutation.isPending}
+                      data-testid="button-submit-registration"
+                    >
+                      {registerMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Submit Registration
                     </Button>
-                  </Link>
-                  <Button 
-                    type="submit" 
-                    disabled={registerMutation.isPending || !formData.agreeToTerms}
-                    data-testid="button-submit-registration"
-                  >
-                    {registerMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Submit Registration
-                  </Button>
-                </div>
-              </form>
+                  </div>
+                </form>
+              </Form>
             </CardContent>
           </Card>
         </div>

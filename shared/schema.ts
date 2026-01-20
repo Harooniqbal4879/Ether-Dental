@@ -622,6 +622,24 @@ export const insertPracticeSchema = createInsertSchema(practices).omit({
 export type InsertPractice = z.infer<typeof insertPracticeSchema>;
 export type Practice = typeof practices.$inferSelect;
 
+// Registration-specific schema with required fields and validation
+export const practiceRegistrationSchema = z.object({
+  name: z.string().min(2, "Practice name must be at least 2 characters"),
+  address: z.string().optional(),
+  city: z.string().min(2, "City is required"),
+  stateCode: z.string().length(2, "Please select a state"),
+  zipCode: z.string().min(5, "ZIP code must be at least 5 characters"),
+  phone: z.string().min(10, "Phone number is required"),
+  email: z.string().email("Please enter a valid email address"),
+  npiNumber: z.string().optional(),
+  taxId: z.string().optional(),
+  ownerFirstName: z.string().min(1, "Owner first name is required"),
+  ownerLastName: z.string().min(1, "Owner last name is required"),
+  ownerEmail: z.string().email("Please enter a valid owner email"),
+  ownerPhone: z.string().min(10, "Owner phone is required"),
+});
+export type PracticeRegistration = z.infer<typeof practiceRegistrationSchema>;
+
 // Practice Settings - Practice-specific fee overrides (inherits from platform if null)
 export const practiceSettings = pgTable("practice_settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
