@@ -1179,6 +1179,39 @@ export async function registerRoutes(
     }
   });
 
+  // Update credential document URL after upload
+  app.patch("/api/credentials/:type/:id/document", async (req, res) => {
+    try {
+      const { type, id } = req.params;
+      const { documentUrl } = req.body;
+
+      if (!documentUrl) {
+        return res.status(400).json({ error: "Document URL is required" });
+      }
+
+      let result;
+      switch (type) {
+        case "certifications":
+          result = await storage.updateProfessionalCertification(id, { documentUrl });
+          break;
+        case "training":
+          result = await storage.updateProfessionalTraining(id, { certificateUrl: documentUrl });
+          break;
+        default:
+          return res.status(400).json({ error: "Invalid credential type" });
+      }
+
+      if (!result) {
+        return res.status(404).json({ error: "Credential not found" });
+      }
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error updating credential document:", error);
+      res.status(500).json({ error: "Failed to update credential document" });
+    }
+  });
+
   // Professional Preferences
   app.get("/api/professionals/:id/preferences", async (req, res) => {
     try {

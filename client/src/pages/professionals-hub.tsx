@@ -39,6 +39,8 @@ import {
   Edit,
   Trash2,
   AlertCircle,
+  Upload,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -72,6 +74,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Label } from "@/components/ui/label";
+import { ObjectUploader } from "@/components/ObjectUploader";
 import {
   type ProfessionalWithBadges,
   type ProfessionalWithCredentials,
@@ -1332,28 +1335,7 @@ function MyCredentialsView({ professionalId }: { professionalId: string }) {
             items={certifications}
             emptyMessage="No certifications added yet"
             renderItem={(cert: ProfessionalCertification) => (
-              <div key={cert.id} className="flex items-start justify-between p-4 border rounded-lg" data-testid={`cert-${cert.id}`}>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h4 className="font-medium">{cert.name}</h4>
-                    {cert.verificationStatus === "verified" && (
-                      <Badge variant="default" className="bg-green-500">Verified</Badge>
-                    )}
-                    {cert.verificationStatus === "pending" && (
-                      <Badge variant="secondary">Pending</Badge>
-                    )}
-                  </div>
-                  <p className="text-sm text-muted-foreground">{cert.issuingAuthority}</p>
-                  {cert.expirationDate && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Expires: {new Date(cert.expirationDate).toLocaleDateString()}
-                      {new Date(cert.expirationDate) < new Date() && (
-                        <Badge variant="destructive" className="ml-2 text-xs">Expired</Badge>
-                      )}
-                    </p>
-                  )}
-                </div>
-              </div>
+              <CertificationItem key={cert.id} cert={cert} professionalId={professionalId} />
             )}
             professionalId={professionalId}
             credentialType="certifications"
@@ -1473,6 +1455,95 @@ function MyCredentialsView({ professionalId }: { professionalId: string }) {
           />
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function CertificationItem({ cert, professionalId }: { cert: ProfessionalCertification; professionalId: string }) {
+  const { toast } = useToast();
+
+  const handleUploadComplete = async (result: any) => {
+    const file = result.successful?.[0];
+    if (file) {
+      try {
+        const objectPath = `/objects/uploads/${file.id}`;
+        await apiRequest("PATCH", `/api/credentials/certifications/${cert.id}/document`, {
+          documentUrl: objectPath,
+        });
+        queryClient.invalidateQueries({ queryKey: [`/api/professionals/${professionalId}/full`] });
+        toast({
+          title: "Document Uploaded",
+          description: "The certification document has been uploaded successfully.",
+        });
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to save document reference",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  return (
+    <div className="flex items-start justify-between p-4 border rounded-lg" data-testid={`cert-${cert.id}`}>
+      <div className="flex-1">
+        <div className="flex items-center gap-2">
+          <h4 className="font-medium">{cert.name}</h4>
+          {cert.verificationStatus === "verified" && (
+            <Badge variant="default" className="bg-green-500">Verified</Badge>
+          )}
+          {cert.verificationStatus === "pending" && (
+            <Badge variant="secondary">Pending</Badge>
+          )}
+        </div>
+        <p className="text-sm text-muted-foreground">{cert.issuingAuthority}</p>
+        {cert.expirationDate && (
+          <p className="text-xs text-muted-foreground mt-1">
+            Expires: {new Date(cert.expirationDate).toLocaleDateString()}
+            {new Date(cert.expirationDate) < new Date() && (
+              <Badge variant="destructive" className="ml-2 text-xs">Expired</Badge>
+            )}
+          </p>
+        )}
+        {cert.documentUrl && (
+          <a
+            href={cert.documentUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-2"
+            data-testid={`link-cert-doc-${cert.id}`}
+          >
+            <FileText className="h-3 w-3" />
+            View Document
+            <ExternalLink className="h-3 w-3" />
+          </a>
+        )}
+      </div>
+      <ObjectUploader
+        onGetUploadParameters={async (file) => {
+          const res = await fetch("/api/uploads/request-url", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: file.name,
+              size: file.size,
+              contentType: file.type,
+            }),
+          });
+          const { uploadURL } = await res.json();
+          return {
+            method: "PUT" as const,
+            url: uploadURL,
+            headers: { "Content-Type": file.type },
+          };
+        }}
+        onComplete={handleUploadComplete}
+        buttonClassName="text-xs"
+      >
+        <Upload className="h-3 w-3 mr-1" />
+        {cert.documentUrl ? "Replace" : "Upload"}
+      </ObjectUploader>
     </div>
   );
 }
