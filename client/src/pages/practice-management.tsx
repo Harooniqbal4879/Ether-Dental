@@ -278,12 +278,6 @@ export default function PracticeManagementPage() {
   const [selectedPractice, setSelectedPractice] = useState<Practice | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
 
-  // Access control
-  if (currentPersona !== "system_admin") {
-    setLocation("/");
-    return null;
-  }
-
   const { data: practices, isLoading } = useQuery<Practice[]>({
     queryKey: ["/api/practices"],
     enabled: currentPersona === "system_admin",
@@ -357,6 +351,12 @@ export default function PracticeManagementPage() {
       toast({ title: "Failed to reject practice", variant: "destructive" });
     },
   });
+
+  // Access control - must come after all hooks
+  if (currentPersona !== "system_admin") {
+    setLocation("/");
+    return null;
+  }
 
   const pendingCount = practices?.filter(p => p.registrationStatus === "pending").length || 0;
 
