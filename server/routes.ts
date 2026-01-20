@@ -666,6 +666,24 @@ export async function registerRoutes(
     }
   });
 
+  // Get professional's claimed shifts (for mobile app)
+  app.get("/api/professionals/:id/shifts", async (req, res) => {
+    try {
+      const { status, startDate, endDate } = req.query;
+      
+      const filters: { status?: string; startDate?: string; endDate?: string } = {};
+      if (typeof status === "string") filters.status = status;
+      if (typeof startDate === "string") filters.startDate = startDate;
+      if (typeof endDate === "string") filters.endDate = endDate;
+      
+      const shifts = await storage.getShiftsForProfessionalWithLocation(req.params.id, filters);
+      res.json(shifts);
+    } catch (error) {
+      console.error("Error fetching professional's shifts:", error);
+      res.status(500).json({ error: "Failed to fetch professional's shifts" });
+    }
+  });
+
   // Shift Transactions
   app.get("/api/shift-transactions", async (req, res) => {
     try {

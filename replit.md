@@ -117,6 +117,10 @@ The platform provides APIs for a mobile app (Expo React Native) that allows dent
   - Body: `{ professionalId: string }`
   - Returns: `{ success: boolean, shift?: StaffShift, error?: string }`
   - Error codes: 409 (conflict) if not assigned to this professional or completed
+- `GET /api/professionals/:id/shifts` - Get professional's claimed/assigned shifts
+  - Query params: `status` (filled, completed), `startDate`, `endDate`
+  - Returns: `StaffShiftWithLocation[]` - shifts assigned to this professional with location details
+  - Use case: Professional views their upcoming schedule or shift history on mobile app
 
 ### Shift Workflow
 1. Practice Admin creates shifts via `/staffing/add-shift` (status: "open")

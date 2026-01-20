@@ -165,6 +165,7 @@ export interface IStorage {
 
   // Professional-specific queries
   getShiftsForProfessional(professionalId: string): Promise<StaffShift[]>;
+  getShiftsForProfessionalWithLocation(professionalId: string, filters?: { status?: string; startDate?: string; endDate?: string }): Promise<StaffShiftWithLocation[]>;
   getTransactionsForProfessional(professionalId: string): Promise<ShiftTransactionWithDetails[]>;
 
   // Platform Settings
@@ -1024,6 +1025,38 @@ export class DatabaseStorage implements IStorage {
       .from(staffShifts)
       .where(eq(staffShifts.assignedProfessionalId, professionalId))
       .orderBy(desc(staffShifts.date));
+  }
+
+  async getShiftsForProfessionalWithLocation(professionalId: string, filters?: { status?: string; startDate?: string; endDate?: string }): Promise<StaffShiftWithLocation[]> {
+    const conditions = [eq(staffShifts.assignedProfessionalId, professionalId)];
+    
+    if (filters?.status) {
+      conditions.push(eq(staffShifts.status, filters.status));
+    }
+    if (filters?.startDate) {
+      conditions.push(gte(staffShifts.date, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(lte(staffShifts.date, filters.endDate));
+    }
+    
+    const shifts = await db
+      .select()
+      .from(staffShifts)
+      .where(and(...conditions))
+      .orderBy(staffShifts.date);
+    
+    const result: StaffShiftWithLocation[] = [];
+    for (const shift of shifts) {
+      let location = null;
+      if (shift.locationId) {
+        const [loc] = await db.select().from(practiceLocations).where(eq(practiceLocations.id, shift.locationId));
+        location = loc || null;
+      }
+      result.push({ ...shift, location });
+    }
+    
+    return result;
   }
 
   async getTransactionsForProfessional(professionalId: string): Promise<ShiftTransactionWithDetails[]> {
