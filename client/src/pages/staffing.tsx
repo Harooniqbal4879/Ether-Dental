@@ -703,6 +703,187 @@ function ShiftHistoryView({ roleFilter }: { roleFilter: StaffRole }) {
   );
 }
 
+function PaymentTransactionsView({ roleFilter }: { roleFilter: StaffRole }) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const roleLabel = roleFilter === "all" ? "transactions" : `${STAFF_ROLES[roleFilter].label.toLowerCase()} transactions`;
+  
+  const { data: transactions, isLoading } = useQuery<ShiftTransactionWithDetails[]>({
+    queryKey: ["/api/shift-transactions"],
+  });
+
+  const filteredTransactions = useMemo(() => {
+    if (!transactions) return [];
+    return transactions.filter((tx) => {
+      const matchesRole = roleFilter === "all" || tx.shift?.role === STAFF_ROLES[roleFilter].label;
+      const matchesStatus = statusFilter === "all" || tx.status === statusFilter;
+      const matchesSearch = searchQuery === "" || 
+        `${tx.professional?.firstName} ${tx.professional?.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        tx.shift?.role?.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesRole && matchesStatus && matchesSearch;
+    });
+  }, [transactions, roleFilter, statusFilter, searchQuery]);
+
+  const totalAmount = filteredTransactions.reduce((sum, tx) => sum + parseFloat(tx.regularPay || "0"), 0);
+  const pendingCount = filteredTransactions.filter(tx => tx.status === "pending").length;
+  const chargedCount = filteredTransactions.filter(tx => tx.status === "charged").length;
+
+  function getTransactionStatusBadge(status: string) {
+    switch (status) {
+      case "pending":
+        return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300">Pending</Badge>;
+      case "charged":
+        return <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300">Charged</Badge>;
+      case "failed":
+        return <Badge variant="outline" className="bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300">Failed</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Card><CardContent className="h-24 animate-pulse bg-muted" /></Card>
+          <Card><CardContent className="h-24 animate-pulse bg-muted" /></Card>
+          <Card><CardContent className="h-24 animate-pulse bg-muted" /></Card>
+        </div>
+        <Card><CardContent className="h-64 animate-pulse bg-muted" /></Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold" data-testid="text-payment-transactions-title">Payment Transactions</h2>
+        <div className="flex items-center gap-3">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-40" data-testid="select-transaction-status">
+              <SelectValue placeholder="All Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="charged">Charged</SelectItem>
+              <SelectItem value="failed">Failed</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="relative w-64">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search transactions..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+              data-testid="input-search-transactions"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Card data-testid="card-total-transactions">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                <DollarSign className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Total Amount</p>
+                <p className="text-xl font-bold">{formatCurrency(totalAmount)}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card data-testid="card-pending-transactions">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-yellow-100 dark:bg-yellow-900/30">
+                <Clock className="h-5 w-5 text-yellow-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Pending</p>
+                <p className="text-xl font-bold text-yellow-600">{pendingCount}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card data-testid="card-charged-transactions">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+                <CheckCircle2 className="h-5 w-5 text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Charged</p>
+                <p className="text-xl font-bold text-green-600">{chargedCount}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {filteredTransactions.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Transaction History</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="divide-y">
+              {filteredTransactions.map((tx) => (
+                <div
+                  key={tx.id}
+                  className="flex items-center justify-between py-4 first:pt-0 last:pb-0"
+                  data-testid={`row-transaction-${tx.id}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                      <Receipt className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <p className="font-medium">
+                        {tx.professional?.firstName} {tx.professional?.lastName}
+                      </p>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span>{tx.shift?.role}</span>
+                        <span>•</span>
+                        <span>{tx.shift?.date ? new Date(tx.shift.date + "T00:00:00").toLocaleDateString() : "N/A"}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <p className="font-semibold">{formatCurrency(tx.regularPay)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Fees: {formatCurrency((parseFloat(tx.serviceFee || "0") + parseFloat(tx.convenienceFee || "0")).toString())}
+                      </p>
+                    </div>
+                    {getTransactionStatusBadge(tx.status)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="rounded-lg bg-muted/50 p-12 flex flex-col items-center justify-center min-h-[350px]">
+          <div className="mb-4">
+            <Receipt className="h-16 w-16 text-muted-foreground/40" />
+          </div>
+          <h3 className="text-xl font-semibold text-foreground mb-2" data-testid="text-no-transactions">
+            No payment transactions yet.
+          </h3>
+          <p className="text-muted-foreground text-center max-w-md">
+            Once shifts are completed and processed, payment transactions will appear here.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RoleFilterBadge({ role }: { role: StaffRole }) {
   if (role === "all") return null;
   return (
@@ -781,6 +962,7 @@ export default function StaffingPage() {
           <TabsTrigger value="pending" data-testid="tab-staffing-pending">Pending</TabsTrigger>
           <TabsTrigger value="team" data-testid="tab-staffing-team">Team</TabsTrigger>
           <TabsTrigger value="history" data-testid="tab-staffing-history">Shift history</TabsTrigger>
+          <TabsTrigger value="transactions" data-testid="tab-staffing-transactions">Payment Transactions</TabsTrigger>
         </TabsList>
         
         <TabsContent value="calendar">
@@ -797,6 +979,10 @@ export default function StaffingPage() {
         
         <TabsContent value="history">
           <ShiftHistoryView roleFilter={roleFilter} />
+        </TabsContent>
+        
+        <TabsContent value="transactions">
+          <PaymentTransactionsView roleFilter={roleFilter} />
         </TabsContent>
       </Tabs>
     </div>
