@@ -326,6 +326,11 @@ export const insertStaffShiftSchema = createInsertSchema(staffShifts).omit({
 export type InsertStaffShift = z.infer<typeof insertStaffShiftSchema>;
 export type StaffShift = typeof staffShifts.$inferSelect;
 
+// Staff Shift with location details for mobile API
+export type StaffShiftWithLocation = StaffShift & {
+  location?: PracticeLocation | null;
+};
+
 // Shift Transactions - payment records for completed shifts
 export const shiftTransactions = pgTable("shift_transactions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

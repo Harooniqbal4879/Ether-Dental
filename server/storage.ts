@@ -39,6 +39,7 @@ import {
   type PatientPayment,
   type InsertPatientPayment,
   type StaffShift,
+  type StaffShiftWithLocation,
   type InsertStaffShift,
   type Professional,
   type InsertProfessional,
@@ -130,6 +131,10 @@ export interface IStorage {
   // Staff Shifts
   getShifts(startDate: string, endDate: string): Promise<StaffShift[]>;
   getShiftsByDate(date: string): Promise<StaffShift[]>;
+  getAvailableShifts(filters?: { startDate?: string; endDate?: string; role?: string; locationId?: string }): Promise<StaffShiftWithLocation[]>;
+  getShiftWithLocation(id: string): Promise<StaffShiftWithLocation | undefined>;
+  claimShift(shiftId: string, professionalId: string): Promise<{ success: boolean; shift?: StaffShift; error?: string }>;
+  releaseShift(shiftId: string, professionalId: string): Promise<{ success: boolean; shift?: StaffShift; error?: string }>;
   createShift(shift: InsertStaffShift): Promise<StaffShift>;
   createShifts(shifts: InsertStaffShift[]): Promise<StaffShift[]>;
 
@@ -725,6 +730,124 @@ export class DatabaseStorage implements IStorage {
   async createShifts(shifts: InsertStaffShift[]): Promise<StaffShift[]> {
     if (shifts.length === 0) return [];
     return db.insert(staffShifts).values(shifts).returning();
+  }
+
+  async getAvailableShifts(filters?: { startDate?: string; endDate?: string; role?: string; locationId?: string }): Promise<StaffShiftWithLocation[]> {
+    const conditions = [eq(staffShifts.status, "open")];
+    
+    if (filters?.startDate) {
+      conditions.push(gte(staffShifts.date, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(lte(staffShifts.date, filters.endDate));
+    }
+    if (filters?.role) {
+      conditions.push(eq(staffShifts.role, filters.role));
+    }
+    if (filters?.locationId) {
+      conditions.push(eq(staffShifts.locationId, filters.locationId));
+    }
+    
+    const shifts = await db
+      .select()
+      .from(staffShifts)
+      .where(and(...conditions))
+      .orderBy(staffShifts.date);
+    
+    const result: StaffShiftWithLocation[] = [];
+    for (const shift of shifts) {
+      let location = null;
+      if (shift.locationId) {
+        const [loc] = await db.select().from(practiceLocations).where(eq(practiceLocations.id, shift.locationId));
+        location = loc || null;
+      }
+      result.push({ ...shift, location });
+    }
+    
+    return result;
+  }
+
+  async getShiftWithLocation(id: string): Promise<StaffShiftWithLocation | undefined> {
+    const [shift] = await db.select().from(staffShifts).where(eq(staffShifts.id, id));
+    if (!shift) return undefined;
+    
+    let location = null;
+    if (shift.locationId) {
+      const [loc] = await db.select().from(practiceLocations).where(eq(practiceLocations.id, shift.locationId));
+      location = loc || null;
+    }
+    
+    return { ...shift, location };
+  }
+
+  async claimShift(shiftId: string, professionalId: string): Promise<{ success: boolean; shift?: StaffShift; error?: string }> {
+    const [shift] = await db.select().from(staffShifts).where(eq(staffShifts.id, shiftId));
+    
+    if (!shift) {
+      return { success: false, error: "Shift not found" };
+    }
+    
+    if (shift.status !== "open") {
+      return { success: false, error: "Shift is not available for claiming" };
+    }
+    
+    if (shift.assignedProfessionalId) {
+      return { success: false, error: "Shift is already assigned to another professional" };
+    }
+    
+    const [professional] = await db.select().from(professionals).where(eq(professionals.id, professionalId));
+    if (!professional) {
+      return { success: false, error: "Professional not found" };
+    }
+    
+    const [updated] = await db
+      .update(staffShifts)
+      .set({ 
+        status: "filled", 
+        assignedProfessionalId: professionalId 
+      })
+      .where(and(
+        eq(staffShifts.id, shiftId),
+        eq(staffShifts.status, "open")
+      ))
+      .returning();
+    
+    if (!updated) {
+      return { success: false, error: "Failed to claim shift - it may have been taken by another professional" };
+    }
+    
+    return { success: true, shift: updated };
+  }
+
+  async releaseShift(shiftId: string, professionalId: string): Promise<{ success: boolean; shift?: StaffShift; error?: string }> {
+    const [shift] = await db.select().from(staffShifts).where(eq(staffShifts.id, shiftId));
+    
+    if (!shift) {
+      return { success: false, error: "Shift not found" };
+    }
+    
+    if (shift.assignedProfessionalId !== professionalId) {
+      return { success: false, error: "You are not assigned to this shift" };
+    }
+    
+    if (shift.status === "completed") {
+      return { success: false, error: "Cannot release a completed shift" };
+    }
+    
+    const [updated] = await db
+      .update(staffShifts)
+      .set({ 
+        status: "open", 
+        assignedProfessionalId: null 
+      })
+      .where(eq(staffShifts.id, shiftId))
+      .returning();
+    
+    if (!updated) {
+      return { success: false, error: "Failed to release shift" };
+    }
+    
+    return { success: true, shift: updated };
   }
 
   // Professionals
