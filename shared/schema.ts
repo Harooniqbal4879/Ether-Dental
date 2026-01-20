@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, boolean, decimal } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, boolean, decimal, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -584,6 +584,242 @@ export const insertRoleSpecialtySchema = createInsertSchema(roleSpecialties).omi
 });
 export type InsertRoleSpecialty = z.infer<typeof insertRoleSpecialtySchema>;
 export type RoleSpecialty = typeof roleSpecialties.$inferSelect;
+
+// Professional Preferences - for shift matching
+export const professionalPreferences = pgTable("professional_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  professionalId: varchar("professional_id").notNull().references(() => professionals.id, { onDelete: "cascade" }),
+  preferredDays: text("preferred_days").array(), // ["Monday", "Tuesday", ...]
+  preferredTimeStart: text("preferred_time_start"), // "08:00"
+  preferredTimeEnd: text("preferred_time_end"), // "17:00"
+  minHourlyRate: decimal("min_hourly_rate", { precision: 10, scale: 2 }),
+  maxHourlyRate: decimal("max_hourly_rate", { precision: 10, scale: 2 }),
+  preferredShiftDurationMin: integer("preferred_shift_duration_min"), // in hours
+  preferredShiftDurationMax: integer("preferred_shift_duration_max"), // in hours
+  preferredLocations: text("preferred_locations").array(), // location IDs
+  maxDistanceMiles: integer("max_distance_miles"),
+  preferredRoles: text("preferred_roles").array(),
+  preferredSpecialties: text("preferred_specialties").array(),
+  acceptLastMinuteShifts: boolean("accept_last_minute_shifts").default(false),
+  acceptOvertimeShifts: boolean("accept_overtime_shifts").default(false),
+  preferredPracticeTypes: text("preferred_practice_types").array(), // general, pediatric, orthodontic, etc.
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const professionalPreferencesRelations = relations(professionalPreferences, ({ one }) => ({
+  professional: one(professionals, {
+    fields: [professionalPreferences.professionalId],
+    references: [professionals.id],
+  }),
+}));
+
+export const insertProfessionalPreferencesSchema = createInsertSchema(professionalPreferences).omit({
+  id: true,
+  updatedAt: true,
+});
+export type InsertProfessionalPreferences = z.infer<typeof insertProfessionalPreferencesSchema>;
+export type ProfessionalPreferences = typeof professionalPreferences.$inferSelect;
+
+// Professional Availability - calendar availability and blackout dates
+export const professionalAvailability = pgTable("professional_availability", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  professionalId: varchar("professional_id").notNull().references(() => professionals.id, { onDelete: "cascade" }),
+  date: date("date").notNull(),
+  startTime: text("start_time"), // null means all day
+  endTime: text("end_time"),
+  status: text("status").notNull(), // available, blocked, tentative
+  reason: text("reason"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const professionalAvailabilityRelations = relations(professionalAvailability, ({ one }) => ({
+  professional: one(professionals, {
+    fields: [professionalAvailability.professionalId],
+    references: [professionals.id],
+  }),
+}));
+
+export const insertProfessionalAvailabilitySchema = createInsertSchema(professionalAvailability).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertProfessionalAvailability = z.infer<typeof insertProfessionalAvailabilitySchema>;
+export type ProfessionalAvailability = typeof professionalAvailability.$inferSelect;
+
+// Professional Certifications - licenses and certifications
+export const professionalCertifications = pgTable("professional_certifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  professionalId: varchar("professional_id").notNull().references(() => professionals.id, { onDelete: "cascade" }),
+  certificationType: text("certification_type").notNull(), // license, certification, permit
+  name: text("name").notNull(), // e.g., "Dental Hygiene License", "CPR Certification"
+  licenseNumber: text("license_number"),
+  issuingAuthority: text("issuing_authority").notNull(),
+  stateCode: text("state_code"),
+  issueDate: date("issue_date"),
+  expirationDate: date("expiration_date"),
+  verificationStatus: text("verification_status").default("pending"), // pending, verified, expired, revoked
+  documentUrl: text("document_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const professionalCertificationsRelations = relations(professionalCertifications, ({ one }) => ({
+  professional: one(professionals, {
+    fields: [professionalCertifications.professionalId],
+    references: [professionals.id],
+  }),
+}));
+
+export const insertProfessionalCertificationSchema = createInsertSchema(professionalCertifications).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  verificationStatus: true,
+});
+export type InsertProfessionalCertification = z.infer<typeof insertProfessionalCertificationSchema>;
+export type ProfessionalCertification = typeof professionalCertifications.$inferSelect;
+
+// Professional Skills - skills and proficiency levels
+export const professionalSkills = pgTable("professional_skills", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  professionalId: varchar("professional_id").notNull().references(() => professionals.id, { onDelete: "cascade" }),
+  category: text("category").notNull(), // clinical, software, equipment, soft_skills
+  skillName: text("skill_name").notNull(),
+  proficiencyLevel: text("proficiency_level").notNull(), // beginner, intermediate, advanced, expert
+  yearsExperience: integer("years_experience"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const professionalSkillsRelations = relations(professionalSkills, ({ one }) => ({
+  professional: one(professionals, {
+    fields: [professionalSkills.professionalId],
+    references: [professionals.id],
+  }),
+}));
+
+export const insertProfessionalSkillSchema = createInsertSchema(professionalSkills).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertProfessionalSkill = z.infer<typeof insertProfessionalSkillSchema>;
+export type ProfessionalSkill = typeof professionalSkills.$inferSelect;
+
+// Professional Experience - work history
+export const professionalExperience = pgTable("professional_experience", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  professionalId: varchar("professional_id").notNull().references(() => professionals.id, { onDelete: "cascade" }),
+  employer: text("employer").notNull(),
+  jobTitle: text("job_title").notNull(),
+  location: text("location"),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date"), // null means current
+  isCurrent: boolean("is_current").default(false),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const professionalExperienceRelations = relations(professionalExperience, ({ one }) => ({
+  professional: one(professionals, {
+    fields: [professionalExperience.professionalId],
+    references: [professionals.id],
+  }),
+}));
+
+export const insertProfessionalExperienceSchema = createInsertSchema(professionalExperience).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertProfessionalExperience = z.infer<typeof insertProfessionalExperienceSchema>;
+export type ProfessionalExperience = typeof professionalExperience.$inferSelect;
+
+// Professional Education - educational background
+export const professionalEducation = pgTable("professional_education", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  professionalId: varchar("professional_id").notNull().references(() => professionals.id, { onDelete: "cascade" }),
+  institution: text("institution").notNull(),
+  degree: text("degree").notNull(),
+  fieldOfStudy: text("field_of_study"),
+  graduationDate: date("graduation_date"),
+  honors: text("honors"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const professionalEducationRelations = relations(professionalEducation, ({ one }) => ({
+  professional: one(professionals, {
+    fields: [professionalEducation.professionalId],
+    references: [professionals.id],
+  }),
+}));
+
+export const insertProfessionalEducationSchema = createInsertSchema(professionalEducation).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertProfessionalEducation = z.infer<typeof insertProfessionalEducationSchema>;
+export type ProfessionalEducation = typeof professionalEducation.$inferSelect;
+
+// Professional Awards - awards and recognitions
+export const professionalAwards = pgTable("professional_awards", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  professionalId: varchar("professional_id").notNull().references(() => professionals.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  issuer: text("issuer").notNull(),
+  dateReceived: date("date_received"),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const professionalAwardsRelations = relations(professionalAwards, ({ one }) => ({
+  professional: one(professionals, {
+    fields: [professionalAwards.professionalId],
+    references: [professionals.id],
+  }),
+}));
+
+export const insertProfessionalAwardSchema = createInsertSchema(professionalAwards).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertProfessionalAward = z.infer<typeof insertProfessionalAwardSchema>;
+export type ProfessionalAward = typeof professionalAwards.$inferSelect;
+
+// Professional Training - continuing education and training
+export const professionalTraining = pgTable("professional_training", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  professionalId: varchar("professional_id").notNull().references(() => professionals.id, { onDelete: "cascade" }),
+  courseName: text("course_name").notNull(),
+  provider: text("provider").notNull(),
+  completionDate: date("completion_date"),
+  ceCredits: decimal("ce_credits", { precision: 5, scale: 2 }), // Continuing Education credits
+  certificateUrl: text("certificate_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const professionalTrainingRelations = relations(professionalTraining, ({ one }) => ({
+  professional: one(professionals, {
+    fields: [professionalTraining.professionalId],
+    references: [professionals.id],
+  }),
+}));
+
+export const insertProfessionalTrainingSchema = createInsertSchema(professionalTraining).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertProfessionalTraining = z.infer<typeof insertProfessionalTrainingSchema>;
+export type ProfessionalTraining = typeof professionalTraining.$inferSelect;
+
+// Combined type for professional with all credentials
+export type ProfessionalWithCredentials = Professional & {
+  badges: ProfessionalBadge[];
+  preferences?: ProfessionalPreferences;
+  certifications: ProfessionalCertification[];
+  skills: ProfessionalSkill[];
+  experience: ProfessionalExperience[];
+  education: ProfessionalEducation[];
+  awards: ProfessionalAward[];
+  training: ProfessionalTraining[];
+};
 
 // Badge types enum
 export const BadgeTypes = {
