@@ -724,7 +724,14 @@ function PaymentTransactionsView({ roleFilter }: { roleFilter: StaffRole }) {
     });
   }, [transactions, roleFilter, statusFilter, searchQuery]);
 
-  const totalAmount = filteredTransactions.reduce((sum, tx) => sum + parseFloat(tx.regularPay || "0"), 0);
+  const totalRegularPay = filteredTransactions.reduce((sum, tx) => sum + parseFloat(tx.regularPay || "0"), 0);
+  const totalServiceFees = filteredTransactions.reduce((sum, tx) => sum + parseFloat(tx.serviceFee || "0"), 0);
+  const totalConvenienceFees = filteredTransactions.reduce((sum, tx) => sum + parseFloat(tx.convenienceFee || "0"), 0);
+  const totalFees = totalServiceFees + totalConvenienceFees;
+  const totalPay = filteredTransactions.reduce((sum, tx) => sum + parseFloat(tx.totalPay || "0"), 0);
+  const totalHours = filteredTransactions.reduce((sum, tx) => sum + parseFloat(tx.hoursWorked || "0"), 0);
+  const pendingAmount = filteredTransactions.filter(tx => tx.status === "pending").reduce((sum, tx) => sum + parseFloat(tx.totalPay || "0"), 0);
+  const chargedAmount = filteredTransactions.filter(tx => tx.status === "charged").reduce((sum, tx) => sum + parseFloat(tx.totalPay || "0"), 0);
   const pendingCount = filteredTransactions.filter(tx => tx.status === "pending").length;
   const chargedCount = filteredTransactions.filter(tx => tx.status === "charged").length;
 
@@ -783,7 +790,7 @@ function PaymentTransactionsView({ roleFilter }: { roleFilter: StaffRole }) {
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card data-testid="card-total-transactions">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -791,8 +798,49 @@ function PaymentTransactionsView({ roleFilter }: { roleFilter: StaffRole }) {
                 <DollarSign className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Total Amount</p>
-                <p className="text-xl font-bold">{formatCurrency(totalAmount)}</p>
+                <p className="text-sm text-muted-foreground">Total Pay</p>
+                <p className="text-xl font-bold">{formatCurrency(totalPay)}</p>
+              </div>
+            </div>
+            <div className="mt-3 pt-3 border-t space-y-1">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Regular Pay</span>
+                <span>{formatCurrency(totalRegularPay)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Total Fees</span>
+                <span>{formatCurrency(totalFees)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Total Hours</span>
+                <span>{totalHours.toFixed(1)} hrs</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card data-testid="card-fees-breakdown">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900/30">
+                <Receipt className="h-5 w-5 text-orange-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Total Fees</p>
+                <p className="text-xl font-bold text-orange-600">{formatCurrency(totalFees)}</p>
+              </div>
+            </div>
+            <div className="mt-3 pt-3 border-t space-y-1">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Service Fees</span>
+                <span>{formatCurrency(totalServiceFees)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Convenience Fees</span>
+                <span>{formatCurrency(totalConvenienceFees)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Transactions</span>
+                <span>{filteredTransactions.length}</span>
               </div>
             </div>
           </CardContent>
@@ -805,7 +853,13 @@ function PaymentTransactionsView({ roleFilter }: { roleFilter: StaffRole }) {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Pending</p>
-                <p className="text-xl font-bold text-yellow-600">{pendingCount}</p>
+                <p className="text-xl font-bold text-yellow-600">{formatCurrency(pendingAmount)}</p>
+              </div>
+            </div>
+            <div className="mt-3 pt-3 border-t">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Transactions</span>
+                <span>{pendingCount}</span>
               </div>
             </div>
           </CardContent>
@@ -818,7 +872,13 @@ function PaymentTransactionsView({ roleFilter }: { roleFilter: StaffRole }) {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Charged</p>
-                <p className="text-xl font-bold text-green-600">{chargedCount}</p>
+                <p className="text-xl font-bold text-green-600">{formatCurrency(chargedAmount)}</p>
+              </div>
+            </div>
+            <div className="mt-3 pt-3 border-t">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Transactions</span>
+                <span>{chargedCount}</span>
               </div>
             </div>
           </CardContent>
