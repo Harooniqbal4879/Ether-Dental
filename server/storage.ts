@@ -13,6 +13,7 @@ import {
   professionalBadges,
   roleSpecialties,
   shiftTransactions,
+  shiftNegotiations,
   platformSettings,
   platformStateTaxRates,
   practices,
@@ -53,6 +54,9 @@ import {
   type ShiftTransaction,
   type InsertShiftTransaction,
   type ShiftTransactionWithDetails,
+  type ShiftNegotiation,
+  type InsertShiftNegotiation,
+  type ShiftNegotiationWithDetails,
   type PlatformSettings,
   type InsertPlatformSettings,
   type PlatformStateTaxRate,
@@ -142,6 +146,16 @@ export interface IStorage {
   releaseShift(shiftId: string, professionalId: string): Promise<{ success: boolean; shift?: StaffShift; error?: string }>;
   createShift(shift: InsertStaffShift): Promise<StaffShift>;
   createShifts(shifts: InsertStaffShift[]): Promise<StaffShift[]>;
+  
+  // Check-in/out
+  checkInShift(shiftId: string, data: { method: string; latitude?: number; longitude?: number }): Promise<{ success: boolean; shift?: StaffShift; error?: string }>;
+  checkOutShift(shiftId: string, data: { method: string; latitude?: number; longitude?: number }): Promise<{ success: boolean; shift?: StaffShift; error?: string }>;
+  
+  // Shift Negotiations
+  createNegotiation(negotiation: InsertShiftNegotiation): Promise<ShiftNegotiation>;
+  getNegotiationsForShift(shiftId: string): Promise<ShiftNegotiationWithDetails[]>;
+  getNegotiationsForProfessional(professionalId: string): Promise<ShiftNegotiationWithDetails[]>;
+  updateNegotiation(id: string, data: Partial<ShiftNegotiation>): Promise<ShiftNegotiation | undefined>;
 
   // Professionals
   getProfessionals(filters?: { role?: string; specialty?: string }): Promise<ProfessionalWithBadges[]>;
@@ -1056,6 +1070,128 @@ export class DatabaseStorage implements IStorage {
     }
     
     return { success: true, shift: updated };
+  }
+
+  // Check-in/out methods
+  async checkInShift(shiftId: string, data: { method: string; latitude?: number; longitude?: number }): Promise<{ success: boolean; shift?: StaffShift; error?: string }> {
+    const [shift] = await db.select().from(staffShifts).where(eq(staffShifts.id, shiftId));
+    
+    if (!shift) {
+      return { success: false, error: "Shift not found" };
+    }
+    
+    if (shift.status !== "filled") {
+      return { success: false, error: "Shift must be filled before check-in" };
+    }
+    
+    if (shift.checkInTime) {
+      return { success: false, error: "Already checked in" };
+    }
+    
+    const [updated] = await db
+      .update(staffShifts)
+      .set({
+        checkInTime: new Date(),
+        checkInMethod: data.method,
+        checkInLatitude: data.latitude?.toString() ?? null,
+        checkInLongitude: data.longitude?.toString() ?? null,
+      })
+      .where(eq(staffShifts.id, shiftId))
+      .returning();
+    
+    if (!updated) {
+      return { success: false, error: "Failed to check in" };
+    }
+    
+    return { success: true, shift: updated };
+  }
+
+  async checkOutShift(shiftId: string, data: { method: string; latitude?: number; longitude?: number }): Promise<{ success: boolean; shift?: StaffShift; error?: string }> {
+    const [shift] = await db.select().from(staffShifts).where(eq(staffShifts.id, shiftId));
+    
+    if (!shift) {
+      return { success: false, error: "Shift not found" };
+    }
+    
+    if (!shift.checkInTime) {
+      return { success: false, error: "Must check in before checking out" };
+    }
+    
+    if (shift.checkOutTime) {
+      return { success: false, error: "Already checked out" };
+    }
+    
+    const [updated] = await db
+      .update(staffShifts)
+      .set({
+        checkOutTime: new Date(),
+        checkOutMethod: data.method,
+        checkOutLatitude: data.latitude?.toString() ?? null,
+        checkOutLongitude: data.longitude?.toString() ?? null,
+      })
+      .where(eq(staffShifts.id, shiftId))
+      .returning();
+    
+    if (!updated) {
+      return { success: false, error: "Failed to check out" };
+    }
+    
+    return { success: true, shift: updated };
+  }
+
+  // Shift Negotiations
+  async createNegotiation(negotiation: InsertShiftNegotiation): Promise<ShiftNegotiation> {
+    const [created] = await db.insert(shiftNegotiations).values(negotiation).returning();
+    return created;
+  }
+
+  async getNegotiationsForShift(shiftId: string): Promise<ShiftNegotiationWithDetails[]> {
+    const negotiations = await db
+      .select()
+      .from(shiftNegotiations)
+      .where(eq(shiftNegotiations.shiftId, shiftId))
+      .orderBy(desc(shiftNegotiations.createdAt));
+    
+    const result: ShiftNegotiationWithDetails[] = [];
+    for (const negotiation of negotiations) {
+      const [shift] = await db.select().from(staffShifts).where(eq(staffShifts.id, negotiation.shiftId));
+      const [professional] = await db.select().from(professionals).where(eq(professionals.id, negotiation.professionalId));
+      
+      if (shift && professional) {
+        result.push({ ...negotiation, shift, professional });
+      }
+    }
+    
+    return result;
+  }
+
+  async getNegotiationsForProfessional(professionalId: string): Promise<ShiftNegotiationWithDetails[]> {
+    const negotiations = await db
+      .select()
+      .from(shiftNegotiations)
+      .where(eq(shiftNegotiations.professionalId, professionalId))
+      .orderBy(desc(shiftNegotiations.createdAt));
+    
+    const result: ShiftNegotiationWithDetails[] = [];
+    for (const negotiation of negotiations) {
+      const [shift] = await db.select().from(staffShifts).where(eq(staffShifts.id, negotiation.shiftId));
+      const [professional] = await db.select().from(professionals).where(eq(professionals.id, negotiation.professionalId));
+      
+      if (shift && professional) {
+        result.push({ ...negotiation, shift, professional });
+      }
+    }
+    
+    return result;
+  }
+
+  async updateNegotiation(id: string, data: Partial<ShiftNegotiation>): Promise<ShiftNegotiation | undefined> {
+    const [updated] = await db
+      .update(shiftNegotiations)
+      .set(data)
+      .where(eq(shiftNegotiations.id, id))
+      .returning();
+    return updated;
   }
 
   // Professionals
