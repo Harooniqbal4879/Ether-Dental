@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import type { ResolvedFeeRates } from "@shared/schema";
+import type { ResolvedFeeRates, PracticeLocation } from "@shared/schema";
 import { Card } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Slider } from "@/components/ui/slider";
@@ -129,6 +129,14 @@ export default function AddShiftPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   
+  // Hardcoded practice ID for now - in a real app, this would come from context/auth
+  const practiceId = "practice-1";
+
+  // Fetch locations for the practice
+  const { data: locations } = useQuery<PracticeLocation[]>({
+    queryKey: ["/api/practices", practiceId, "locations"],
+  });
+
   // Fetch configurable fee rates from the platform settings
   const { data: feeRates } = useQuery<ResolvedFeeRates>({
     queryKey: ['/api/fees/resolved'],
@@ -153,6 +161,7 @@ export default function AddShiftPage() {
   const [selectedDates, setSelectedDates] = useState<Set<string>>(new Set());
   
   const [selectedRole, setSelectedRole] = useState("Hygienist");
+  const [selectedLocationId, setSelectedLocationId] = useState<string>("");
   const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([]);
   const [arrivalTime, setArrivalTime] = useState("8:30 AM");
   const [firstPatient, setFirstPatient] = useState("9:00 AM");
@@ -171,6 +180,7 @@ export default function AddShiftPage() {
     mutationFn: async (data: {
       dates: string[];
       role: string;
+      locationId: string | null;
       specialties: string[];
       arrivalTime: string;
       firstPatientTime: string;
@@ -211,6 +221,7 @@ export default function AddShiftPage() {
     createShiftsMutation.mutate({
       dates: Array.from(selectedDates).sort(),
       role: selectedRole,
+      locationId: selectedLocationId || null,
       specialties: selectedSpecialties,
       arrivalTime,
       firstPatientTime: firstPatient,
@@ -414,6 +425,26 @@ export default function AddShiftPage() {
               {selectedDates.size > 0 && (
                 <div className="border-t pt-6">
                   <div className="flex flex-wrap items-center gap-4">
+                    <div>
+                      <label className="block text-xs text-muted-foreground mb-1">Location</label>
+                      <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
+                        <SelectTrigger className="w-[180px]" data-testid="select-location">
+                          <SelectValue placeholder="Select location" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {locations && locations.length > 0 ? (
+                            locations.filter(loc => loc.isActive).map((loc) => (
+                              <SelectItem key={loc.id} value={loc.id} data-testid={`option-location-${loc.id}`}>
+                                {loc.name}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="none" disabled>No locations available</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
                     <div>
                       <label className="block text-xs text-muted-foreground mb-1">Role</label>
                       <Select value={selectedRole} onValueChange={setSelectedRole}>
