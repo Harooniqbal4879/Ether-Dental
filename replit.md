@@ -71,3 +71,31 @@ The platform supports two practice onboarding flows:
 - `ownerFirstName`, `ownerLastName`, `ownerEmail`, `ownerPhone`: Owner contact info
 - `approvedBy`, `approvedAt`: Approval tracking
 - `rejectionReason`: Required when rejecting
+
+## Multi-Location Support
+The platform supports practices with multiple office locations. Each practice can manage multiple locations, and shifts/appointments can be assigned to specific locations.
+
+### Practice Locations (`practice_locations` table)
+- `id`: Unique location identifier
+- `practiceId`: Reference to parent practice
+- `name`: Location display name (e.g., "Main Office", "Downtown Branch")
+- `address`, `city`, `stateCode`, `zipCode`: Location address
+- `phone`, `email`: Location contact info
+- `isPrimary`: Boolean indicating the main/primary location
+- `isActive`: Boolean for soft delete functionality
+
+### Location Management
+- **Settings Page**: The Locations tab (`/settings` → Locations tab) allows Practice Admins to add, edit, and manage office locations
+- **Shift Creation**: When creating shifts at `/staffing/add-shift`, staff can select which location the shift is for
+- **Appointments**: Appointments can be linked to specific locations (future enhancement)
+
+### API Endpoints
+- `GET /api/practices/:practiceId/locations` - List all locations for a practice
+- `POST /api/practices/:practiceId/locations` - Create a new location
+- `PATCH /api/practices/:practiceId/locations/:id` - Update a location
+- `DELETE /api/practices/:practiceId/locations/:id` - Soft delete a location
+
+### Known Limitations (MVP)
+- **Hardcoded practiceId**: Currently using `practiceId = "practice-1"` as a placeholder in several components. This should be replaced with auth/context-based practice resolution for multi-tenant production deployment.
+- **Nullable locationId**: The `locationId` field in `staffShifts` and `appointments` tables is currently nullable for backward compatibility. For production, consider adding a migration to backfill with default primary location and then enforce NOT NULL.
+- **Default Demo Practice**: A demo practice with ID "practice-1" is seeded with two sample locations (Main Office, Downtown Branch) for testing purposes.
