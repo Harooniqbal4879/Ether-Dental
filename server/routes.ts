@@ -4,11 +4,15 @@ import { storage } from "./storage";
 import { insertPatientSchema, insertInsuranceCarrierSchema, insertInsurancePolicySchema, insertClearinghouseConfigSchema, insertStaffShiftSchema, insertProfessionalSchema, insertProfessionalBadgeSchema, insertRoleSpecialtySchema } from "@shared/schema";
 import { z } from "zod";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
+import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // Register Object Storage routes for file uploads
+  registerObjectStorageRoutes(app);
+
   // Dashboard Stats
   app.get("/api/dashboard/stats", async (req, res) => {
     try {

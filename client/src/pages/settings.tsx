@@ -73,6 +73,7 @@ import type { ClearinghouseConfig, InsertClearinghouseConfig, InsuranceCarrier, 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useUpload } from "@/hooks/use-upload";
 import {
   Form,
   FormControl,
@@ -510,6 +511,16 @@ const PRACTICE_ID = "practice-1"; // Hardcoded for now - should come from auth c
 
 function OfficeProfileTab() {
   const { toast } = useToast();
+  const { uploadFile, isUploading } = useUpload({
+    onError: (error) => {
+      toast({
+        title: "Upload Failed",
+        description: error.message || "Failed to upload photo",
+        variant: "destructive",
+      });
+    },
+  });
+  const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
   
   const { data: profile, isLoading } = useQuery<PracticeProfile>({
     queryKey: ["/api/practices", PRACTICE_ID, "profile"],
@@ -529,6 +540,7 @@ function OfficeProfileTab() {
     refrigeratorAvailable: false,
     microwaveAvailable: false,
     hiringPermanently: false,
+    photos: [] as string[],
   });
   
   // Sync profile data to local state when it loads
@@ -548,9 +560,49 @@ function OfficeProfileTab() {
         refrigeratorAvailable: profile.refrigeratorAvailable || false,
         microwaveAvailable: profile.microwaveAvailable || false,
         hiringPermanently: profile.hiringPermanently || false,
+        photos: profile.photos || [],
       });
     }
   }, [profile]);
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith("image/")) {
+        toast({
+          title: "Invalid File",
+          description: "Please select an image file.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setUploadingIndex(index);
+      try {
+        const response = await uploadFile(file);
+        if (response) {
+          setOfficeData((prev) => {
+            const newPhotos = [...prev.photos];
+            newPhotos[index] = response.objectPath;
+            return { ...prev, photos: newPhotos };
+          });
+          toast({
+            title: "Photo Uploaded",
+            description: "Your photo has been uploaded successfully.",
+          });
+        }
+      } finally {
+        setUploadingIndex(null);
+      }
+    }
+  };
+
+  const handleRemovePhoto = (index: number) => {
+    setOfficeData((prev) => {
+      const newPhotos = [...prev.photos];
+      newPhotos.splice(index, 1);
+      return { ...prev, photos: newPhotos };
+    });
+  };
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data: Partial<PracticeProfile>) => {
@@ -585,6 +637,7 @@ function OfficeProfileTab() {
       refrigeratorAvailable: officeData.refrigeratorAvailable,
       microwaveAvailable: officeData.microwaveAvailable,
       hiringPermanently: officeData.hiringPermanently,
+      photos: officeData.photos,
     });
   };
 
@@ -616,22 +669,45 @@ function OfficeProfileTab() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div className="aspect-video rounded-lg border-2 border-dashed flex flex-col items-center justify-center gap-2 hover-elevate cursor-pointer">
-              <Plus className="h-8 w-8 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">Add cover photo</span>
-            </div>
-            <div className="aspect-video rounded-lg border-2 border-dashed flex flex-col items-center justify-center gap-2 hover-elevate cursor-pointer">
-              <Plus className="h-8 w-8 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">Add photo</span>
-            </div>
-            <div className="aspect-video rounded-lg border-2 border-dashed flex flex-col items-center justify-center gap-2 hover-elevate cursor-pointer">
-              <Plus className="h-8 w-8 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">Add photo</span>
-            </div>
-            <div className="aspect-video rounded-lg border-2 border-dashed flex flex-col items-center justify-center gap-2 hover-elevate cursor-pointer">
-              <Plus className="h-8 w-8 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">Add photo</span>
-            </div>
+            {[0, 1, 2, 3].map((index) => (
+              <div key={index} className="relative">
+                {officeData.photos[index] ? (
+                  <div className="aspect-video rounded-lg overflow-hidden relative group">
+                    <img
+                      src={officeData.photos[index]}
+                      alt={`Office photo ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      onClick={() => handleRemovePhoto(index)}
+                      className="absolute top-2 right-2 p-1 bg-destructive text-destructive-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                      data-testid={`button-remove-photo-${index}`}
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="aspect-video rounded-lg border-2 border-dashed flex flex-col items-center justify-center gap-2 hover-elevate cursor-pointer">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handlePhotoUpload(e, index)}
+                      disabled={isUploading}
+                      data-testid={`input-photo-${index}`}
+                    />
+                    {uploadingIndex === index ? (
+                      <Loader2 className="h-8 w-8 text-muted-foreground animate-spin" />
+                    ) : (
+                      <Plus className="h-8 w-8 text-muted-foreground" />
+                    )}
+                    <span className="text-xs text-muted-foreground">
+                      {index === 0 ? "Add cover photo" : "Add photo"}
+                    </span>
+                  </label>
+                )}
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>
