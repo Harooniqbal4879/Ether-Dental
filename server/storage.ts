@@ -14,6 +14,14 @@ import {
   roleSpecialties,
   shiftTransactions,
   shiftNegotiations,
+  professionalPreferences,
+  professionalAvailability,
+  professionalCertifications,
+  professionalSkills,
+  professionalExperience,
+  professionalEducation,
+  professionalAwards,
+  professionalTraining,
   platformSettings,
   platformStateTaxRates,
   practices,
@@ -49,6 +57,7 @@ import {
   type ProfessionalBadge,
   type InsertProfessionalBadge,
   type ProfessionalWithBadges,
+  type ProfessionalWithCredentials,
   type RoleSpecialty,
   type InsertRoleSpecialty,
   type ShiftTransaction,
@@ -57,6 +66,22 @@ import {
   type ShiftNegotiation,
   type InsertShiftNegotiation,
   type ShiftNegotiationWithDetails,
+  type ProfessionalPreferences,
+  type InsertProfessionalPreferences,
+  type ProfessionalAvailability,
+  type InsertProfessionalAvailability,
+  type ProfessionalCertification,
+  type InsertProfessionalCertification,
+  type ProfessionalSkill,
+  type InsertProfessionalSkill,
+  type ProfessionalExperience,
+  type InsertProfessionalExperience,
+  type ProfessionalEducation,
+  type InsertProfessionalEducation,
+  type ProfessionalAward,
+  type InsertProfessionalAward,
+  type ProfessionalTraining,
+  type InsertProfessionalTraining,
   type PlatformSettings,
   type InsertPlatformSettings,
   type PlatformStateTaxRate,
@@ -172,6 +197,55 @@ export interface IStorage {
   getRoleSpecialties(role?: string): Promise<RoleSpecialty[]>;
   createRoleSpecialty(roleSpecialty: InsertRoleSpecialty): Promise<RoleSpecialty>;
   deleteRoleSpecialty(id: string): Promise<boolean>;
+
+  // Professional Preferences
+  getProfessionalPreferences(professionalId: string): Promise<ProfessionalPreferences | undefined>;
+  upsertProfessionalPreferences(preferences: InsertProfessionalPreferences): Promise<ProfessionalPreferences>;
+
+  // Professional Availability
+  getProfessionalAvailability(professionalId: string, startDate?: string, endDate?: string): Promise<ProfessionalAvailability[]>;
+  createProfessionalAvailability(availability: InsertProfessionalAvailability): Promise<ProfessionalAvailability>;
+  updateProfessionalAvailability(id: string, data: Partial<ProfessionalAvailability>): Promise<ProfessionalAvailability | undefined>;
+  deleteProfessionalAvailability(id: string): Promise<boolean>;
+
+  // Professional Certifications
+  getProfessionalCertifications(professionalId: string): Promise<ProfessionalCertification[]>;
+  createProfessionalCertification(certification: InsertProfessionalCertification): Promise<ProfessionalCertification>;
+  updateProfessionalCertification(id: string, data: Partial<ProfessionalCertification>): Promise<ProfessionalCertification | undefined>;
+  deleteProfessionalCertification(id: string): Promise<boolean>;
+
+  // Professional Skills
+  getProfessionalSkills(professionalId: string): Promise<ProfessionalSkill[]>;
+  createProfessionalSkill(skill: InsertProfessionalSkill): Promise<ProfessionalSkill>;
+  updateProfessionalSkill(id: string, data: Partial<ProfessionalSkill>): Promise<ProfessionalSkill | undefined>;
+  deleteProfessionalSkill(id: string): Promise<boolean>;
+
+  // Professional Experience
+  getProfessionalExperience(professionalId: string): Promise<ProfessionalExperience[]>;
+  createProfessionalExperience(experience: InsertProfessionalExperience): Promise<ProfessionalExperience>;
+  updateProfessionalExperience(id: string, data: Partial<ProfessionalExperience>): Promise<ProfessionalExperience | undefined>;
+  deleteProfessionalExperience(id: string): Promise<boolean>;
+
+  // Professional Education
+  getProfessionalEducation(professionalId: string): Promise<ProfessionalEducation[]>;
+  createProfessionalEducation(education: InsertProfessionalEducation): Promise<ProfessionalEducation>;
+  updateProfessionalEducation(id: string, data: Partial<ProfessionalEducation>): Promise<ProfessionalEducation | undefined>;
+  deleteProfessionalEducation(id: string): Promise<boolean>;
+
+  // Professional Awards
+  getProfessionalAwards(professionalId: string): Promise<ProfessionalAward[]>;
+  createProfessionalAward(award: InsertProfessionalAward): Promise<ProfessionalAward>;
+  updateProfessionalAward(id: string, data: Partial<ProfessionalAward>): Promise<ProfessionalAward | undefined>;
+  deleteProfessionalAward(id: string): Promise<boolean>;
+
+  // Professional Training
+  getProfessionalTraining(professionalId: string): Promise<ProfessionalTraining[]>;
+  createProfessionalTraining(training: InsertProfessionalTraining): Promise<ProfessionalTraining>;
+  updateProfessionalTraining(id: string, data: Partial<ProfessionalTraining>): Promise<ProfessionalTraining | undefined>;
+  deleteProfessionalTraining(id: string): Promise<boolean>;
+
+  // Get professional with all credentials
+  getProfessionalWithCredentials(id: string): Promise<ProfessionalWithCredentials | undefined>;
 
   // Shift Transactions
   getShiftTransactions(filters?: { startDate?: string; endDate?: string; status?: string }): Promise<ShiftTransactionWithDetails[]>;
@@ -1279,6 +1353,196 @@ export class DatabaseStorage implements IStorage {
   async deleteRoleSpecialty(id: string): Promise<boolean> {
     await db.delete(roleSpecialties).where(eq(roleSpecialties.id, id));
     return true;
+  }
+
+  // Professional Preferences
+  async getProfessionalPreferences(professionalId: string): Promise<ProfessionalPreferences | undefined> {
+    const [prefs] = await db.select().from(professionalPreferences).where(eq(professionalPreferences.professionalId, professionalId));
+    return prefs;
+  }
+
+  async upsertProfessionalPreferences(preferences: InsertProfessionalPreferences): Promise<ProfessionalPreferences> {
+    const existing = await this.getProfessionalPreferences(preferences.professionalId);
+    if (existing) {
+      const [updated] = await db
+        .update(professionalPreferences)
+        .set({ ...preferences, updatedAt: new Date() })
+        .where(eq(professionalPreferences.professionalId, preferences.professionalId))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(professionalPreferences).values(preferences).returning();
+    return created;
+  }
+
+  // Professional Availability
+  async getProfessionalAvailability(professionalId: string, startDate?: string, endDate?: string): Promise<ProfessionalAvailability[]> {
+    const conditions = [eq(professionalAvailability.professionalId, professionalId)];
+    if (startDate) conditions.push(gte(professionalAvailability.date, startDate));
+    if (endDate) conditions.push(lte(professionalAvailability.date, endDate));
+    return db.select().from(professionalAvailability).where(and(...conditions)).orderBy(professionalAvailability.date);
+  }
+
+  async createProfessionalAvailability(availability: InsertProfessionalAvailability): Promise<ProfessionalAvailability> {
+    const [created] = await db.insert(professionalAvailability).values(availability).returning();
+    return created;
+  }
+
+  async updateProfessionalAvailability(id: string, data: Partial<ProfessionalAvailability>): Promise<ProfessionalAvailability | undefined> {
+    const [updated] = await db.update(professionalAvailability).set(data).where(eq(professionalAvailability.id, id)).returning();
+    return updated;
+  }
+
+  async deleteProfessionalAvailability(id: string): Promise<boolean> {
+    await db.delete(professionalAvailability).where(eq(professionalAvailability.id, id));
+    return true;
+  }
+
+  // Professional Certifications
+  async getProfessionalCertifications(professionalId: string): Promise<ProfessionalCertification[]> {
+    return db.select().from(professionalCertifications).where(eq(professionalCertifications.professionalId, professionalId)).orderBy(desc(professionalCertifications.expirationDate));
+  }
+
+  async createProfessionalCertification(certification: InsertProfessionalCertification): Promise<ProfessionalCertification> {
+    const [created] = await db.insert(professionalCertifications).values(certification).returning();
+    return created;
+  }
+
+  async updateProfessionalCertification(id: string, data: Partial<ProfessionalCertification>): Promise<ProfessionalCertification | undefined> {
+    const [updated] = await db.update(professionalCertifications).set({ ...data, updatedAt: new Date() }).where(eq(professionalCertifications.id, id)).returning();
+    return updated;
+  }
+
+  async deleteProfessionalCertification(id: string): Promise<boolean> {
+    await db.delete(professionalCertifications).where(eq(professionalCertifications.id, id));
+    return true;
+  }
+
+  // Professional Skills
+  async getProfessionalSkills(professionalId: string): Promise<ProfessionalSkill[]> {
+    return db.select().from(professionalSkills).where(eq(professionalSkills.professionalId, professionalId)).orderBy(professionalSkills.category);
+  }
+
+  async createProfessionalSkill(skill: InsertProfessionalSkill): Promise<ProfessionalSkill> {
+    const [created] = await db.insert(professionalSkills).values(skill).returning();
+    return created;
+  }
+
+  async updateProfessionalSkill(id: string, data: Partial<ProfessionalSkill>): Promise<ProfessionalSkill | undefined> {
+    const [updated] = await db.update(professionalSkills).set(data).where(eq(professionalSkills.id, id)).returning();
+    return updated;
+  }
+
+  async deleteProfessionalSkill(id: string): Promise<boolean> {
+    await db.delete(professionalSkills).where(eq(professionalSkills.id, id));
+    return true;
+  }
+
+  // Professional Experience
+  async getProfessionalExperience(professionalId: string): Promise<ProfessionalExperience[]> {
+    return db.select().from(professionalExperience).where(eq(professionalExperience.professionalId, professionalId)).orderBy(desc(professionalExperience.startDate));
+  }
+
+  async createProfessionalExperience(experience: InsertProfessionalExperience): Promise<ProfessionalExperience> {
+    const [created] = await db.insert(professionalExperience).values(experience).returning();
+    return created;
+  }
+
+  async updateProfessionalExperience(id: string, data: Partial<ProfessionalExperience>): Promise<ProfessionalExperience | undefined> {
+    const [updated] = await db.update(professionalExperience).set(data).where(eq(professionalExperience.id, id)).returning();
+    return updated;
+  }
+
+  async deleteProfessionalExperience(id: string): Promise<boolean> {
+    await db.delete(professionalExperience).where(eq(professionalExperience.id, id));
+    return true;
+  }
+
+  // Professional Education
+  async getProfessionalEducation(professionalId: string): Promise<ProfessionalEducation[]> {
+    return db.select().from(professionalEducation).where(eq(professionalEducation.professionalId, professionalId)).orderBy(desc(professionalEducation.graduationDate));
+  }
+
+  async createProfessionalEducation(education: InsertProfessionalEducation): Promise<ProfessionalEducation> {
+    const [created] = await db.insert(professionalEducation).values(education).returning();
+    return created;
+  }
+
+  async updateProfessionalEducation(id: string, data: Partial<ProfessionalEducation>): Promise<ProfessionalEducation | undefined> {
+    const [updated] = await db.update(professionalEducation).set(data).where(eq(professionalEducation.id, id)).returning();
+    return updated;
+  }
+
+  async deleteProfessionalEducation(id: string): Promise<boolean> {
+    await db.delete(professionalEducation).where(eq(professionalEducation.id, id));
+    return true;
+  }
+
+  // Professional Awards
+  async getProfessionalAwards(professionalId: string): Promise<ProfessionalAward[]> {
+    return db.select().from(professionalAwards).where(eq(professionalAwards.professionalId, professionalId)).orderBy(desc(professionalAwards.dateReceived));
+  }
+
+  async createProfessionalAward(award: InsertProfessionalAward): Promise<ProfessionalAward> {
+    const [created] = await db.insert(professionalAwards).values(award).returning();
+    return created;
+  }
+
+  async updateProfessionalAward(id: string, data: Partial<ProfessionalAward>): Promise<ProfessionalAward | undefined> {
+    const [updated] = await db.update(professionalAwards).set(data).where(eq(professionalAwards.id, id)).returning();
+    return updated;
+  }
+
+  async deleteProfessionalAward(id: string): Promise<boolean> {
+    await db.delete(professionalAwards).where(eq(professionalAwards.id, id));
+    return true;
+  }
+
+  // Professional Training
+  async getProfessionalTraining(professionalId: string): Promise<ProfessionalTraining[]> {
+    return db.select().from(professionalTraining).where(eq(professionalTraining.professionalId, professionalId)).orderBy(desc(professionalTraining.completionDate));
+  }
+
+  async createProfessionalTraining(training: InsertProfessionalTraining): Promise<ProfessionalTraining> {
+    const [created] = await db.insert(professionalTraining).values(training).returning();
+    return created;
+  }
+
+  async updateProfessionalTraining(id: string, data: Partial<ProfessionalTraining>): Promise<ProfessionalTraining | undefined> {
+    const [updated] = await db.update(professionalTraining).set(data).where(eq(professionalTraining.id, id)).returning();
+    return updated;
+  }
+
+  async deleteProfessionalTraining(id: string): Promise<boolean> {
+    await db.delete(professionalTraining).where(eq(professionalTraining.id, id));
+    return true;
+  }
+
+  // Get professional with all credentials
+  async getProfessionalWithCredentials(id: string): Promise<ProfessionalWithCredentials | undefined> {
+    const professional = await this.getProfessional(id);
+    if (!professional) return undefined;
+
+    const [preferences, certifications, skills, experience, education, awards, training] = await Promise.all([
+      this.getProfessionalPreferences(id),
+      this.getProfessionalCertifications(id),
+      this.getProfessionalSkills(id),
+      this.getProfessionalExperience(id),
+      this.getProfessionalEducation(id),
+      this.getProfessionalAwards(id),
+      this.getProfessionalTraining(id),
+    ]);
+
+    return {
+      ...professional,
+      preferences,
+      certifications,
+      skills,
+      experience,
+      education,
+      awards,
+      training,
+    };
   }
 
   // Shift Transactions
