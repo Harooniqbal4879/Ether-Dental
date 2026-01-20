@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import type { ResolvedFeeRates } from "@shared/schema";
 import { Card } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Slider } from "@/components/ui/slider";
@@ -57,7 +58,9 @@ const ROLE_OPTIONS = [
   { value: "Billing Staff", label: "Billing Staff", category: "Administrative" },
 ];
 
-const PAYROLL_BREAKDOWN = {
+// Default payroll breakdown rates (overridden by API values when available)
+// Note: Social Security (6.2%) and Medicare (1.45%) are federally mandated fixed rates
+const DEFAULT_PAYROLL_BREAKDOWN = {
   socialSecurityTax: { label: "Social security tax", rate: 0.062 },
   medicareTax: { label: "Medicare tax", rate: 0.0145 },
   federalUnemploymentTax: { label: "Federal unemployment tax", rate: 0.006 },
@@ -66,7 +69,8 @@ const PAYROLL_BREAKDOWN = {
   paidSickLeave: { label: "Paid sick leave (ESTA)", rate: 0.0333 },
 };
 
-const ETHERAI_FEE_RATE = 0.12;
+// Default fee rates (overridden by API values)
+const DEFAULT_ETHERAI_FEE_RATE = 0.12;
 const MIN_RATE = 49;
 const MAX_RATE = 58;
 
@@ -124,6 +128,24 @@ function getFillRateInfo(rate: number, minRate: number, maxRate: number) {
 export default function AddShiftPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  
+  // Fetch configurable fee rates from the platform settings
+  const { data: feeRates } = useQuery<ResolvedFeeRates>({
+    queryKey: ['/api/fees/resolved'],
+  });
+  
+  // Build dynamic payroll breakdown from API rates
+  const PAYROLL_BREAKDOWN = useMemo(() => ({
+    socialSecurityTax: { label: "Social security tax", rate: 0.062 },
+    medicareTax: { label: "Medicare tax", rate: 0.0145 },
+    federalUnemploymentTax: { label: "Federal unemployment tax", rate: feeRates?.federalUnemploymentRate ?? DEFAULT_PAYROLL_BREAKDOWN.federalUnemploymentTax.rate },
+    stateUnemploymentTax: { label: "State unemployment tax", rate: feeRates?.stateUnemploymentRate ?? DEFAULT_PAYROLL_BREAKDOWN.stateUnemploymentTax.rate },
+    workersCompCoverage: { label: "Workers compensation coverage", rate: feeRates?.workersCompRate ?? DEFAULT_PAYROLL_BREAKDOWN.workersCompCoverage.rate },
+    paidSickLeave: { label: "Paid sick leave (ESTA)", rate: feeRates?.paidSickLeaveRate ?? DEFAULT_PAYROLL_BREAKDOWN.paidSickLeave.rate },
+  }), [feeRates]);
+  
+  // Get platform fee rate from API or use default
+  const ETHERAI_FEE_RATE = feeRates?.platformFeeRate ?? DEFAULT_ETHERAI_FEE_RATE;
   
   const today = new Date();
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
@@ -258,7 +280,7 @@ export default function AddShiftPage() {
     const baseWage = displayRate;
     
     const payrollFees = Object.entries(PAYROLL_BREAKDOWN).reduce((sum, [_, item]) => {
-      return sum + (baseWage * item.rate);
+      return sum + (baseWage * (item as { label: string; rate: number }).rate);
     }, 0);
     
     const subtotal = baseWage + payrollFees;
@@ -268,16 +290,20 @@ export default function AddShiftPage() {
     return {
       baseWage,
       payrollFees,
-      payrollBreakdown: Object.entries(PAYROLL_BREAKDOWN).map(([key, item]) => ({
-        key,
-        label: item.label,
-        rate: item.rate,
-        amount: baseWage * item.rate,
-      })),
+      payrollBreakdown: Object.entries(PAYROLL_BREAKDOWN).map(([key, item]) => {
+        const typedItem = item as { label: string; rate: number };
+        return {
+          key,
+          label: typedItem.label,
+          rate: typedItem.rate,
+          amount: baseWage * typedItem.rate,
+        };
+      }),
       etherAIFee,
+      etherAIFeeRate: ETHERAI_FEE_RATE,
       hourlyTotal,
     };
-  }, [displayRate]);
+  }, [displayRate, PAYROLL_BREAKDOWN, ETHERAI_FEE_RATE]);
   
   const fillRateInfo = getFillRateInfo(
     pricingMode === "fixed" ? fixedHourlyRate : maxHourlyRate,
@@ -798,7 +824,7 @@ export default function AddShiftPage() {
                 </Collapsible>
                 
                 <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">EtherAI fee (12%)</span>
+                  <span className="text-sm text-muted-foreground">EtherAI fee ({(pricing.etherAIFeeRate * 100).toFixed(0)}%)</span>
                   <span className="text-sm" data-testid="text-etherai-fee">
                     ${pricing.etherAIFee.toFixed(2)}
                   </span>

@@ -627,6 +627,7 @@ export async function registerRoutes(
   // Complete a shift and create transaction
   const completeShiftSchema = z.object({
     professionalId: z.string(),
+    practiceId: z.string().optional(), // Optional practice ID for fee resolution
     hoursWorked: z.coerce.number(),
     hourlyRate: z.coerce.number(),
     mealBreakMinutes: z.coerce.number().default(0),
@@ -650,16 +651,19 @@ export async function registerRoutes(
 
       const data = parsed.data;
       
-      // Calculate payment breakdown
+      // Get configurable fee rates from platform settings (with practice fallback if practiceId provided)
+      const feeRates = await storage.getResolvedFeeRates(data.practiceId);
+      
+      // Calculate payment breakdown using configurable rates
       const regularPay = data.hoursWorked * data.hourlyRate;
-      const serviceFeeRate = 0.225; // 22.5%
-      const convenienceFeeRate = 0.035; // 3.5%
+      const serviceFeeRate = feeRates.serviceFeeRate;
+      const convenienceFeeRate = feeRates.convenienceFeeRate;
       const serviceFee = regularPay * serviceFeeRate;
       const convenienceFee = (regularPay + serviceFee) * convenienceFeeRate;
       const adjustment = data.adjustmentMade ? (data.adjustmentAmount || 0) : 0;
       const totalPay = regularPay + serviceFee + convenienceFee + adjustment - data.counterCoverDiscount;
 
-      // Create transaction
+      // Create transaction with the effective rates stored for audit trail
       const transaction = await storage.createShiftTransaction({
         shiftId: req.params.id,
         professionalId: data.professionalId,
@@ -870,6 +874,173 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error deleting role specialty:", error);
       res.status(500).json({ error: "Failed to delete role specialty" });
+    }
+  });
+
+  // Platform Settings - Global fee and tax configuration
+  app.get("/api/settings/platform", async (req, res) => {
+    try {
+      let settings = await storage.getPlatformSettings();
+      if (!settings) {
+        // Create default settings if none exist
+        settings = await storage.createPlatformSettings({});
+      }
+      res.json(settings);
+    } catch (error) {
+      console.error("Error fetching platform settings:", error);
+      res.status(500).json({ error: "Failed to fetch platform settings" });
+    }
+  });
+
+  app.patch("/api/settings/platform", async (req, res) => {
+    try {
+      let settings = await storage.getPlatformSettings();
+      if (!settings) {
+        settings = await storage.createPlatformSettings(req.body);
+      } else {
+        settings = await storage.updatePlatformSettings(settings.id, req.body);
+      }
+      res.json(settings);
+    } catch (error) {
+      console.error("Error updating platform settings:", error);
+      res.status(500).json({ error: "Failed to update platform settings" });
+    }
+  });
+
+  // State Tax Rates
+  app.get("/api/settings/state-tax-rates", async (req, res) => {
+    try {
+      const rates = await storage.getStateTaxRates();
+      res.json(rates);
+    } catch (error) {
+      console.error("Error fetching state tax rates:", error);
+      res.status(500).json({ error: "Failed to fetch state tax rates" });
+    }
+  });
+
+  app.get("/api/settings/state-tax-rates/:stateCode", async (req, res) => {
+    try {
+      const rate = await storage.getStateTaxRate(req.params.stateCode);
+      if (!rate) {
+        return res.status(404).json({ error: "State tax rate not found" });
+      }
+      res.json(rate);
+    } catch (error) {
+      console.error("Error fetching state tax rate:", error);
+      res.status(500).json({ error: "Failed to fetch state tax rate" });
+    }
+  });
+
+  app.post("/api/settings/state-tax-rates", async (req, res) => {
+    try {
+      const rate = await storage.upsertStateTaxRate(req.body);
+      res.status(201).json(rate);
+    } catch (error) {
+      console.error("Error creating/updating state tax rate:", error);
+      res.status(500).json({ error: "Failed to create/update state tax rate" });
+    }
+  });
+
+  app.patch("/api/settings/state-tax-rates/:stateCode", async (req, res) => {
+    try {
+      const rate = await storage.updateStateTaxRate(req.params.stateCode, req.body);
+      if (!rate) {
+        return res.status(404).json({ error: "State tax rate not found" });
+      }
+      res.json(rate);
+    } catch (error) {
+      console.error("Error updating state tax rate:", error);
+      res.status(500).json({ error: "Failed to update state tax rate" });
+    }
+  });
+
+  // Practices
+  app.get("/api/practices", async (req, res) => {
+    try {
+      const practicesList = await storage.getPractices();
+      res.json(practicesList);
+    } catch (error) {
+      console.error("Error fetching practices:", error);
+      res.status(500).json({ error: "Failed to fetch practices" });
+    }
+  });
+
+  app.get("/api/practices/:id", async (req, res) => {
+    try {
+      const practice = await storage.getPractice(req.params.id);
+      if (!practice) {
+        return res.status(404).json({ error: "Practice not found" });
+      }
+      res.json(practice);
+    } catch (error) {
+      console.error("Error fetching practice:", error);
+      res.status(500).json({ error: "Failed to fetch practice" });
+    }
+  });
+
+  app.post("/api/practices", async (req, res) => {
+    try {
+      const practice = await storage.createPractice(req.body);
+      res.status(201).json(practice);
+    } catch (error) {
+      console.error("Error creating practice:", error);
+      res.status(500).json({ error: "Failed to create practice" });
+    }
+  });
+
+  app.patch("/api/practices/:id", async (req, res) => {
+    try {
+      const practice = await storage.updatePractice(req.params.id, req.body);
+      if (!practice) {
+        return res.status(404).json({ error: "Practice not found" });
+      }
+      res.json(practice);
+    } catch (error) {
+      console.error("Error updating practice:", error);
+      res.status(500).json({ error: "Failed to update practice" });
+    }
+  });
+
+  // Practice Settings
+  app.get("/api/practices/:id/settings", async (req, res) => {
+    try {
+      const settings = await storage.getPracticeSettings(req.params.id);
+      res.json(settings || { practiceId: req.params.id });
+    } catch (error) {
+      console.error("Error fetching practice settings:", error);
+      res.status(500).json({ error: "Failed to fetch practice settings" });
+    }
+  });
+
+  app.patch("/api/practices/:id/settings", async (req, res) => {
+    try {
+      let settings = await storage.getPracticeSettings(req.params.id);
+      if (!settings) {
+        settings = await storage.createPracticeSettings({
+          practiceId: req.params.id,
+          ...req.body,
+        });
+      } else {
+        settings = await storage.updatePracticeSettings(req.params.id, req.body);
+      }
+      res.json(settings);
+    } catch (error) {
+      console.error("Error updating practice settings:", error);
+      res.status(500).json({ error: "Failed to update practice settings" });
+    }
+  });
+
+  // Resolved Fee Rates - Get effective rates with practice → platform fallback
+  app.get("/api/fees/resolved", async (req, res) => {
+    try {
+      const { practiceId } = req.query;
+      const rates = await storage.getResolvedFeeRates(
+        typeof practiceId === "string" ? practiceId : undefined
+      );
+      res.json(rates);
+    } catch (error) {
+      console.error("Error resolving fee rates:", error);
+      res.status(500).json({ error: "Failed to resolve fee rates" });
     }
   });
 

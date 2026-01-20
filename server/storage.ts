@@ -13,6 +13,10 @@ import {
   professionalBadges,
   roleSpecialties,
   shiftTransactions,
+  platformSettings,
+  platformStateTaxRates,
+  practices,
+  practiceSettings,
   type Patient,
   type InsertPatient,
   type InsuranceCarrier,
@@ -45,6 +49,15 @@ import {
   type ShiftTransaction,
   type InsertShiftTransaction,
   type ShiftTransactionWithDetails,
+  type PlatformSettings,
+  type InsertPlatformSettings,
+  type PlatformStateTaxRate,
+  type InsertPlatformStateTaxRate,
+  type Practice,
+  type InsertPractice,
+  type PracticeSettings,
+  type InsertPracticeSettings,
+  type ResolvedFeeRates,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -145,6 +158,32 @@ export interface IStorage {
   // Professional-specific queries
   getShiftsForProfessional(professionalId: string): Promise<StaffShift[]>;
   getTransactionsForProfessional(professionalId: string): Promise<ShiftTransactionWithDetails[]>;
+
+  // Platform Settings
+  getPlatformSettings(): Promise<PlatformSettings | undefined>;
+  createPlatformSettings(settings: InsertPlatformSettings): Promise<PlatformSettings>;
+  updatePlatformSettings(id: string, data: Partial<PlatformSettings>): Promise<PlatformSettings | undefined>;
+
+  // Platform State Tax Rates
+  getStateTaxRates(): Promise<PlatformStateTaxRate[]>;
+  getStateTaxRate(stateCode: string): Promise<PlatformStateTaxRate | undefined>;
+  createStateTaxRate(rate: InsertPlatformStateTaxRate): Promise<PlatformStateTaxRate>;
+  updateStateTaxRate(stateCode: string, data: Partial<PlatformStateTaxRate>): Promise<PlatformStateTaxRate | undefined>;
+  upsertStateTaxRate(rate: InsertPlatformStateTaxRate): Promise<PlatformStateTaxRate>;
+
+  // Practices
+  getPractices(): Promise<Practice[]>;
+  getPractice(id: string): Promise<Practice | undefined>;
+  createPractice(practice: InsertPractice): Promise<Practice>;
+  updatePractice(id: string, data: Partial<Practice>): Promise<Practice | undefined>;
+
+  // Practice Settings
+  getPracticeSettings(practiceId: string): Promise<PracticeSettings | undefined>;
+  createPracticeSettings(settings: InsertPracticeSettings): Promise<PracticeSettings>;
+  updatePracticeSettings(practiceId: string, data: Partial<PracticeSettings>): Promise<PracticeSettings | undefined>;
+
+  // Resolved Fee Rates (with practice → platform fallback)
+  getResolvedFeeRates(practiceId?: string): Promise<ResolvedFeeRates>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -870,6 +909,188 @@ export class DatabaseStorage implements IStorage {
       }
     }
     return result;
+  }
+
+  // Platform Settings
+  async getPlatformSettings(): Promise<PlatformSettings | undefined> {
+    const [settings] = await db.select().from(platformSettings).limit(1);
+    return settings;
+  }
+
+  async createPlatformSettings(settings: InsertPlatformSettings): Promise<PlatformSettings> {
+    const [created] = await db.insert(platformSettings).values(settings).returning();
+    return created;
+  }
+
+  async updatePlatformSettings(id: string, data: Partial<PlatformSettings>): Promise<PlatformSettings | undefined> {
+    const [updated] = await db
+      .update(platformSettings)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(platformSettings.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Platform State Tax Rates
+  async getStateTaxRates(): Promise<PlatformStateTaxRate[]> {
+    return db.select().from(platformStateTaxRates).orderBy(platformStateTaxRates.stateCode);
+  }
+
+  async getStateTaxRate(stateCode: string): Promise<PlatformStateTaxRate | undefined> {
+    const [rate] = await db
+      .select()
+      .from(platformStateTaxRates)
+      .where(eq(platformStateTaxRates.stateCode, stateCode));
+    return rate;
+  }
+
+  async createStateTaxRate(rate: InsertPlatformStateTaxRate): Promise<PlatformStateTaxRate> {
+    const [created] = await db.insert(platformStateTaxRates).values(rate).returning();
+    return created;
+  }
+
+  async updateStateTaxRate(stateCode: string, data: Partial<PlatformStateTaxRate>): Promise<PlatformStateTaxRate | undefined> {
+    const [updated] = await db
+      .update(platformStateTaxRates)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(platformStateTaxRates.stateCode, stateCode))
+      .returning();
+    return updated;
+  }
+
+  async upsertStateTaxRate(rate: InsertPlatformStateTaxRate): Promise<PlatformStateTaxRate> {
+    const existing = await this.getStateTaxRate(rate.stateCode);
+    if (existing) {
+      const updated = await this.updateStateTaxRate(rate.stateCode, rate);
+      return updated!;
+    }
+    return this.createStateTaxRate(rate);
+  }
+
+  // Practices
+  async getPractices(): Promise<Practice[]> {
+    return db.select().from(practices).orderBy(practices.name);
+  }
+
+  async getPractice(id: string): Promise<Practice | undefined> {
+    const [practice] = await db.select().from(practices).where(eq(practices.id, id));
+    return practice;
+  }
+
+  async createPractice(practice: InsertPractice): Promise<Practice> {
+    const [created] = await db.insert(practices).values(practice).returning();
+    return created;
+  }
+
+  async updatePractice(id: string, data: Partial<Practice>): Promise<Practice | undefined> {
+    const [updated] = await db
+      .update(practices)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(practices.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Practice Settings
+  async getPracticeSettings(practiceId: string): Promise<PracticeSettings | undefined> {
+    const [settings] = await db
+      .select()
+      .from(practiceSettings)
+      .where(eq(practiceSettings.practiceId, practiceId));
+    return settings;
+  }
+
+  async createPracticeSettings(settings: InsertPracticeSettings): Promise<PracticeSettings> {
+    const [created] = await db.insert(practiceSettings).values(settings).returning();
+    return created;
+  }
+
+  async updatePracticeSettings(practiceId: string, data: Partial<PracticeSettings>): Promise<PracticeSettings | undefined> {
+    const [updated] = await db
+      .update(practiceSettings)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(practiceSettings.practiceId, practiceId))
+      .returning();
+    return updated;
+  }
+
+  // Resolved Fee Rates (with practice → platform fallback)
+  async getResolvedFeeRates(practiceId?: string): Promise<ResolvedFeeRates> {
+    // Get platform defaults
+    let platform = await this.getPlatformSettings();
+    if (!platform) {
+      // Create default platform settings if none exist
+      platform = await this.createPlatformSettings({});
+    }
+
+    // Get practice settings and state tax rate if practiceId provided
+    let practiceSettingsData: PracticeSettings | undefined;
+    let practice: Practice | undefined;
+    let stateTaxRate: PlatformStateTaxRate | undefined;
+
+    if (practiceId) {
+      practiceSettingsData = await this.getPracticeSettings(practiceId);
+      practice = await this.getPractice(practiceId);
+      if (practice?.stateCode) {
+        stateTaxRate = await this.getStateTaxRate(practice.stateCode);
+      }
+    }
+
+    // Resolve rates with practice → platform fallback
+    const serviceFeeRate = practiceSettingsData?.serviceFeeRateOverride 
+      ? parseFloat(practiceSettingsData.serviceFeeRateOverride) 
+      : parseFloat(platform.serviceFeeRate);
+    
+    const convenienceFeeRate = practiceSettingsData?.convenienceFeeRateOverride 
+      ? parseFloat(practiceSettingsData.convenienceFeeRateOverride) 
+      : parseFloat(platform.convenienceFeeRate);
+    
+    const platformFeeRate = practiceSettingsData?.platformFeeRateOverride 
+      ? parseFloat(practiceSettingsData.platformFeeRateOverride) 
+      : parseFloat(platform.platformFeeRate);
+    
+    const workersCompRate = practiceSettingsData?.workersCompRateOverride 
+      ? parseFloat(practiceSettingsData.workersCompRateOverride) 
+      : parseFloat(platform.workersCompRate);
+
+    const payrollTaxRate = parseFloat(platform.payrollTaxRate);
+    const federalUnemploymentRate = parseFloat(platform.federalUnemploymentRate);
+    const paidSickLeaveRate = parseFloat(platform.paidSickLeaveRate);
+    
+    // State-specific rates
+    const stateUnemploymentRate = stateTaxRate 
+      ? parseFloat(stateTaxRate.stateUnemploymentRate) 
+      : 0.027; // Default 2.7%
+    
+    const stateIncomeTaxRate = stateTaxRate 
+      ? parseFloat(stateTaxRate.stateIncomeTaxRate) 
+      : 0;
+    
+    const additionalTaxRate = stateTaxRate 
+      ? parseFloat(stateTaxRate.additionalTaxRate) 
+      : 0;
+
+    // Calculate total payroll burden (employer-side taxes)
+    const totalPayrollBurden = 
+      payrollTaxRate + 
+      federalUnemploymentRate + 
+      stateUnemploymentRate + 
+      workersCompRate + 
+      paidSickLeaveRate;
+
+    return {
+      serviceFeeRate,
+      convenienceFeeRate,
+      platformFeeRate,
+      payrollTaxRate,
+      federalUnemploymentRate,
+      stateUnemploymentRate,
+      workersCompRate,
+      paidSickLeaveRate,
+      stateIncomeTaxRate,
+      additionalTaxRate,
+      totalPayrollBurden,
+    };
   }
 }
 

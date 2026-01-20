@@ -172,7 +172,7 @@ The Add Shift page (`/staffing/add-shift`) allows practice managers to create ne
 - Estimated pricing sidebar with detailed cost breakdown:
   - Base wages
   - Payroll fees (expandable breakdown: Social Security, Medicare, Federal/State unemployment, Workers comp, Paid sick leave)
-  - EtherAI fee (12%)
+  - EtherAI fee (configurable platform fee rate, fetched from /api/fees/resolved)
   - Hourly total
 - Post shifts button with Terms of Service and Privacy Policy links
 
@@ -188,6 +188,9 @@ When viewing as a Professional persona, the Professionals Hub displays a persona
 - Payment transaction details showing hours worked, hourly rate, and fees
 
 ### Recent Changes
+- Updated Add Shift page to use configurable fee rates from /api/fees/resolved instead of hardcoded values
+- Platform fee (EtherAI fee), payroll tax rates, and state-specific rates now dynamically fetched from database
+- Fee rate fallback logic: API rates → default constants (Social Security 6.2%, Medicare 1.45% are federally fixed)
 - Added Professional Portal with My Shifts and My Earnings views for professionals to track their work and payments
 - Added API endpoints for professional-specific data: GET /api/professionals/:id/shifts and /api/professionals/:id/transactions
 - Added shift payment transaction system with detailed payment breakdown

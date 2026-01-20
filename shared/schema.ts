@@ -546,3 +546,161 @@ export const DentalProcedures = {
 export type ProfessionalWithBadges = Professional & {
   badges: ProfessionalBadge[];
 };
+
+// Platform Settings - Global fee and tax configuration
+export const platformSettings = pgTable("platform_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  serviceFeeRate: decimal("service_fee_rate", { precision: 5, scale: 4 }).notNull().default("0.2250"), // 22.5%
+  convenienceFeeRate: decimal("convenience_fee_rate", { precision: 5, scale: 4 }).notNull().default("0.0350"), // 3.5%
+  platformFeeRate: decimal("platform_fee_rate", { precision: 5, scale: 4 }).notNull().default("0.1200"), // 12% EtherAI fee
+  payrollTaxRate: decimal("payroll_tax_rate", { precision: 5, scale: 4 }).notNull().default("0.0765"), // 7.65% (Social Security + Medicare)
+  federalUnemploymentRate: decimal("federal_unemployment_rate", { precision: 5, scale: 4 }).notNull().default("0.0060"), // 0.6% FUTA
+  workersCompRate: decimal("workers_comp_rate", { precision: 5, scale: 4 }).notNull().default("0.0100"), // 1% default
+  paidSickLeaveRate: decimal("paid_sick_leave_rate", { precision: 5, scale: 4 }).notNull().default("0.0050"), // 0.5% default
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPlatformSettingsSchema = createInsertSchema(platformSettings).omit({ 
+  id: true, 
+  updatedAt: true 
+});
+export type InsertPlatformSettings = z.infer<typeof insertPlatformSettingsSchema>;
+export type PlatformSettings = typeof platformSettings.$inferSelect;
+
+// Platform State Tax Rates - State-specific unemployment and tax rates
+export const platformStateTaxRates = pgTable("platform_state_tax_rates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  stateCode: varchar("state_code", { length: 2 }).notNull().unique(),
+  stateName: text("state_name").notNull(),
+  stateUnemploymentRate: decimal("state_unemployment_rate", { precision: 5, scale: 4 }).notNull().default("0.0270"), // State unemployment rate
+  stateIncomeTaxRate: decimal("state_income_tax_rate", { precision: 5, scale: 4 }).notNull().default("0.0000"), // State income tax withholding
+  additionalTaxRate: decimal("additional_tax_rate", { precision: 5, scale: 4 }).notNull().default("0.0000"), // Any additional state-specific taxes
+  isActive: boolean("is_active").default(true),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPlatformStateTaxRateSchema = createInsertSchema(platformStateTaxRates).omit({ 
+  id: true, 
+  updatedAt: true 
+});
+export type InsertPlatformStateTaxRate = z.infer<typeof insertPlatformStateTaxRateSchema>;
+export type PlatformStateTaxRate = typeof platformStateTaxRates.$inferSelect;
+
+// Practices - Dental practices/offices that use the platform
+export const practices = pgTable("practices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  address: text("address"),
+  city: text("city"),
+  stateCode: varchar("state_code", { length: 2 }),
+  zipCode: text("zip_code"),
+  phone: text("phone"),
+  email: text("email"),
+  npiNumber: text("npi_number"),
+  taxId: text("tax_id"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPracticeSchema = createInsertSchema(practices).omit({ 
+  id: true, 
+  createdAt: true,
+  updatedAt: true 
+});
+export type InsertPractice = z.infer<typeof insertPracticeSchema>;
+export type Practice = typeof practices.$inferSelect;
+
+// Practice Settings - Practice-specific fee overrides (inherits from platform if null)
+export const practiceSettings = pgTable("practice_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  practiceId: varchar("practice_id").notNull().references(() => practices.id, { onDelete: "cascade" }).unique(),
+  serviceFeeRateOverride: decimal("service_fee_rate_override", { precision: 5, scale: 4 }), // null = use platform default
+  convenienceFeeRateOverride: decimal("convenience_fee_rate_override", { precision: 5, scale: 4 }),
+  platformFeeRateOverride: decimal("platform_fee_rate_override", { precision: 5, scale: 4 }),
+  workersCompRateOverride: decimal("workers_comp_rate_override", { precision: 5, scale: 4 }),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const practiceSettingsRelations = relations(practiceSettings, ({ one }) => ({
+  practice: one(practices, {
+    fields: [practiceSettings.practiceId],
+    references: [practices.id],
+  }),
+}));
+
+export const insertPracticeSettingsSchema = createInsertSchema(practiceSettings).omit({ 
+  id: true, 
+  updatedAt: true 
+});
+export type InsertPracticeSettings = z.infer<typeof insertPracticeSettingsSchema>;
+export type PracticeSettings = typeof practiceSettings.$inferSelect;
+
+// Resolved fee rates type (computed from practice → platform fallback)
+export type ResolvedFeeRates = {
+  serviceFeeRate: number;
+  convenienceFeeRate: number;
+  platformFeeRate: number;
+  payrollTaxRate: number;
+  federalUnemploymentRate: number;
+  stateUnemploymentRate: number;
+  workersCompRate: number;
+  paidSickLeaveRate: number;
+  stateIncomeTaxRate: number;
+  additionalTaxRate: number;
+  totalPayrollBurden: number; // Sum of all employer-side taxes
+};
+
+// US States for dropdown
+export const US_STATES = [
+  { code: "AL", name: "Alabama" },
+  { code: "AK", name: "Alaska" },
+  { code: "AZ", name: "Arizona" },
+  { code: "AR", name: "Arkansas" },
+  { code: "CA", name: "California" },
+  { code: "CO", name: "Colorado" },
+  { code: "CT", name: "Connecticut" },
+  { code: "DE", name: "Delaware" },
+  { code: "FL", name: "Florida" },
+  { code: "GA", name: "Georgia" },
+  { code: "HI", name: "Hawaii" },
+  { code: "ID", name: "Idaho" },
+  { code: "IL", name: "Illinois" },
+  { code: "IN", name: "Indiana" },
+  { code: "IA", name: "Iowa" },
+  { code: "KS", name: "Kansas" },
+  { code: "KY", name: "Kentucky" },
+  { code: "LA", name: "Louisiana" },
+  { code: "ME", name: "Maine" },
+  { code: "MD", name: "Maryland" },
+  { code: "MA", name: "Massachusetts" },
+  { code: "MI", name: "Michigan" },
+  { code: "MN", name: "Minnesota" },
+  { code: "MS", name: "Mississippi" },
+  { code: "MO", name: "Missouri" },
+  { code: "MT", name: "Montana" },
+  { code: "NE", name: "Nebraska" },
+  { code: "NV", name: "Nevada" },
+  { code: "NH", name: "New Hampshire" },
+  { code: "NJ", name: "New Jersey" },
+  { code: "NM", name: "New Mexico" },
+  { code: "NY", name: "New York" },
+  { code: "NC", name: "North Carolina" },
+  { code: "ND", name: "North Dakota" },
+  { code: "OH", name: "Ohio" },
+  { code: "OK", name: "Oklahoma" },
+  { code: "OR", name: "Oregon" },
+  { code: "PA", name: "Pennsylvania" },
+  { code: "RI", name: "Rhode Island" },
+  { code: "SC", name: "South Carolina" },
+  { code: "SD", name: "South Dakota" },
+  { code: "TN", name: "Tennessee" },
+  { code: "TX", name: "Texas" },
+  { code: "UT", name: "Utah" },
+  { code: "VT", name: "Vermont" },
+  { code: "VA", name: "Virginia" },
+  { code: "WA", name: "Washington" },
+  { code: "WV", name: "West Virginia" },
+  { code: "WI", name: "Wisconsin" },
+  { code: "WY", name: "Wyoming" },
+] as const;

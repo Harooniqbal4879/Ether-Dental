@@ -10,6 +10,9 @@ import {
   professionalBadges,
   staffShifts,
   shiftTransactions,
+  platformSettings,
+  platformStateTaxRates,
+  practices,
   StaffRoles,
   DentalSpecialties,
 } from "@shared/schema";
@@ -73,6 +76,48 @@ async function seed() {
     .returning();
 
   console.log(`Created ${carriers.length} insurance carriers`);
+
+  // Seed Platform Settings (global fee configuration)
+  const [platformSettingsCreated] = await db.insert(platformSettings).values({
+    serviceFeeRate: "0.2250",      // 22.5%
+    convenienceFeeRate: "0.0350",  // 3.5%
+    platformFeeRate: "0.1200",     // 12% EtherAI fee
+    payrollTaxRate: "0.0765",      // 7.65% (Social Security + Medicare)
+    federalUnemploymentRate: "0.0060", // 0.6% FUTA
+    workersCompRate: "0.0100",     // 1% default
+    paidSickLeaveRate: "0.0050",   // 0.5% default
+  }).returning();
+  console.log("Created platform settings with configurable fee rates");
+
+  // Seed State Tax Rates (key states for demonstration)
+  const stateTaxData = [
+    { stateCode: "CA", stateName: "California", stateUnemploymentRate: "0.0340", stateIncomeTaxRate: "0.0725", additionalTaxRate: "0.0010" },
+    { stateCode: "TX", stateName: "Texas", stateUnemploymentRate: "0.0270", stateIncomeTaxRate: "0.0000", additionalTaxRate: "0.0000" },
+    { stateCode: "FL", stateName: "Florida", stateUnemploymentRate: "0.0270", stateIncomeTaxRate: "0.0000", additionalTaxRate: "0.0000" },
+    { stateCode: "NY", stateName: "New York", stateUnemploymentRate: "0.0420", stateIncomeTaxRate: "0.0685", additionalTaxRate: "0.0015" },
+    { stateCode: "IL", stateName: "Illinois", stateUnemploymentRate: "0.0350", stateIncomeTaxRate: "0.0495", additionalTaxRate: "0.0000" },
+    { stateCode: "PA", stateName: "Pennsylvania", stateUnemploymentRate: "0.0300", stateIncomeTaxRate: "0.0307", additionalTaxRate: "0.0000" },
+    { stateCode: "OH", stateName: "Ohio", stateUnemploymentRate: "0.0280", stateIncomeTaxRate: "0.0400", additionalTaxRate: "0.0000" },
+    { stateCode: "GA", stateName: "Georgia", stateUnemploymentRate: "0.0270", stateIncomeTaxRate: "0.0549", additionalTaxRate: "0.0000" },
+    { stateCode: "NC", stateName: "North Carolina", stateUnemploymentRate: "0.0250", stateIncomeTaxRate: "0.0499", additionalTaxRate: "0.0000" },
+    { stateCode: "MI", stateName: "Michigan", stateUnemploymentRate: "0.0300", stateIncomeTaxRate: "0.0425", additionalTaxRate: "0.0000" },
+  ];
+  await db.insert(platformStateTaxRates).values(stateTaxData);
+  console.log(`Created ${stateTaxData.length} state tax rate configurations`);
+
+  // Seed a sample practice
+  const [samplePractice] = await db.insert(practices).values({
+    name: "Sunrise Dental Care",
+    address: "456 Healthcare Blvd",
+    city: "Los Angeles",
+    stateCode: "CA",
+    zipCode: "90210",
+    phone: "(555) 987-6543",
+    email: "info@sunrisedentalcare.com",
+    npiNumber: "1234567890",
+    taxId: "12-3456789",
+  }).returning();
+  console.log("Created sample practice: Sunrise Dental Care");
 
   // Seed Patients
   const patientData = [
@@ -402,7 +447,7 @@ async function seed() {
       arrivalTime: "07:45",
       firstPatientTime: "08:00",
       endTime: "17:00",
-      breakDuration: 60,
+      breakDuration: "60 min",
       pricingMode: "fixed",
       fixedHourlyRate: "52.00",
       status: "completed",
@@ -415,7 +460,7 @@ async function seed() {
       arrivalTime: "07:30",
       firstPatientTime: "08:00",
       endTime: "16:00",
-      breakDuration: 30,
+      breakDuration: "30 min",
       pricingMode: "fixed",
       fixedHourlyRate: "28.00",
       status: "completed",
@@ -424,11 +469,11 @@ async function seed() {
     {
       date: formatDate(new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)), // 7 days ago
       role: StaffRoles.DENTIST,
-      specialties: [DentalSpecialties.GENERAL_DENTISTRY, DentalSpecialties.COSMETIC_DENTISTRY],
+      specialties: [DentalSpecialties.GENERAL_DENTISTRY, DentalSpecialties.COSMETICS],
       arrivalTime: "08:00",
       firstPatientTime: "08:30",
       endTime: "17:30",
-      breakDuration: 60,
+      breakDuration: "60 min",
       pricingMode: "smart",
       minHourlyRate: "85.00",
       maxHourlyRate: "110.00",
@@ -442,7 +487,7 @@ async function seed() {
       arrivalTime: "08:00",
       firstPatientTime: "08:30",
       endTime: "16:30",
-      breakDuration: 30,
+      breakDuration: "30 min",
       pricingMode: "fixed",
       fixedHourlyRate: "50.00",
       status: "open",
@@ -454,7 +499,7 @@ async function seed() {
       arrivalTime: "07:30",
       firstPatientTime: "08:00",
       endTime: "17:00",
-      breakDuration: 60,
+      breakDuration: "60 min",
       pricingMode: "fixed",
       fixedHourlyRate: "22.00",
       status: "open",
@@ -464,19 +509,26 @@ async function seed() {
   const createdShifts = await db.insert(staffShifts).values(shiftsData).returning();
   console.log(`Created ${createdShifts.length} staff shifts`);
 
-  // Create transactions for completed shifts
+  // Create transactions for completed shifts using configurable rates
+  // Note: In production, these rates come from platform_settings table
   const completedShifts = createdShifts.filter(s => s.status === "completed");
+  
+  // Get platform settings for fee rates (or use defaults)
+  const [platformSettingsRow] = await db.select().from(platformSettings).limit(1);
+  const serviceFeeRate = platformSettingsRow ? parseFloat(platformSettingsRow.serviceFeeRate) : 0.225;
+  const convenienceFeeRate = platformSettingsRow ? parseFloat(platformSettingsRow.convenienceFeeRate) : 0.035;
   
   const transactionsData = [];
   for (const shift of completedShifts) {
     const hoursWorked = 8.0;
     const hourlyRate = parseFloat(shift.fixedHourlyRate || shift.maxHourlyRate || "50.00");
     const regularPay = hoursWorked * hourlyRate;
-    const serviceFeeRate = 0.225;
-    const convenienceFeeRate = 0.035;
     const serviceFee = regularPay * serviceFeeRate;
     const convenienceFee = (regularPay + serviceFee) * convenienceFeeRate;
     const totalPay = regularPay + serviceFee + convenienceFee;
+    
+    // Parse break duration from string format like "60 min"
+    const breakMinutes = parseInt(shift.breakDuration?.replace(/\D/g, '') || '0', 10);
 
     transactionsData.push({
       shiftId: shift.id,
@@ -484,7 +536,7 @@ async function seed() {
       chargeDate: shift.date,
       hoursWorked: hoursWorked.toFixed(2),
       hourlyRate: hourlyRate.toFixed(2),
-      mealBreakMinutes: shift.breakDuration || 0,
+      mealBreakMinutes: breakMinutes,
       adjustmentMade: false,
       regularPay: regularPay.toFixed(2),
       serviceFeeRate: serviceFeeRate.toFixed(4),
