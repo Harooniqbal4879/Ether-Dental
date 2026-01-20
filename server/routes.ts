@@ -1070,5 +1070,75 @@ export async function registerRoutes(
     }
   });
 
+  // Practice Locations
+  app.get("/api/practices/:practiceId/locations", async (req, res) => {
+    try {
+      const locations = await storage.getLocations(req.params.practiceId);
+      res.json(locations);
+    } catch (error) {
+      console.error("Error fetching locations:", error);
+      res.status(500).json({ error: "Failed to fetch locations" });
+    }
+  });
+
+  app.get("/api/locations/:id", async (req, res) => {
+    try {
+      const location = await storage.getLocation(req.params.id);
+      if (!location) {
+        return res.status(404).json({ error: "Location not found" });
+      }
+      res.json(location);
+    } catch (error) {
+      console.error("Error fetching location:", error);
+      res.status(500).json({ error: "Failed to fetch location" });
+    }
+  });
+
+  app.post("/api/practices/:practiceId/locations", async (req, res) => {
+    try {
+      const { insertPracticeLocationSchema } = await import("@shared/schema");
+      const parseResult = insertPracticeLocationSchema.safeParse({
+        ...req.body,
+        practiceId: req.params.practiceId,
+      });
+      
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          error: "Validation failed", 
+          details: parseResult.error.errors 
+        });
+      }
+      
+      const location = await storage.createLocation(parseResult.data);
+      res.status(201).json(location);
+    } catch (error) {
+      console.error("Error creating location:", error);
+      res.status(500).json({ error: "Failed to create location" });
+    }
+  });
+
+  app.patch("/api/locations/:id", async (req, res) => {
+    try {
+      const location = await storage.updateLocation(req.params.id, req.body);
+      if (!location) {
+        return res.status(404).json({ error: "Location not found" });
+      }
+      res.json(location);
+    } catch (error) {
+      console.error("Error updating location:", error);
+      res.status(500).json({ error: "Failed to update location" });
+    }
+  });
+
+  app.delete("/api/locations/:id", async (req, res) => {
+    try {
+      await storage.deleteLocation(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting location:", error);
+      res.status(500).json({ error: "Failed to delete location" });
+    }
+  });
+
   return httpServer;
 }
