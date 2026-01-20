@@ -100,3 +100,29 @@ The platform supports practices with multiple office locations. Each practice ca
 - **Hardcoded practiceId**: Currently using `practiceId = "practice-1"` as a placeholder in several components. This should be replaced with auth/context-based practice resolution for multi-tenant production deployment.
 - **Nullable locationId**: The `locationId` field in `staffShifts` and `appointments` tables is currently nullable for backward compatibility. For production, consider adding a migration to backfill with default primary location and then enforce NOT NULL.
 - **Default Demo Practice**: A demo practice with ID "practice-1" is seeded with two sample locations (Main Office, Downtown Branch) for testing purposes.
+
+## Mobile App Integration (Shift Management)
+The platform provides APIs for a mobile app (Expo React Native) that allows dental professionals to browse available shifts, claim shifts, and manage their assignments.
+
+### Mobile API Endpoints
+- `GET /api/shifts/available` - List open shifts with optional filters (startDate, endDate, role, locationId)
+  - Returns: `StaffShiftWithLocation[]` - shifts with embedded location details
+- `GET /api/shifts/:id/details` - Get detailed shift information including location
+  - Returns: `StaffShiftWithLocation` - shift with embedded location object
+- `POST /api/shifts/:id/claim` - Claim an open shift (professional accepts)
+  - Body: `{ professionalId: string }`
+  - Returns: `{ success: boolean, shift?: StaffShift, error?: string }`
+  - Error codes: 409 (conflict) if shift already claimed or unavailable
+- `POST /api/shifts/:id/release` - Release a claimed shift
+  - Body: `{ professionalId: string }`
+  - Returns: `{ success: boolean, shift?: StaffShift, error?: string }`
+  - Error codes: 409 (conflict) if not assigned to this professional or completed
+
+### Shift Workflow
+1. Practice Admin creates shifts via `/staffing/add-shift` (status: "open")
+2. Professional claims shift via mobile app POST `/api/shifts/:id/claim` (status: "filled")
+3. Professional can release shift via POST `/api/shifts/:id/release` (status returns to "open")
+4. Practice completes shift after work is done (status: "completed") - cannot be released
+
+### Type Definitions
+- `StaffShiftWithLocation`: Extends `StaffShift` with `location: PracticeLocation | null`
