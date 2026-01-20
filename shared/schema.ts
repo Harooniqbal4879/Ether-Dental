@@ -310,6 +310,15 @@ export const staffShifts = pgTable("staff_shifts", {
   status: text("status").notNull().default("open"), // open, filled, completed, cancelled
   assignedProfessionalId: varchar("assigned_professional_id").references(() => professionals.id),
   scheduledBy: text("scheduled_by"), // Name of person who scheduled the shift
+  // Check-in/out tracking for mobile app
+  checkInTime: timestamp("check_in_time"),
+  checkInMethod: text("check_in_method"), // "manual" or "automatic" (GPS-based)
+  checkInLatitude: decimal("check_in_latitude", { precision: 10, scale: 7 }),
+  checkInLongitude: decimal("check_in_longitude", { precision: 10, scale: 7 }),
+  checkOutTime: timestamp("check_out_time"),
+  checkOutMethod: text("check_out_method"), // "manual" or "automatic"
+  checkOutLatitude: decimal("check_out_latitude", { precision: 10, scale: 7 }),
+  checkOutLongitude: decimal("check_out_longitude", { precision: 10, scale: 7 }),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -426,6 +435,47 @@ export type ShiftTransaction = typeof shiftTransactions.$inferSelect;
 
 // Shift transaction with related data
 export type ShiftTransactionWithDetails = ShiftTransaction & {
+  shift: StaffShift;
+  professional: Professional;
+};
+
+// Shift Negotiations - rate negotiation requests from professionals
+export const shiftNegotiations = pgTable("shift_negotiations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  shiftId: varchar("shift_id").notNull().references(() => staffShifts.id, { onDelete: "cascade" }),
+  professionalId: varchar("professional_id").notNull().references(() => professionals.id),
+  currentRate: decimal("current_rate", { precision: 10, scale: 2 }).notNull(),
+  proposedRate: decimal("proposed_rate", { precision: 10, scale: 2 }).notNull(),
+  reason: text("reason"),
+  status: text("status").notNull().default("pending"), // pending, accepted, rejected, expired
+  practiceResponse: text("practice_response"), // Optional response message from practice
+  respondedAt: timestamp("responded_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const shiftNegotiationsRelations = relations(shiftNegotiations, ({ one }) => ({
+  shift: one(staffShifts, {
+    fields: [shiftNegotiations.shiftId],
+    references: [staffShifts.id],
+  }),
+  professional: one(professionals, {
+    fields: [shiftNegotiations.professionalId],
+    references: [professionals.id],
+  }),
+}));
+
+export const insertShiftNegotiationSchema = createInsertSchema(shiftNegotiations).omit({
+  id: true,
+  createdAt: true,
+  status: true,
+  practiceResponse: true,
+  respondedAt: true,
+});
+export type InsertShiftNegotiation = z.infer<typeof insertShiftNegotiationSchema>;
+export type ShiftNegotiation = typeof shiftNegotiations.$inferSelect;
+
+// Shift negotiation with related data
+export type ShiftNegotiationWithDetails = ShiftNegotiation & {
   shift: StaffShift;
   professional: Professional;
 };
