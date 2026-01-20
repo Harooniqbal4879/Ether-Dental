@@ -598,6 +598,17 @@ export const practices = pgTable("practices", {
   email: text("email"),
   npiNumber: text("npi_number"),
   taxId: text("tax_id"),
+  // Owner information (for self-registration)
+  ownerFirstName: text("owner_first_name"),
+  ownerLastName: text("owner_last_name"),
+  ownerEmail: text("owner_email"),
+  ownerPhone: text("owner_phone"),
+  // Registration status
+  registrationStatus: varchar("registration_status", { length: 20 }).default("approved").notNull(), // pending, approved, rejected
+  registrationSource: varchar("registration_source", { length: 20 }).default("admin"), // admin, self_registration
+  approvedBy: text("approved_by"),
+  approvedAt: timestamp("approved_at"),
+  rejectionReason: text("rejection_reason"),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

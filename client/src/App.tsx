@@ -20,6 +20,8 @@ import Services from "@/pages/services";
 import PatientPortal from "@/pages/patient-portal";
 import ProfessionalsHub from "@/pages/professionals-hub";
 import PlatformSettings from "@/pages/platform-settings";
+import PracticeManagement from "@/pages/practice-management";
+import RegisterPractice from "@/pages/register-practice";
 import NotFound from "@/pages/not-found";
 
 function MainRouter() {
@@ -44,6 +46,7 @@ function MainRouter() {
       <Route path="/professionals" component={ProfessionalsHub} />
       <Route path="/professionals/:id" component={ProfessionalsHub} />
       <Route path="/platform-settings" component={PlatformSettings} />
+      <Route path="/practices" component={PracticeManagement} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -71,7 +74,6 @@ function MainLayout() {
           </SidebarInset>
         </div>
       </SidebarProvider>
-      <Toaster />
     </PersonaProvider>
   );
 }
@@ -81,7 +83,13 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="light" storageKey="etherai-theme">
         <TooltipProvider>
-          <MainLayout />
+          <Switch>
+            <Route path="/register" component={RegisterPractice} />
+            <Route>
+              <MainLayout />
+            </Route>
+          </Switch>
+          <Toaster />
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>

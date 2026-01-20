@@ -11,6 +11,7 @@ import {
   CreditCard,
   Contact,
   Sliders,
+  Building2,
 } from "lucide-react";
 import {
   Sidebar,
@@ -79,6 +80,12 @@ const configNavItems = [
     url: "/settings",
     icon: Settings,
     personas: ["system_admin", "admin"],
+  },
+  {
+    title: "Practices",
+    url: "/practices",
+    icon: Building2,
+    personas: ["system_admin"],
   },
   {
     title: "Platform Settings",

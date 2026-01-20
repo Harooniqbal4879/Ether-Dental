@@ -965,6 +965,21 @@ export async function registerRoutes(
     }
   });
 
+  // Public registration endpoint for practice self-registration (must come before :id route)
+  app.post("/api/practices/register", async (req, res) => {
+    try {
+      const practice = await storage.createPractice({
+        ...req.body,
+        registrationStatus: "pending",
+        registrationSource: "self_registration",
+      });
+      res.status(201).json(practice);
+    } catch (error) {
+      console.error("Error registering practice:", error);
+      res.status(500).json({ error: "Failed to register practice" });
+    }
+  });
+
   app.get("/api/practices/:id", async (req, res) => {
     try {
       const practice = await storage.getPractice(req.params.id);
