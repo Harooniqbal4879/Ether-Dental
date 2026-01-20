@@ -304,6 +304,304 @@ function AddProfessionalDialog({ open, onOpenChange }: { open: boolean; onOpenCh
   );
 }
 
+const editProfessionalSchema = z.object({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  email: z.string().email("Valid email is required"),
+  phone: z.string().optional(),
+  role: z.string().min(1, "Role is required"),
+  specialty: z.string().optional(),
+  education: z.string().optional(),
+  graduationDate: z.string().optional(),
+  licenseNumber: z.string().optional(),
+  licenseState: z.string().optional(),
+  licenseYearIssued: z.string().optional(),
+  experienceRange: z.string().optional(),
+  bio: z.string().optional(),
+});
+
+type EditProfessionalFormData = z.infer<typeof editProfessionalSchema>;
+
+function EditProfessionalDialog({
+  open,
+  onOpenChange,
+  professional,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  professional: ProfessionalWithBadges;
+}) {
+  const { toast } = useToast();
+
+  const form = useForm<EditProfessionalFormData>({
+    resolver: zodResolver(editProfessionalSchema),
+    defaultValues: {
+      firstName: professional.firstName || "",
+      lastName: professional.lastName || "",
+      email: professional.email || "",
+      phone: professional.phone || "",
+      role: professional.role || "",
+      specialty: professional.specialty || "",
+      education: professional.education || "",
+      graduationDate: professional.graduationDate || "",
+      licenseNumber: professional.licenseNumber || "",
+      licenseState: professional.licenseState || "",
+      licenseYearIssued: professional.licenseYearIssued || "",
+      experienceRange: professional.experienceRange || "",
+      bio: professional.bio || "",
+    },
+  });
+
+  const updateProfessionalMutation = useMutation({
+    mutationFn: async (data: EditProfessionalFormData) => {
+      const response = await apiRequest("PATCH", `/api/professionals/${professional.id}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/professionals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/professionals", professional.id] });
+      toast({
+        title: "Professional Updated",
+        description: "The professional information has been updated successfully.",
+      });
+      onOpenChange(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update professional",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onSubmit = (data: EditProfessionalFormData) => {
+    updateProfessionalMutation.mutate(data);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Edit Professional Information</DialogTitle>
+          <DialogDescription>
+            Update the professional's profile information.
+          </DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="firstName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>First Name</FormLabel>
+                    <FormControl>
+                      <Input {...field} data-testid="input-edit-first-name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="lastName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Last Name</FormLabel>
+                    <FormControl>
+                      <Input {...field} data-testid="input-edit-last-name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <Input type="email" {...field} data-testid="input-edit-email" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="phone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Phone</FormLabel>
+                  <FormControl>
+                    <Input {...field} data-testid="input-edit-phone" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="role"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Role</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-role">
+                          <SelectValue placeholder="Select a role" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {Object.values(StaffRoles).map((role) => (
+                          <SelectItem key={role} value={role}>
+                            {role}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="specialty"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Specialty</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-specialty">
+                          <SelectValue placeholder="Select specialty" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {Object.values(DentalSpecialties).map((specialty) => (
+                          <SelectItem key={specialty} value={specialty}>
+                            {specialty}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <FormField
+              control={form.control}
+              name="education"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Education</FormLabel>
+                  <FormControl>
+                    <Input placeholder="School name" {...field} data-testid="input-edit-education" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="graduationDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Graduation Date</FormLabel>
+                    <FormControl>
+                      <Input placeholder="MM/DD/YYYY" {...field} data-testid="input-edit-graduation-date" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="experienceRange"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Experience</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-experience">
+                          <SelectValue placeholder="Select range" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Less than 1 year">Less than 1 year</SelectItem>
+                        <SelectItem value="1-3 Years">1-3 Years</SelectItem>
+                        <SelectItem value="3-5 Years">3-5 Years</SelectItem>
+                        <SelectItem value="5-10 Years">5-10 Years</SelectItem>
+                        <SelectItem value="10+ Years">10+ Years</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <FormField
+              control={form.control}
+              name="licenseNumber"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>License Number</FormLabel>
+                  <FormControl>
+                    <Input {...field} data-testid="input-edit-license-number" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="licenseState"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>License State</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g. CA" {...field} data-testid="input-edit-license-state" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="licenseYearIssued"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Year Issued</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g. 2020" {...field} data-testid="input-edit-license-year" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-4">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} data-testid="button-edit-cancel">
+                Cancel
+              </Button>
+              <Button type="submit" disabled={updateProfessionalMutation.isPending} data-testid="button-edit-professional-submit">
+                {updateProfessionalMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function formatDate(dateStr: string): string {
   const date = new Date(dateStr + "T00:00:00");
   return date.toLocaleDateString("en-US", {
@@ -1281,6 +1579,7 @@ function ProfessionalCard({ professional }: { professional: ProfessionalWithBadg
 }
 
 function ProfessionalDetail({ professional }: { professional: ProfessionalWithBadges }) {
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const initials = `${professional.firstName[0]}${professional.lastName[0]}`;
   const rating = parseFloat(professional.rating || "0");
 
@@ -1337,6 +1636,16 @@ function ProfessionalDetail({ professional }: { professional: ProfessionalWithBa
                     </Badge>
                   )}
                 </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-3"
+                  onClick={() => setEditDialogOpen(true)}
+                  data-testid="button-edit-professional"
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit Profile
+                </Button>
               </div>
             </div>
 
@@ -1483,6 +1792,12 @@ function ProfessionalDetail({ professional }: { professional: ProfessionalWithBa
           )}
         </div>
       </div>
+
+      <EditProfessionalDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        professional={professional}
+      />
     </div>
   );
 }
