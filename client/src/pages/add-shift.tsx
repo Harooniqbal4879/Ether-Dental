@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
+import { useLocation as useLocationContext } from "@/lib/location-context";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import type { ResolvedFeeRates, PracticeLocation } from "@shared/schema";
@@ -128,14 +129,10 @@ function getFillRateInfo(rate: number, minRate: number, maxRate: number) {
 export default function AddShiftPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { currentPracticeId, locations } = useLocationContext();
   
-  // Hardcoded practice ID for now - in a real app, this would come from context/auth
-  const practiceId = "practice-1";
-
-  // Fetch locations for the practice
-  const { data: locations } = useQuery<PracticeLocation[]>({
-    queryKey: ["/api/practices", practiceId, "locations"],
-  });
+  // Get practiceId from location context
+  const practiceId = currentPracticeId;
 
   // Fetch configurable fee rates from the platform settings
   const { data: feeRates } = useQuery<ResolvedFeeRates>({

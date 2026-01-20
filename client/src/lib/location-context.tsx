@@ -4,6 +4,7 @@ import type { PracticeLocation } from "@shared/schema";
 
 interface LocationContextType {
   currentLocationId: string | null;
+  currentPracticeId: string | null;
   setCurrentLocationId: (locationId: string | null) => void;
   currentLocation: PracticeLocation | null;
   locations: PracticeLocation[];
@@ -61,10 +62,12 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   };
 
   const currentLocation = locations.find(loc => loc.id === currentLocationId) || null;
+  const currentPracticeId = currentLocation?.practiceId || null;
 
   return (
     <LocationContext.Provider value={{ 
-      currentLocationId, 
+      currentLocationId,
+      currentPracticeId,
       setCurrentLocationId, 
       currentLocation,
       locations: locations.filter(loc => loc.isActive),
