@@ -541,6 +541,8 @@ function OfficeProfileTab() {
     microwaveAvailable: false,
     hiringPermanently: false,
     photos: [] as string[],
+    arrivalInstructions: "",
+    dressCode: "",
   });
   
   // Sync profile data to local state when it loads
@@ -561,6 +563,8 @@ function OfficeProfileTab() {
         microwaveAvailable: profile.microwaveAvailable || false,
         hiringPermanently: profile.hiringPermanently || false,
         photos: profile.photos || [],
+        arrivalInstructions: profile.arrivalInstructions || "",
+        dressCode: profile.dressCode || "",
       });
     }
   }, [profile]);
@@ -638,6 +642,8 @@ function OfficeProfileTab() {
       microwaveAvailable: officeData.microwaveAvailable,
       hiringPermanently: officeData.hiringPermanently,
       photos: officeData.photos,
+      arrivalInstructions: officeData.arrivalInstructions,
+      dressCode: officeData.dressCode,
     });
   };
 
@@ -925,7 +931,39 @@ function OfficeProfileTab() {
             Extra information to help with matching
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="arrival-instructions">Arrival instructions</Label>
+            <p className="text-sm text-muted-foreground">
+              Help staff know where to park, which entrance to use, etc.
+            </p>
+            <Textarea
+              id="arrival-instructions"
+              placeholder="Park in the back lot, enter through the side door..."
+              value={officeData.arrivalInstructions}
+              onChange={(e) => setOfficeData({ ...officeData, arrivalInstructions: e.target.value })}
+              className="min-h-[80px]"
+              maxLength={500}
+              data-testid="textarea-arrival-instructions"
+            />
+          </div>
+          <Separator />
+          <div className="space-y-2">
+            <Label htmlFor="dress-code">Dress code</Label>
+            <p className="text-sm text-muted-foreground">
+              Let staff know what to wear when working at your office.
+            </p>
+            <Textarea
+              id="dress-code"
+              placeholder="Business casual, scrubs provided, closed-toe shoes required..."
+              value={officeData.dressCode}
+              onChange={(e) => setOfficeData({ ...officeData, dressCode: e.target.value })}
+              className="min-h-[80px]"
+              maxLength={500}
+              data-testid="textarea-dress-code"
+            />
+          </div>
+          <Separator />
           <div className="flex items-center justify-between py-2">
             <div>
               <span className="font-medium">Are you currently hiring permanently?</span>
