@@ -915,12 +915,10 @@ export class DatabaseStorage implements IStorage {
       if (shift.locationId) {
         const [loc] = await db.select().from(practiceLocations).where(eq(practiceLocations.id, shift.locationId));
         location = loc || null;
-        // Use location-specific profile (with practice defaults as fallback)
-        practice = await this.getLocationProfile(shift.locationId);
       }
       
-      // Fallback: if no location but practiceId exists on shift, get practice-level profile
-      if (!practice && shift.practiceId) {
+      // Get full practice object from practiceId
+      if (shift.practiceId) {
         practice = await this.getPracticeProfile(shift.practiceId);
       }
       
@@ -940,12 +938,10 @@ export class DatabaseStorage implements IStorage {
     if (shift.locationId) {
       const [loc] = await db.select().from(practiceLocations).where(eq(practiceLocations.id, shift.locationId));
       location = loc || null;
-      // Use location-specific profile (with practice defaults as fallback)
-      practice = await this.getLocationProfile(shift.locationId);
     }
     
-    // Fallback: if no location but practiceId exists on shift, get practice-level profile
-    if (!practice && shift.practiceId) {
+    // Get full practice object from practiceId
+    if (shift.practiceId) {
       practice = await this.getPracticeProfile(shift.practiceId);
     }
     
@@ -979,12 +975,10 @@ export class DatabaseStorage implements IStorage {
       if (shift.locationId) {
         const [loc] = await db.select().from(practiceLocations).where(eq(practiceLocations.id, shift.locationId));
         location = loc || null;
-        // Use location-specific profile (with practice defaults as fallback)
-        practice = await this.getLocationProfile(shift.locationId);
       }
       
-      // Fallback: if no location but practiceId exists on shift, get practice-level profile
-      if (!practice && shift.practiceId) {
+      // Get full practice object from practiceId
+      if (shift.practiceId) {
         practice = await this.getPracticeProfile(shift.practiceId);
       }
       
