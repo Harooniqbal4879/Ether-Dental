@@ -433,13 +433,13 @@ function ProfessionalPortalView() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="shifts" data-testid="tab-my-shifts">
+          <TabsTrigger value="shifts" data-testid="tab-shift-history">
             <Calendar className="h-4 w-4 mr-2" />
-            My Shifts
+            Shift History
           </TabsTrigger>
-          <TabsTrigger value="earnings" data-testid="tab-my-earnings">
+          <TabsTrigger value="transactions" data-testid="tab-payment-transactions">
             <DollarSign className="h-4 w-4 mr-2" />
-            My Earnings
+            Payment Transactions
           </TabsTrigger>
         </TabsList>
 
@@ -447,7 +447,7 @@ function ProfessionalPortalView() {
           <MyShiftsView professionalId={currentProfessional.id} />
         </TabsContent>
 
-        <TabsContent value="earnings" className="mt-6">
+        <TabsContent value="transactions" className="mt-6">
           <MyEarningsView professionalId={currentProfessional.id} />
         </TabsContent>
       </Tabs>
