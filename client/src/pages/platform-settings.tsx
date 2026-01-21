@@ -28,8 +28,9 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Settings, DollarSign, MapPin, Plus, Pencil, Save, Loader2 } from "lucide-react";
-import type { PlatformSettings, PlatformStateTaxRate } from "@shared/schema";
+import { Settings, DollarSign, MapPin, Plus, Pencil, Save, Loader2, Plug, Shield, Trash2, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { PlatformSettings, PlatformStateTaxRate, ClearinghouseConfig, InsertClearinghouseConfig } from "@shared/schema";
 
 export default function PlatformSettingsPage() {
   const { toast } = useToast();
@@ -84,6 +85,10 @@ export default function PlatformSettingsPage() {
               <MapPin className="h-4 w-4 mr-2" />
               State Tax Rates
             </TabsTrigger>
+            <TabsTrigger value="integrations" data-testid="tab-integrations">
+              <Plug className="h-4 w-4 mr-2" />
+              Integrations
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="fees" className="space-y-6">
@@ -107,6 +112,10 @@ export default function PlatformSettingsPage() {
               rates={stateTaxRates || []}
               isLoading={isLoadingRates}
             />
+          </TabsContent>
+
+          <TabsContent value="integrations" className="space-y-6">
+            <ClearinghouseIntegrationsTab />
           </TabsContent>
         </Tabs>
       </div>
@@ -641,6 +650,321 @@ function StateTaxRateForm({
           )}
         </Button>
       </DialogFooter>
+    </div>
+  );
+}
+
+const CLEARINGHOUSE_OPTIONS = [
+  { value: "change_healthcare", label: "Change Healthcare" },
+  { value: "availity", label: "Availity" },
+  { value: "trizetto", label: "Trizetto" },
+  { value: "office_ally", label: "Office Ally" },
+  { value: "waystar", label: "Waystar" },
+];
+
+function ClearinghouseIntegrationsTab() {
+  const { toast } = useToast();
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [testingConfigId, setTestingConfigId] = useState<string | null>(null);
+
+  const { data: configs = [], isLoading: isLoadingConfigs } = useQuery<ClearinghouseConfig[]>({
+    queryKey: ["/api/clearinghouse-configs"],
+  });
+
+  const createConfigMutation = useMutation({
+    mutationFn: async (data: Omit<InsertClearinghouseConfig, "id">) => {
+      const res = await apiRequest("POST", "/api/clearinghouse-configs", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clearinghouse-configs"] });
+      setIsAddDialogOpen(false);
+      toast({
+        title: "Configuration Created",
+        description: "Clearinghouse configuration has been saved successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create configuration. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteConfigMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/clearinghouse-configs/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clearinghouse-configs"] });
+      toast({
+        title: "Configuration Deleted",
+        description: "Clearinghouse configuration has been removed.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete configuration. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const testConnectionMutation = useMutation({
+    mutationFn: async (id: string) => {
+      setTestingConfigId(id);
+      const response = await apiRequest("POST", `/api/clearinghouse-configs/${id}/test`);
+      return response.json() as Promise<{ success: boolean; message: string }>;
+    },
+    onSuccess: (data: { success: boolean; message: string }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clearinghouse-configs"] });
+      toast({
+        title: data.success ? "Connection Successful" : "Connection Failed",
+        description: data.message,
+        variant: data.success ? "default" : "destructive",
+      });
+      setTestingConfigId(null);
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to test connection. Please try again.",
+        variant: "destructive",
+      });
+      setTestingConfigId(null);
+    },
+  });
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted">
+                <Shield className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Clearinghouse Credentials</CardTitle>
+                <CardDescription>
+                  Configure EDI clearinghouse connections for automated insurance verification across all practices
+                </CardDescription>
+              </div>
+            </div>
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" data-testid="button-add-clearinghouse">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Clearinghouse
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add Clearinghouse Configuration</DialogTitle>
+                  <DialogDescription>
+                    Configure credentials for a clearinghouse provider
+                  </DialogDescription>
+                </DialogHeader>
+                <AddClearinghouseForm
+                  onSubmit={(data) => createConfigMutation.mutate(data)}
+                  isPending={createConfigMutation.isPending}
+                />
+              </DialogContent>
+            </Dialog>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoadingConfigs ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : configs.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <p className="mb-2">No clearinghouse configurations yet</p>
+              <p className="text-sm">Add a clearinghouse to enable automated insurance verification</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {configs.map((config) => (
+                <ClearinghouseConfigItem
+                  key={config.id}
+                  config={config}
+                  onTest={() => testConnectionMutation.mutate(config.id)}
+                  onDelete={() => deleteConfigMutation.mutate(config.id)}
+                  isTesting={testingConfigId === config.id}
+                  isDeleting={deleteConfigMutation.isPending}
+                />
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted">
+              <Plug className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <div>
+              <CardTitle className="text-base">Future Integrations</CardTitle>
+              <CardDescription>
+                Additional platform integrations will be available here
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            More integrations coming soon: Practice Management Systems, Payment Processors, Communication Tools, and more.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function AddClearinghouseForm({
+  onSubmit,
+  isPending,
+}: {
+  onSubmit: (data: Omit<InsertClearinghouseConfig, "id">) => void;
+  isPending: boolean;
+}) {
+  const [provider, setProvider] = useState("");
+  const [name, setName] = useState("");
+  const [submitterId, setSubmitterId] = useState("");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!provider || !name) return;
+    onSubmit({
+      name,
+      provider,
+      submitterId: submitterId || null,
+      isActive: true,
+    });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="provider">Clearinghouse Provider</Label>
+        <Select value={provider} onValueChange={setProvider}>
+          <SelectTrigger data-testid="select-clearinghouse-provider">
+            <SelectValue placeholder="Select a provider" />
+          </SelectTrigger>
+          <SelectContent>
+            {CLEARINGHOUSE_OPTIONS.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="name">Configuration Name</Label>
+        <Input
+          id="name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g., Primary Clearinghouse"
+          data-testid="input-clearinghouse-name"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="submitterId">EDI Submitter ID (optional)</Label>
+        <Input
+          id="submitterId"
+          value={submitterId}
+          onChange={(e) => setSubmitterId(e.target.value)}
+          placeholder="Enter submitter ID"
+          data-testid="input-clearinghouse-submitter-id"
+        />
+      </div>
+      <DialogFooter>
+        <Button type="submit" disabled={isPending || !provider} data-testid="button-save-clearinghouse">
+          {isPending ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <Save className="h-4 w-4 mr-2" />
+              Save Configuration
+            </>
+          )}
+        </Button>
+      </DialogFooter>
+    </form>
+  );
+}
+
+function ClearinghouseConfigItem({
+  config,
+  onTest,
+  onDelete,
+  isTesting,
+  isDeleting,
+}: {
+  config: ClearinghouseConfig;
+  onTest: () => void;
+  onDelete: () => void;
+  isTesting: boolean;
+  isDeleting: boolean;
+}) {
+  const providerLabel = CLEARINGHOUSE_OPTIONS.find(o => o.value === config.provider)?.label || config.provider;
+  
+  const getStatusIcon = () => {
+    if (config.connectionStatus === "connected") {
+      return <CheckCircle className="h-4 w-4 text-green-500" />;
+    } else if (config.connectionStatus === "failed") {
+      return <XCircle className="h-4 w-4 text-red-500" />;
+    }
+    return <AlertCircle className="h-4 w-4 text-muted-foreground" />;
+  };
+
+  return (
+    <div className="flex items-center justify-between p-3 border rounded-lg" data-testid={`clearinghouse-config-${config.id}`}>
+      <div className="flex items-center gap-3">
+        {getStatusIcon()}
+        <div>
+          <p className="font-medium text-sm">{config.name} ({providerLabel})</p>
+          <p className="text-xs text-muted-foreground">
+            {config.submitterId ? `Submitter ID: ${config.submitterId}` : "No submitter ID"}
+            {config.lastTestedAt && ` • Last tested: ${new Date(config.lastTestedAt).toLocaleDateString()}`}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onTest}
+          disabled={isTesting}
+          data-testid={`button-test-clearinghouse-${config.id}`}
+        >
+          {isTesting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            "Test"
+          )}
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onDelete}
+          disabled={isDeleting}
+          data-testid={`button-delete-clearinghouse-${config.id}`}
+        >
+          <Trash2 className="h-4 w-4 text-destructive" />
+        </Button>
+      </div>
     </div>
   );
 }
