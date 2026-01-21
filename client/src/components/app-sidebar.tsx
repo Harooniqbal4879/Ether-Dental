@@ -81,7 +81,7 @@ const configNavItems = [
     title: "Settings",
     url: "/settings",
     icon: Settings,
-    personas: ["system_admin", "admin"],
+    personas: ["admin"],
   },
   {
     title: "Practices",
