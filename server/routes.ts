@@ -360,6 +360,140 @@ export async function registerRoutes(
     }
   });
 
+  // Auto-create Office Ally config from environment variables (System Admin only)
+  app.post("/api/clearinghouse-configs/office-ally/auto-create", async (req, res) => {
+    try {
+      const { officeAllySftpService } = await import("./services/office-ally-sftp");
+      
+      if (!officeAllySftpService.isConfigured()) {
+        return res.status(400).json({ 
+          error: "Office Ally SFTP credentials are not configured in environment variables" 
+        });
+      }
+
+      // Check if Office Ally config already exists
+      const existingConfigs = await storage.getClearinghouseConfigs();
+      const existingOfficeAlly = existingConfigs.find(c => c.provider === "office_ally");
+      
+      if (existingOfficeAlly) {
+        return res.json({ 
+          message: "Office Ally configuration already exists",
+          config: existingOfficeAlly,
+          created: false
+        });
+      }
+
+      // Create new config - credentials are stored in environment variables, not in DB
+      const config = await storage.createClearinghouseConfig({
+        name: "Office Ally SFTP (Environment Credentials)",
+        provider: "office_ally",
+        submitterId: process.env.OFFICE_ALLY_SFTP_USERNAME || null,
+        isActive: true,
+      });
+
+      res.status(201).json({ 
+        message: "Office Ally configuration created successfully. SFTP credentials are managed via environment variables.",
+        config,
+        created: true
+      });
+    } catch (error) {
+      console.error("Error auto-creating Office Ally config:", error);
+      res.status(500).json({ error: "Failed to create Office Ally configuration" });
+    }
+  });
+
+  // Submit EDI 270 eligibility request via Office Ally (Protected - requires system context)
+  // Note: In production, add proper authentication middleware
+  app.post("/api/clearinghouse/office-ally/submit-270", async (req, res) => {
+    try {
+      const { officeAllySftpService } = await import("./services/office-ally-sftp");
+      
+      if (!officeAllySftpService.isConfigured()) {
+        return res.status(400).json({ 
+          error: "Office Ally SFTP credentials are not configured" 
+        });
+      }
+
+      const { subscriberId, subscriberFirstName, subscriberLastName, subscriberDob, 
+              payerId, providerId, providerNpi, serviceTypeCode, dateOfService } = req.body;
+
+      // Validate request using the service's validation
+      const validation = officeAllySftpService.validateRequest({
+        subscriberId: subscriberId || "",
+        subscriberFirstName: subscriberFirstName || "",
+        subscriberLastName: subscriberLastName || "",
+        subscriberDob: subscriberDob || "",
+        payerId: payerId || "",
+        providerId: providerId || "",
+        providerNpi: providerNpi || "",
+        serviceTypeCode,
+        dateOfService,
+      });
+
+      if (!validation.valid) {
+        return res.status(400).json({ 
+          error: "Validation failed",
+          validationErrors: validation.errors
+        });
+      }
+
+      const result = await officeAllySftpService.submitEligibilityRequest({
+        subscriberId,
+        subscriberFirstName,
+        subscriberLastName,
+        subscriberDob,
+        payerId,
+        providerId,
+        providerNpi,
+        serviceTypeCode,
+        dateOfService,
+      });
+
+      if (!result.success) {
+        return res.status(400).json(result);
+      }
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error submitting EDI 270:", error);
+      res.status(500).json({ error: "Failed to submit eligibility request" });
+    }
+  });
+
+  // Retrieve EDI 271 eligibility responses from Office Ally (Protected - requires system context)
+  // Note: In production, add proper authentication middleware  
+  app.get("/api/clearinghouse/office-ally/responses", async (req, res) => {
+    try {
+      const { officeAllySftpService } = await import("./services/office-ally-sftp");
+      
+      if (!officeAllySftpService.isConfigured()) {
+        return res.status(400).json({ 
+          error: "Office Ally SFTP credentials are not configured" 
+        });
+      }
+
+      const result = await officeAllySftpService.retrieveEligibilityResponses();
+      
+      // Don't return raw EDI content in response - parse it first
+      if (result.success && result.files) {
+        const parsedResponses = result.files.map(file => ({
+          filename: file.filename,
+          parsed: officeAllySftpService.parseEDI271Response(file.content),
+        }));
+        return res.json({
+          success: true,
+          message: result.message,
+          responses: parsedResponses,
+        });
+      }
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Error retrieving EDI 271 responses:", error);
+      res.status(500).json({ error: "Failed to retrieve eligibility responses" });
+    }
+  });
+
   // Patient Portal Routes
   
   // Get Stripe publishable key for frontend

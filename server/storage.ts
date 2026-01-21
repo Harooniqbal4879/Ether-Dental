@@ -611,23 +611,30 @@ export class DatabaseStorage implements IStorage {
       return { success: false, message: "Configuration not found" };
     }
     
-    // Simulate connection test (in production, this would make actual API call)
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    let result: { success: boolean; message: string };
     
-    // Random success/failure for demo (80% success rate)
-    const success = Math.random() > 0.2;
+    // Use actual SFTP service for Office Ally
+    if (config.provider === "office_ally") {
+      const { officeAllySftpService } = await import("./services/office-ally-sftp");
+      result = await officeAllySftpService.testConnection();
+    } else {
+      // Simulate connection test for other providers
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      const success = Math.random() > 0.2;
+      result = {
+        success,
+        message: success 
+          ? "Connection successful - EDI 270/271 test passed" 
+          : "Connection failed - please verify your credentials",
+      };
+    }
     
     await this.updateClearinghouseConfig(id, {
       lastTestedAt: new Date(),
-      connectionStatus: success ? "connected" : "failed",
+      connectionStatus: result.success ? "connected" : "failed",
     });
     
-    return {
-      success,
-      message: success 
-        ? "Connection successful - EDI 270/271 test passed" 
-        : "Connection failed - please verify your credentials",
-    };
+    return result;
   }
 
   // Patient Billing

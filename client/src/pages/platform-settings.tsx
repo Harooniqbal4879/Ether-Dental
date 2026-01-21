@@ -738,6 +738,29 @@ function ClearinghouseIntegrationsTab() {
     },
   });
 
+  const autoSetupOfficeAllyMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/clearinghouse-configs/office-ally/auto-create");
+      return response.json() as Promise<{ message: string; config: ClearinghouseConfig; created: boolean }>;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clearinghouse-configs"] });
+      toast({
+        title: data.created ? "Office Ally Configured" : "Already Configured",
+        description: data.message,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to auto-setup Office Ally. Credentials may not be configured.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const hasOfficeAllyConfig = configs.some(c => c.provider === "office_ally");
+
   return (
     <div className="space-y-6">
       <Card>
@@ -754,13 +777,30 @@ function ClearinghouseIntegrationsTab() {
                 </CardDescription>
               </div>
             </div>
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" data-testid="button-add-clearinghouse">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Clearinghouse
+            <div className="flex items-center gap-2">
+              {!hasOfficeAllyConfig && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => autoSetupOfficeAllyMutation.mutate()}
+                  disabled={autoSetupOfficeAllyMutation.isPending}
+                  data-testid="button-auto-setup-office-ally"
+                >
+                  {autoSetupOfficeAllyMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Shield className="h-4 w-4 mr-2" />
+                  )}
+                  Auto-Setup Office Ally
                 </Button>
-              </DialogTrigger>
+              )}
+              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" data-testid="button-add-clearinghouse">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Clearinghouse
+                  </Button>
+                </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Add Clearinghouse Configuration</DialogTitle>
