@@ -1047,12 +1047,192 @@ function OfficeProfileTab() {
   );
 }
 
+function IntegrationsTab() {
+  const { toast } = useToast();
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [testingConfigId, setTestingConfigId] = useState<string | null>(null);
+
+  const { data: configs = [], isLoading: isLoadingConfigs } = useQuery<ClearinghouseConfig[]>({
+    queryKey: ["/api/clearinghouse-configs"],
+  });
+
+  const createConfigMutation = useMutation({
+    mutationFn: async (data: Omit<InsertClearinghouseConfig, "id">) => {
+      const res = await apiRequest("POST", "/api/clearinghouse-configs", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clearinghouse-configs"] });
+      setIsAddDialogOpen(false);
+      toast({
+        title: "Configuration Created",
+        description: "Clearinghouse configuration has been saved successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create configuration. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteConfigMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/clearinghouse-configs/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clearinghouse-configs"] });
+      toast({
+        title: "Configuration Deleted",
+        description: "Clearinghouse configuration has been removed.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete configuration. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const testConnectionMutation = useMutation({
+    mutationFn: async (id: string) => {
+      setTestingConfigId(id);
+      const response = await apiRequest("POST", `/api/clearinghouse-configs/${id}/test`);
+      return response.json() as Promise<{ success: boolean; message: string }>;
+    },
+    onSuccess: (data: { success: boolean; message: string }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clearinghouse-configs"] });
+      toast({
+        title: data.success ? "Connection Successful" : "Connection Failed",
+        description: data.message,
+        variant: data.success ? "default" : "destructive",
+      });
+      setTestingConfigId(null);
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to test connection. Please try again.",
+        variant: "destructive",
+      });
+      setTestingConfigId(null);
+    },
+  });
+
+  return (
+    <div className="space-y-6">
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold">Platform Integrations</h2>
+        <p className="text-sm text-muted-foreground">
+          Configure platform-wide integrations that apply to all practices
+        </p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted">
+                <Shield className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Clearinghouse Credentials</CardTitle>
+                <CardDescription>
+                  Configure your EDI clearinghouse connections for automated insurance verification
+                </CardDescription>
+              </div>
+            </div>
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button data-testid="button-add-clearinghouse">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Clearinghouse
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add Clearinghouse Configuration</DialogTitle>
+                  <DialogDescription>
+                    Configure a new clearinghouse connection for EDI 270/271 eligibility transactions.
+                  </DialogDescription>
+                </DialogHeader>
+                <ClearinghouseForm
+                  onSubmit={(data) => createConfigMutation.mutate(data)}
+                  isLoading={createConfigMutation.isPending}
+                />
+              </DialogContent>
+            </Dialog>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoadingConfigs ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : configs.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-8 text-center">
+              <Shield className="mx-auto h-10 w-10 text-muted-foreground" />
+              <h3 className="mt-4 font-medium">No Clearinghouse Configured</h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Add a clearinghouse configuration to enable electronic insurance verification.
+              </p>
+              <Button
+                className="mt-4"
+                onClick={() => setIsAddDialogOpen(true)}
+                data-testid="button-add-first-clearinghouse"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add First Clearinghouse
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {configs.map((config) => (
+                <ClearinghouseConfigCard
+                  key={config.id}
+                  config={config}
+                  onTest={() => testConnectionMutation.mutate(config.id)}
+                  onDelete={() => deleteConfigMutation.mutate(config.id)}
+                  isTesting={testingConfigId === config.id}
+                />
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted">
+              <Plug className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <div>
+              <CardTitle className="text-base">Future Integrations</CardTitle>
+              <CardDescription>
+                Additional platform integrations will be available here
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            More integrations coming soon: Practice Management Systems, Payment Processors, Communication Tools, and more.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function PracticeInformationTab() {
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
   const { currentLocationId, currentLocation } = useLocation();
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [testingConfigId, setTestingConfigId] = useState<string | null>(null);
 
   // Load location-specific profile data
   const { data: profile, isLoading: isLoadingProfile } = useQuery<LocationProfile>({
@@ -1171,77 +1351,6 @@ function PracticeInformationTab() {
       dressCode: practiceData.dressCode,
     });
   };
-
-  const { data: configs = [], isLoading: isLoadingConfigs } = useQuery<ClearinghouseConfig[]>({
-    queryKey: ["/api/clearinghouse-configs"],
-  });
-
-  const createConfigMutation = useMutation({
-    mutationFn: async (data: Omit<InsertClearinghouseConfig, "id">) => {
-      const res = await apiRequest("POST", "/api/clearinghouse-configs", data);
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/clearinghouse-configs"] });
-      setIsAddDialogOpen(false);
-      toast({
-        title: "Configuration Created",
-        description: "Clearinghouse configuration has been saved successfully.",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to create configuration. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const deleteConfigMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await apiRequest("DELETE", `/api/clearinghouse-configs/${id}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/clearinghouse-configs"] });
-      toast({
-        title: "Configuration Deleted",
-        description: "Clearinghouse configuration has been removed.",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to delete configuration. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const testConnectionMutation = useMutation({
-    mutationFn: async (id: string) => {
-      setTestingConfigId(id);
-      const response = await apiRequest("POST", `/api/clearinghouse-configs/${id}/test`);
-      return response.json() as Promise<{ success: boolean; message: string }>;
-    },
-    onSuccess: (data: { success: boolean; message: string }) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/clearinghouse-configs"] });
-      toast({
-        title: data.success ? "Connection Successful" : "Connection Failed",
-        description: data.message,
-        variant: data.success ? "default" : "destructive",
-      });
-      setTestingConfigId(null);
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to test connection. Please try again.",
-        variant: "destructive",
-      });
-      setTestingConfigId(null);
-    },
-  });
 
   return (
     <div className="space-y-6">
@@ -1569,79 +1678,6 @@ function PracticeInformationTab() {
               />
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted">
-                <Shield className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div>
-                <CardTitle className="text-base">Clearinghouse Credentials</CardTitle>
-                <CardDescription>
-                  Configure your EDI clearinghouse connections for automated insurance verification
-                </CardDescription>
-              </div>
-            </div>
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button data-testid="button-add-clearinghouse">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Clearinghouse
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Add Clearinghouse Configuration</DialogTitle>
-                  <DialogDescription>
-                    Configure a new clearinghouse connection for EDI 270/271 eligibility transactions.
-                  </DialogDescription>
-                </DialogHeader>
-                <ClearinghouseForm
-                  onSubmit={(data) => createConfigMutation.mutate(data)}
-                  isLoading={createConfigMutation.isPending}
-                />
-              </DialogContent>
-            </Dialog>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {isLoadingConfigs ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : configs.length === 0 ? (
-            <div className="rounded-lg border border-dashed p-8 text-center">
-              <Shield className="mx-auto h-10 w-10 text-muted-foreground" />
-              <h3 className="mt-4 font-medium">No Clearinghouse Configured</h3>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Add a clearinghouse configuration to enable electronic insurance verification.
-              </p>
-              <Button
-                className="mt-4"
-                onClick={() => setIsAddDialogOpen(true)}
-                data-testid="button-add-first-clearinghouse"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Add First Clearinghouse
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {configs.map((config) => (
-                <ClearinghouseConfigCard
-                  key={config.id}
-                  config={config}
-                  onTest={() => testConnectionMutation.mutate(config.id)}
-                  onDelete={() => deleteConfigMutation.mutate(config.id)}
-                  isTesting={testingConfigId === config.id}
-                />
-              ))}
-            </div>
-          )}
         </CardContent>
       </Card>
 
@@ -3084,7 +3120,7 @@ export default function Settings() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="office-profile" className="flex items-center gap-2" data-testid="tab-office-profile">
             Office profile
             <Badge variant="secondary" className="h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
@@ -3116,6 +3152,10 @@ export default function Settings() {
               {tabCounts["billing"]}
             </Badge>
           </TabsTrigger>
+          <TabsTrigger value="integrations" className="flex items-center gap-2" data-testid="tab-integrations">
+            <Plug className="h-4 w-4" />
+            Integrations
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="office-profile">
@@ -3140,6 +3180,10 @@ export default function Settings() {
 
         <TabsContent value="billing">
           <BillingTab />
+        </TabsContent>
+
+        <TabsContent value="integrations">
+          <IntegrationsTab />
         </TabsContent>
       </Tabs>
     </div>
