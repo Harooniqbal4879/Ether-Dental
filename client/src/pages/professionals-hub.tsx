@@ -605,6 +605,237 @@ function EditProfessionalDialog({
   );
 }
 
+function ProfessionalProfileDisplay({
+  professional,
+  canEdit,
+  showBackButton = false,
+  onEditClick,
+}: {
+  professional: ProfessionalWithBadges;
+  canEdit: boolean;
+  showBackButton?: boolean;
+  onEditClick?: () => void;
+}) {
+  const initials = `${professional.firstName[0]}${professional.lastName[0]}`;
+  const rating = parseFloat(professional.rating || "0");
+
+  return (
+    <div className="space-y-6">
+      {showBackButton && (
+        <div className="flex items-center gap-4 mb-6">
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/professionals" data-testid="button-back-to-professionals">
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Back to Professionals
+            </Link>
+          </Button>
+        </div>
+      )}
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-start gap-4 mb-6">
+              <Avatar className="h-24 w-24">
+                <AvatarImage src={professional.photoUrl || undefined} alt={`${professional.firstName} ${professional.lastName}`} />
+                <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <h2 className="text-xl font-bold">
+                    {professional.firstName} {professional.lastName}
+                  </h2>
+                  {rating > 0 && (
+                    <div className="flex items-center gap-1 text-yellow-500">
+                      <Star className="h-5 w-5 fill-yellow-400" />
+                      <span className="font-semibold">{rating.toFixed(1)}</span>
+                    </div>
+                  )}
+                </div>
+                {professional.credentialsVerified && (
+                  <div className="flex items-center gap-1 text-primary text-sm mb-2">
+                    <BadgeCheck className="h-4 w-4" />
+                    <span>Credentials Verified</span>
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  {professional.email && (
+                    <Badge variant="outline" className="text-xs">
+                      <Mail className="h-3 w-3 mr-1" />
+                      {professional.email}
+                    </Badge>
+                  )}
+                  {professional.phone && (
+                    <Badge variant="outline" className="text-xs">
+                      <Phone className="h-3 w-3 mr-1" />
+                      {professional.phone}
+                    </Badge>
+                  )}
+                </div>
+                {canEdit && onEditClick && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    onClick={onEditClick}
+                    data-testid="button-edit-professional"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit Profile
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            <Separator className="my-4" />
+
+            <div className="space-y-4">
+              {professional.education && (
+                <div>
+                  <h4 className="font-semibold text-sm flex items-center gap-2 mb-1">
+                    <GraduationCap className="h-4 w-4 text-muted-foreground" />
+                    Education
+                  </h4>
+                  <p className="text-sm text-muted-foreground">{professional.education}</p>
+                  {professional.graduationDate && (
+                    <p className="text-xs text-muted-foreground">Graduation Date: {professional.graduationDate}</p>
+                  )}
+                </div>
+              )}
+
+              <div>
+                <h4 className="font-semibold text-sm flex items-center gap-2 mb-1">
+                  <Briefcase className="h-4 w-4 text-muted-foreground" />
+                  Profession
+                </h4>
+                <p className="text-sm text-muted-foreground">{professional.role}</p>
+              </div>
+
+              {professional.licenseNumber && (
+                <div>
+                  <h4 className="font-semibold text-sm flex items-center gap-2 mb-1">
+                    <BadgeCheck className="h-4 w-4 text-muted-foreground" />
+                    License Information
+                  </h4>
+                  <div className="text-sm text-muted-foreground space-y-1">
+                    <p>License #: {professional.licenseNumber}</p>
+                    {professional.licenseState && <p>Issued by State of: {professional.licenseState}</p>}
+                    {professional.licenseYearIssued && <p>Year Issued: {professional.licenseYearIssued}</p>}
+                  </div>
+                </div>
+              )}
+
+              {professional.experienceRange && (
+                <div>
+                  <h4 className="font-semibold text-sm mb-1">Years of Experience</h4>
+                  <p className="text-sm text-muted-foreground">{professional.experienceRange}</p>
+                </div>
+              )}
+
+              {professional.software && professional.software.length > 0 && (
+                <div>
+                  <h4 className="font-semibold text-sm mb-1">Software</h4>
+                  <div className="flex flex-wrap gap-1">
+                    {professional.software.map((sw) => (
+                      <Badge key={sw} variant="secondary" className="text-xs">
+                        {sw}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {professional.specialty && (
+                <div>
+                  <h4 className="font-semibold text-sm flex items-center gap-2 mb-1">
+                    <Wrench className="h-4 w-4 text-muted-foreground" />
+                    Specialty
+                  </h4>
+                  <p className="text-sm text-muted-foreground">{professional.specialty}</p>
+                  {professional.specialties && professional.specialties.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {professional.specialties.map((s) => (
+                        <Badge key={s} variant="outline" className="text-xs">
+                          {s}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Badges</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {professional.badges && professional.badges.length > 0 ? (
+                <div className="grid grid-cols-5 gap-4">
+                  {professional.badges.map((badge) => (
+                    <div key={badge.id} className="flex flex-col items-center text-center">
+                      <div
+                        className={`flex items-center justify-center h-14 w-14 rounded-full ${badgeColors[badge.level] || "bg-muted"} mb-2`}
+                      >
+                        <span className="text-white">
+                          {badgeIcons[badge.badgeType]}
+                        </span>
+                      </div>
+                      <span className="text-xs font-medium">
+                        {badgeLabels[badge.badgeType] || badge.badgeType}
+                      </span>
+                      {badge.count && badge.count > 0 && (
+                        <span className="text-xs text-muted-foreground">{badge.count}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No badges earned yet
+                </p>
+              )}
+              {professional.badges && professional.badges.some(b => b.level === "gold") && (
+                <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-950/20 rounded-md border border-yellow-200 dark:border-yellow-900">
+                  <p className="text-sm">
+                    <span className="font-semibold text-yellow-700 dark:text-yellow-400">Gold:</span>{" "}
+                    <span className="text-muted-foreground">
+                      Perfect Attendance. This professional has shown unwavering commitment and never cancelled a shift late!
+                    </span>
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {professional.procedures && professional.procedures.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Experienced Procedures</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-1">
+                  {professional.procedures.map((procedure) => (
+                    <li key={procedure} className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+                      {procedure}
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function formatDate(dateStr: string): string {
   const date = new Date(dateStr + "T00:00:00");
   return date.toLocaleDateString("en-US", {
@@ -878,7 +1109,8 @@ function MyEarningsView({ professionalId }: { professionalId: string }) {
 }
 
 function ProfessionalPortalView() {
-  const [activeTab, setActiveTab] = useState("shifts");
+  const [activeTab, setActiveTab] = useState("profile");
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   
   const { data: professionals, isLoading } = useQuery<ProfessionalWithBadges[]>({
     queryKey: ["/api/professionals"],
@@ -924,39 +1156,14 @@ function ProfessionalPortalView() {
     );
   }
 
-  const initials = `${currentProfessional.firstName[0]}${currentProfessional.lastName[0]}`;
-  const rating = parseFloat(currentProfessional.rating || "0");
-
   return (
     <div className="container max-w-5xl py-6 space-y-6">
-      <div className="flex items-start gap-4">
-        <Avatar className="h-16 w-16">
-          <AvatarImage src={currentProfessional.photoUrl || undefined} />
-          <AvatarFallback className="bg-primary text-primary-foreground text-xl">
-            {initials}
-          </AvatarFallback>
-        </Avatar>
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold">
-              Welcome, {currentProfessional.firstName}!
-            </h1>
-            {currentProfessional.credentialsVerified && (
-              <BadgeCheck className="h-5 w-5 text-primary" />
-            )}
-          </div>
-          <p className="text-muted-foreground">{currentProfessional.role}</p>
-          {rating > 0 && (
-            <div className="flex items-center gap-1 mt-1">
-              <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-              <span className="text-sm font-medium">{rating.toFixed(1)}</span>
-            </div>
-          )}
-        </div>
-      </div>
-
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full max-w-2xl grid-cols-4">
+        <TabsList className="grid w-full max-w-3xl grid-cols-5">
+          <TabsTrigger value="profile" data-testid="tab-profile">
+            <Users className="h-4 w-4 mr-2" />
+            Profile
+          </TabsTrigger>
           <TabsTrigger value="shifts" data-testid="tab-shift-history">
             <Calendar className="h-4 w-4 mr-2" />
             Shifts
@@ -975,6 +1182,15 @@ function ProfessionalPortalView() {
           </TabsTrigger>
         </TabsList>
 
+        <TabsContent value="profile" className="mt-6">
+          <ProfessionalProfileDisplay
+            professional={currentProfessional}
+            canEdit={true}
+            showBackButton={false}
+            onEditClick={() => setEditDialogOpen(true)}
+          />
+        </TabsContent>
+
         <TabsContent value="shifts" className="mt-6">
           <MyShiftsView professionalId={currentProfessional.id} />
         </TabsContent>
@@ -991,6 +1207,12 @@ function ProfessionalPortalView() {
           <MyCredentialsView professionalId={currentProfessional.id} />
         </TabsContent>
       </Tabs>
+
+      <EditProfessionalDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        professional={currentProfessional}
+      />
     </div>
   );
 }
@@ -1652,226 +1874,12 @@ function ProfessionalCard({ professional }: { professional: ProfessionalWithBadg
 }
 
 function ProfessionalDetail({ professional }: { professional: ProfessionalWithBadges }) {
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const initials = `${professional.firstName[0]}${professional.lastName[0]}`;
-  const rating = parseFloat(professional.rating || "0");
-
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4 mb-6">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/professionals" data-testid="button-back-to-professionals">
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            Back to Professionals
-          </Link>
-        </Button>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-start gap-4 mb-6">
-              <Avatar className="h-24 w-24">
-                <AvatarImage src={professional.photoUrl || undefined} alt={`${professional.firstName} ${professional.lastName}`} />
-                <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <h2 className="text-xl font-bold">
-                    {professional.firstName} {professional.lastName}
-                  </h2>
-                  {rating > 0 && (
-                    <div className="flex items-center gap-1 text-yellow-500">
-                      <Star className="h-5 w-5 fill-yellow-400" />
-                      <span className="font-semibold">{rating.toFixed(1)}</span>
-                    </div>
-                  )}
-                </div>
-                {professional.credentialsVerified && (
-                  <div className="flex items-center gap-1 text-primary text-sm mb-2">
-                    <BadgeCheck className="h-4 w-4" />
-                    <span>Credentials Verified</span>
-                  </div>
-                )}
-                <div className="flex flex-wrap gap-2">
-                  {professional.email && (
-                    <Badge variant="outline" className="text-xs">
-                      <Mail className="h-3 w-3 mr-1" />
-                      {professional.email}
-                    </Badge>
-                  )}
-                  {professional.phone && (
-                    <Badge variant="outline" className="text-xs">
-                      <Phone className="h-3 w-3 mr-1" />
-                      {professional.phone}
-                    </Badge>
-                  )}
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-3"
-                  onClick={() => setEditDialogOpen(true)}
-                  data-testid="button-edit-professional"
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit Profile
-                </Button>
-              </div>
-            </div>
-
-            <Separator className="my-4" />
-
-            <div className="space-y-4">
-              {professional.education && (
-                <div>
-                  <h4 className="font-semibold text-sm flex items-center gap-2 mb-1">
-                    <GraduationCap className="h-4 w-4 text-muted-foreground" />
-                    Education
-                  </h4>
-                  <p className="text-sm text-muted-foreground">{professional.education}</p>
-                  {professional.graduationDate && (
-                    <p className="text-xs text-muted-foreground">Graduation Date: {professional.graduationDate}</p>
-                  )}
-                </div>
-              )}
-
-              <div>
-                <h4 className="font-semibold text-sm flex items-center gap-2 mb-1">
-                  <Briefcase className="h-4 w-4 text-muted-foreground" />
-                  Profession
-                </h4>
-                <p className="text-sm text-muted-foreground">{professional.role}</p>
-              </div>
-
-              {professional.licenseNumber && (
-                <div>
-                  <h4 className="font-semibold text-sm flex items-center gap-2 mb-1">
-                    <BadgeCheck className="h-4 w-4 text-muted-foreground" />
-                    License Information
-                  </h4>
-                  <div className="text-sm text-muted-foreground space-y-1">
-                    <p>License #: {professional.licenseNumber}</p>
-                    {professional.licenseState && <p>Issued by State of: {professional.licenseState}</p>}
-                    {professional.licenseYearIssued && <p>Year Issued: {professional.licenseYearIssued}</p>}
-                  </div>
-                </div>
-              )}
-
-              {professional.experienceRange && (
-                <div>
-                  <h4 className="font-semibold text-sm mb-1">Years of Experience</h4>
-                  <p className="text-sm text-muted-foreground">{professional.experienceRange}</p>
-                </div>
-              )}
-
-              {professional.software && professional.software.length > 0 && (
-                <div>
-                  <h4 className="font-semibold text-sm mb-1">Software</h4>
-                  <div className="flex flex-wrap gap-1">
-                    {professional.software.map((sw) => (
-                      <Badge key={sw} variant="secondary" className="text-xs">
-                        {sw}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {professional.specialty && (
-                <div>
-                  <h4 className="font-semibold text-sm flex items-center gap-2 mb-1">
-                    <Wrench className="h-4 w-4 text-muted-foreground" />
-                    Specialty
-                  </h4>
-                  <p className="text-sm text-muted-foreground">{professional.specialty}</p>
-                  {professional.specialties && professional.specialties.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {professional.specialties.map((s) => (
-                        <Badge key={s} variant="outline" className="text-xs">
-                          {s}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Badges</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {professional.badges && professional.badges.length > 0 ? (
-                <div className="grid grid-cols-5 gap-4">
-                  {professional.badges.map((badge) => (
-                    <div key={badge.id} className="flex flex-col items-center text-center">
-                      <div
-                        className={`flex items-center justify-center h-14 w-14 rounded-full ${badgeColors[badge.level] || "bg-muted"} mb-2`}
-                      >
-                        <span className="text-white">
-                          {badgeIcons[badge.badgeType]}
-                        </span>
-                      </div>
-                      <span className="text-xs font-medium">
-                        {badgeLabels[badge.badgeType] || badge.badgeType}
-                      </span>
-                      {badge.count && badge.count > 0 && (
-                        <span className="text-xs text-muted-foreground">{badge.count}</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  No badges earned yet
-                </p>
-              )}
-              {professional.badges && professional.badges.some(b => b.level === "gold") && (
-                <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-950/20 rounded-md border border-yellow-200 dark:border-yellow-900">
-                  <p className="text-sm">
-                    <span className="font-semibold text-yellow-700 dark:text-yellow-400">Gold:</span>{" "}
-                    <span className="text-muted-foreground">
-                      Perfect Attendance. This professional has shown unwavering commitment and never cancelled a shift late!
-                    </span>
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {professional.procedures && professional.procedures.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Experienced Procedures</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-1">
-                  {professional.procedures.map((procedure) => (
-                    <li key={procedure} className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
-                      {procedure}
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </div>
-
-      <EditProfessionalDialog
-        open={editDialogOpen}
-        onOpenChange={setEditDialogOpen}
-        professional={professional}
-      />
-    </div>
+    <ProfessionalProfileDisplay
+      professional={professional}
+      canEdit={false}
+      showBackButton={true}
+    />
   );
 }
 
