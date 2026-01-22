@@ -814,6 +814,7 @@ function ClearinghouseIntegrationsTab() {
                 />
               </DialogContent>
             </Dialog>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
