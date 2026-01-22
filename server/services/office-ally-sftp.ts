@@ -105,14 +105,17 @@ export class OfficeAllySftpService {
     const sftp = new SftpClient();
     
     try {
+      console.log(`[Office Ally SFTP] Attempting connection to ${this.config.host}:${this.config.port} as ${this.config.username}`);
+      
       await sftp.connect({
         host: this.config.host,
         port: this.config.port,
         username: this.config.username,
         password: this.config.password,
-        readyTimeout: 10000,
-        retries: 2,
+        readyTimeout: 20000,
+        retries: 1,
         retry_minTimeout: 2000,
+        debug: (msg: string) => console.log(`[SFTP Debug] ${msg}`),
       });
 
       const listing = await sftp.list("/");
