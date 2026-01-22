@@ -28,7 +28,8 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Settings, DollarSign, MapPin, Plus, Pencil, Save, Loader2, Plug, Shield, Trash2, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { Settings, DollarSign, MapPin, Plus, Pencil, Save, Loader2, Plug, Shield, Trash2, CheckCircle, XCircle, AlertCircle, Stethoscope } from "lucide-react";
+import { EligibilityCheck } from "@/components/eligibility-check";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { PlatformSettings, PlatformStateTaxRate, ClearinghouseConfig, InsertClearinghouseConfig } from "@shared/schema";
 
@@ -89,6 +90,10 @@ export default function PlatformSettingsPage() {
               <Plug className="h-4 w-4 mr-2" />
               Integrations
             </TabsTrigger>
+            <TabsTrigger value="eligibility" data-testid="tab-eligibility">
+              <Stethoscope className="h-4 w-4 mr-2" />
+              Eligibility
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="fees" className="space-y-6">
@@ -116,6 +121,10 @@ export default function PlatformSettingsPage() {
 
           <TabsContent value="integrations" className="space-y-6">
             <ClearinghouseIntegrationsTab />
+          </TabsContent>
+
+          <TabsContent value="eligibility" className="space-y-6">
+            <EligibilityCheck />
           </TabsContent>
         </Tabs>
       </div>

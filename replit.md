@@ -34,4 +34,36 @@ The platform is built on a modern web stack designed for scalability and maintai
 - **Payment Gateway**: Stripe (for Patient Portal payments)
 - **Mapping/Geocoding**: Google Maps API
 - **Font Hosting**: Google Fonts
-- **Clearinghouse Integration**: (Specific clearinghouse not named, but integrated for insurance claim submissions)
+- **Clearinghouse Integration**: Office Ally SFTP for claims, DentalXchange for eligibility
+
+## DentalXchange Integration (January 2026)
+Real-time dental insurance eligibility verification through DentalXchange XConnect API.
+
+### Credentials Required
+Set these environment variables to enable live API calls:
+- `DENTALXCHANGE_USERNAME` - DentalXchange account username
+- `DENTALXCHANGE_PASSWORD` - DentalXchange account password
+- `DENTALXCHANGE_API_KEY` - Optional API key
+
+### API Endpoints
+- `POST /api/eligibility/check` - Check patient eligibility (returns simulated data if credentials not configured)
+- `GET /api/eligibility/verifications` - List recent eligibility verifications
+- `GET /api/eligibility/verifications/:id` - Get verification with benefits breakdown
+- `GET /api/eligibility/payers` - List supported insurance payers (950+ dental payers)
+- `POST /api/eligibility/payers/sync` - Sync payer list to database
+- `GET /api/patients/:id/eligibility` - Get eligibility history for a patient
+- `GET /api/policies/:id/eligibility` - Get eligibility history for a policy
+- `GET /api/eligibility/service-types` - Get CDT service type codes
+- `GET /api/eligibility/relationship-codes` - Get subscriber relationship codes
+
+### Database Tables
+- `eligibility_verifications` - Stores verification requests and responses
+- `eligibility_benefits` - Stores detailed benefits breakdown (co-insurance, deductibles, maximums, limitations)
+- `dentalxchange_payers` - Cache of supported payers
+
+### UI Location
+Platform Settings → Eligibility tab (System Admin only)
+
+### Key Files
+- `server/services/dentalxchange.ts` - DentalXchange API service
+- `client/src/components/eligibility-check.tsx` - Eligibility check UI component

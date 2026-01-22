@@ -27,6 +27,9 @@ import {
   practices,
   practiceSettings,
   practiceLocations,
+  eligibilityVerifications,
+  eligibilityBenefits,
+  dentalxchangePayers,
   type Patient,
   type InsertPatient,
   type InsuranceCarrier,
@@ -93,6 +96,12 @@ import {
   type PracticeLocation,
   type InsertPracticeLocation,
   type ResolvedFeeRates,
+  type EligibilityVerification,
+  type InsertEligibilityVerification,
+  type EligibilityBenefit,
+  type InsertEligibilityBenefit,
+  type DentalxchangePayer,
+  type InsertDentalxchangePayer,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -1909,6 +1918,115 @@ export class DatabaseStorage implements IStorage {
       .delete(practiceLocations)
       .where(eq(practiceLocations.id, id));
     return true;
+  }
+
+  // Eligibility Verifications
+  async createEligibilityVerification(data: InsertEligibilityVerification): Promise<EligibilityVerification> {
+    const [created] = await db.insert(eligibilityVerifications).values(data).returning();
+    return created;
+  }
+
+  async getEligibilityVerification(id: string): Promise<EligibilityVerification | undefined> {
+    const [verification] = await db
+      .select()
+      .from(eligibilityVerifications)
+      .where(eq(eligibilityVerifications.id, id));
+    return verification;
+  }
+
+  async getEligibilityVerificationWithBenefits(id: string): Promise<{
+    verification: EligibilityVerification;
+    benefits: EligibilityBenefit[];
+  } | undefined> {
+    const [verification] = await db
+      .select()
+      .from(eligibilityVerifications)
+      .where(eq(eligibilityVerifications.id, id));
+    
+    if (!verification) return undefined;
+
+    const benefitsList = await db
+      .select()
+      .from(eligibilityBenefits)
+      .where(eq(eligibilityBenefits.verificationId, id))
+      .orderBy(eligibilityBenefits.benefitType, eligibilityBenefits.serviceType);
+
+    return { verification, benefits: benefitsList };
+  }
+
+  async getPatientEligibilityVerifications(patientId: string): Promise<EligibilityVerification[]> {
+    return db
+      .select()
+      .from(eligibilityVerifications)
+      .where(eq(eligibilityVerifications.patientId, patientId))
+      .orderBy(desc(eligibilityVerifications.createdAt));
+  }
+
+  async getPolicyEligibilityVerifications(policyId: string): Promise<EligibilityVerification[]> {
+    return db
+      .select()
+      .from(eligibilityVerifications)
+      .where(eq(eligibilityVerifications.policyId, policyId))
+      .orderBy(desc(eligibilityVerifications.createdAt));
+  }
+
+  async getRecentEligibilityVerifications(limit: number = 50): Promise<EligibilityVerification[]> {
+    return db
+      .select()
+      .from(eligibilityVerifications)
+      .orderBy(desc(eligibilityVerifications.createdAt))
+      .limit(limit);
+  }
+
+  // Eligibility Benefits
+  async createEligibilityBenefits(benefits: InsertEligibilityBenefit[]): Promise<EligibilityBenefit[]> {
+    if (benefits.length === 0) return [];
+    return db.insert(eligibilityBenefits).values(benefits).returning();
+  }
+
+  async getEligibilityBenefits(verificationId: string): Promise<EligibilityBenefit[]> {
+    return db
+      .select()
+      .from(eligibilityBenefits)
+      .where(eq(eligibilityBenefits.verificationId, verificationId))
+      .orderBy(eligibilityBenefits.benefitType, eligibilityBenefits.serviceType);
+  }
+
+  // DentalXchange Payers
+  async getDentalxchangePayers(): Promise<DentalxchangePayer[]> {
+    return db
+      .select()
+      .from(dentalxchangePayers)
+      .where(eq(dentalxchangePayers.isActive, true))
+      .orderBy(dentalxchangePayers.name);
+  }
+
+  async getDentalxchangePayer(payerIdCode: string): Promise<DentalxchangePayer | undefined> {
+    const [payer] = await db
+      .select()
+      .from(dentalxchangePayers)
+      .where(eq(dentalxchangePayers.payerIdCode, payerIdCode));
+    return payer;
+  }
+
+  async upsertDentalxchangePayer(data: InsertDentalxchangePayer): Promise<DentalxchangePayer> {
+    const existing = await this.getDentalxchangePayer(data.payerIdCode);
+    if (existing) {
+      const [updated] = await db
+        .update(dentalxchangePayers)
+        .set({ ...data, lastUpdated: new Date() })
+        .where(eq(dentalxchangePayers.payerIdCode, data.payerIdCode))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(dentalxchangePayers).values(data).returning();
+    return created;
+  }
+
+  async syncDentalxchangePayers(payers: InsertDentalxchangePayer[]): Promise<void> {
+    for (const payer of payers) {
+      await this.upsertDentalxchangePayer(payer);
+    }
   }
 }
 

@@ -1137,6 +1137,146 @@ export type ResolvedFeeRates = {
   totalPayrollBurden: number; // Sum of all employer-side taxes
 };
 
+// DentalXchange Eligibility Verifications - Stores eligibility check results
+export const eligibilityVerifications = pgTable("eligibility_verifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  patientId: varchar("patient_id").references(() => patients.id, { onDelete: "cascade" }),
+  policyId: varchar("policy_id").references(() => insurancePolicies.id, { onDelete: "set null" }),
+  practiceId: varchar("practice_id"),
+  locationId: varchar("location_id"),
+  
+  // Request details
+  requestedBy: varchar("requested_by"), // User who initiated the request
+  requestedAt: timestamp("requested_at").defaultNow(),
+  
+  // Payer information
+  payerIdCode: text("payer_id_code").notNull(),
+  payerName: text("payer_name").notNull(),
+  
+  // Provider used for verification
+  providerNpi: text("provider_npi"),
+  providerName: text("provider_name"),
+  
+  // Subscriber information
+  subscriberMemberId: text("subscriber_member_id"),
+  subscriberFirstName: text("subscriber_first_name"),
+  subscriberLastName: text("subscriber_last_name"),
+  subscriberDob: text("subscriber_dob"),
+  
+  // Patient information from response
+  patientFirstName: text("patient_first_name"),
+  patientLastName: text("patient_last_name"),
+  patientDob: text("patient_dob"),
+  patientRelationship: text("patient_relationship"),
+  
+  // Coverage status
+  coverageStatus: text("coverage_status").notNull(), // active, inactive, unknown
+  groupNumber: text("group_number"),
+  groupName: text("group_name"),
+  effectiveDateFrom: text("effective_date_from"),
+  effectiveDateTo: text("effective_date_to"),
+  planCoverageDescription: text("plan_coverage_description"),
+  insuranceType: text("insurance_type"), // PPO, HMO, etc.
+  
+  // Response metadata
+  transactionId: text("transaction_id"),
+  responseCode: integer("response_code"),
+  responseDescription: text("response_description"),
+  responseMessages: text("response_messages").array(),
+  
+  // Full response stored as JSON for reference
+  rawResponse: text("raw_response"), // JSON string of full response
+  
+  // Status
+  status: text("status").default("completed"), // pending, completed, error
+  errorMessage: text("error_message"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const eligibilityVerificationsRelations = relations(eligibilityVerifications, ({ one, many }) => ({
+  patient: one(patients, {
+    fields: [eligibilityVerifications.patientId],
+    references: [patients.id],
+  }),
+  policy: one(insurancePolicies, {
+    fields: [eligibilityVerifications.policyId],
+    references: [insurancePolicies.id],
+  }),
+  benefits: many(eligibilityBenefits),
+}));
+
+export const insertEligibilityVerificationSchema = createInsertSchema(eligibilityVerifications).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertEligibilityVerification = z.infer<typeof insertEligibilityVerificationSchema>;
+export type EligibilityVerification = typeof eligibilityVerifications.$inferSelect;
+
+// Eligibility Benefits - Stores detailed benefits breakdown from eligibility response
+export const eligibilityBenefits = pgTable("eligibility_benefits", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  verificationId: varchar("verification_id").notNull().references(() => eligibilityVerifications.id, { onDelete: "cascade" }),
+  
+  // Benefit category
+  benefitType: text("benefit_type").notNull(), // coInsurance, deductible, maximum, limitation
+  serviceType: text("service_type"), // Preventive, Basic, Major, etc.
+  procedureCode: text("procedure_code"), // CDT code if specific
+  
+  // Network breakdown
+  network: text("network").notNull(), // In-Network, Out-Of-Network
+  coverageLevel: text("coverage_level"), // Individual, Family
+  
+  // Values
+  percent: text("percent"), // For co-insurance
+  amount: text("amount"), // For deductibles/maximums
+  remaining: text("remaining"), // Remaining amount
+  
+  // Limitations
+  quantity: text("quantity"),
+  quantityQualifier: text("quantity_qualifier"),
+  timePeriod: text("time_period"), // Calendar Year, Benefit Year, etc.
+  
+  // Additional info
+  authorizationRequired: boolean("authorization_required").default(false),
+  message: text("message"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const eligibilityBenefitsRelations = relations(eligibilityBenefits, ({ one }) => ({
+  verification: one(eligibilityVerifications, {
+    fields: [eligibilityBenefits.verificationId],
+    references: [eligibilityVerifications.id],
+  }),
+}));
+
+export const insertEligibilityBenefitSchema = createInsertSchema(eligibilityBenefits).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertEligibilityBenefit = z.infer<typeof insertEligibilityBenefitSchema>;
+export type EligibilityBenefit = typeof eligibilityBenefits.$inferSelect;
+
+// DentalXchange Payer Directory - Cache of supported payers
+export const dentalxchangePayers = pgTable("dentalxchange_payers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  payerIdCode: text("payer_id_code").notNull().unique(),
+  name: text("name").notNull(),
+  eligibilitySupported: boolean("eligibility_supported").default(true),
+  claimsSupported: boolean("claims_supported").default(true),
+  attachmentsSupported: boolean("attachments_supported").default(false),
+  isActive: boolean("is_active").default(true),
+  lastUpdated: timestamp("last_updated").defaultNow(),
+});
+
+export const insertDentalxchangePayerSchema = createInsertSchema(dentalxchangePayers).omit({
+  id: true,
+  lastUpdated: true,
+});
+export type InsertDentalxchangePayer = z.infer<typeof insertDentalxchangePayerSchema>;
+export type DentalxchangePayer = typeof dentalxchangePayers.$inferSelect;
+
 // US States for dropdown
 export const US_STATES = [
   { code: "AL", name: "Alabama" },

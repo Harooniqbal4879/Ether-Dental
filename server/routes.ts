@@ -2373,5 +2373,408 @@ export async function registerRoutes(
     }
   });
 
+  // =====================================
+  // DentalXchange Eligibility Verification
+  // =====================================
+  
+  // Check eligibility for a patient
+  const eligibilityRequestSchema = z.object({
+    patientId: z.string().optional(),
+    policyId: z.string().optional(),
+    practiceId: z.string().optional(),
+    locationId: z.string().optional(),
+    
+    // Provider info (required for real API calls)
+    provider: z.object({
+      type: z.enum(["1", "2"]), // 1 = Individual, 2 = Organization
+      firstName: z.string().optional(),
+      lastName: z.string().optional(),
+      organizationName: z.string().optional(),
+      npi: z.string(),
+      taxId: z.string(),
+    }),
+    
+    // Payer info
+    payer: z.object({
+      name: z.string(),
+      payerIdCode: z.string(),
+    }),
+    
+    // Patient info
+    patient: z.object({
+      dateOfBirth: z.string(),
+      memberId: z.string(),
+      firstName: z.string(),
+      lastName: z.string(),
+      relationship: z.string().default("18"), // 18 = Self
+    }),
+    
+    // Subscriber info (optional - defaults to patient if same)
+    subscriber: z.object({
+      dateOfBirth: z.string(),
+      memberId: z.string(),
+      firstName: z.string(),
+      lastName: z.string(),
+    }).optional(),
+    
+    // Optional filters
+    groupNumber: z.string().optional(),
+    procedureCode: z.string().optional(),
+    category: z.string().optional(),
+  });
+
+  app.post("/api/eligibility/check", async (req, res) => {
+    try {
+      const parsed = eligibilityRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.errors });
+      }
+
+      const data = parsed.data;
+      
+      // Import the DentalXchange service
+      const { dentalXchangeService, CommonDentalPayers } = await import("./services/dentalxchange");
+      
+      // Check if credentials are configured
+      const username = process.env.DENTALXCHANGE_USERNAME;
+      const password = process.env.DENTALXCHANGE_PASSWORD;
+      const apiKey = process.env.DENTALXCHANGE_API_KEY;
+
+      if (!username || !password) {
+        // Return simulated response for testing when credentials not configured
+        const simulatedVerification = await storage.createEligibilityVerification({
+          patientId: data.patientId || null,
+          policyId: data.policyId || null,
+          practiceId: data.practiceId || null,
+          locationId: data.locationId || null,
+          payerIdCode: data.payer.payerIdCode,
+          payerName: data.payer.name,
+          providerNpi: data.provider.npi,
+          providerName: data.provider.type === "1" 
+            ? `${data.provider.firstName} ${data.provider.lastName}`
+            : data.provider.organizationName || '',
+          subscriberMemberId: data.subscriber?.memberId || data.patient.memberId,
+          subscriberFirstName: data.subscriber?.firstName || data.patient.firstName,
+          subscriberLastName: data.subscriber?.lastName || data.patient.lastName,
+          subscriberDob: data.subscriber?.dateOfBirth || data.patient.dateOfBirth,
+          patientFirstName: data.patient.firstName,
+          patientLastName: data.patient.lastName,
+          patientDob: data.patient.dateOfBirth,
+          patientRelationship: data.patient.relationship,
+          coverageStatus: "simulated",
+          groupNumber: data.groupNumber || null,
+          groupName: null,
+          effectiveDateFrom: null,
+          effectiveDateTo: null,
+          planCoverageDescription: "Simulated response - DentalXchange credentials not configured",
+          insuranceType: null,
+          transactionId: `SIM-${Date.now()}`,
+          responseCode: 0,
+          responseDescription: "Simulated - Configure DENTALXCHANGE_USERNAME and DENTALXCHANGE_PASSWORD",
+          responseMessages: ["This is a simulated response. Configure DentalXchange credentials to get real eligibility data."],
+          rawResponse: null,
+          status: "completed",
+          errorMessage: null,
+        });
+
+        // Add simulated benefits
+        const simulatedBenefits = [
+          { verificationId: simulatedVerification.id, benefitType: "coInsurance", serviceType: "Preventive", network: "In-Network", percent: "0", message: "Simulated: 100% covered" },
+          { verificationId: simulatedVerification.id, benefitType: "coInsurance", serviceType: "Basic", network: "In-Network", percent: "20", message: "Simulated: 80% covered" },
+          { verificationId: simulatedVerification.id, benefitType: "coInsurance", serviceType: "Major", network: "In-Network", percent: "50", message: "Simulated: 50% covered" },
+          { verificationId: simulatedVerification.id, benefitType: "deductible", serviceType: "Individual", network: "In-Network", amount: "50.00", remaining: "50.00" },
+          { verificationId: simulatedVerification.id, benefitType: "maximum", serviceType: "Annual", network: "In-Network", amount: "1500.00", remaining: "1500.00" },
+        ];
+
+        await storage.createEligibilityBenefits(simulatedBenefits as any);
+
+        return res.json({
+          success: true,
+          simulated: true,
+          message: "DentalXchange credentials not configured. Returning simulated response.",
+          verification: simulatedVerification,
+        });
+      }
+
+      // Configure service with credentials
+      dentalXchangeService.setCredentials({ username, password, apiKey });
+
+      try {
+        // Make real API call
+        const eligibilityRequest = {
+          provider: data.provider,
+          payer: data.payer,
+          patient: data.patient,
+          subscriber: data.subscriber,
+          groupNumber: data.groupNumber,
+          procedureCode: data.procedureCode,
+          category: data.category,
+        };
+
+        const response = await dentalXchangeService.checkEligibility(eligibilityRequest);
+
+        // Determine coverage status
+        const isActive = response.response.activeCoverage && response.response.activeCoverage.length > 0;
+        
+        // Store the verification
+        const verification = await storage.createEligibilityVerification({
+          patientId: data.patientId || null,
+          policyId: data.policyId || null,
+          practiceId: data.practiceId || null,
+          locationId: data.locationId || null,
+          payerIdCode: data.payer.payerIdCode,
+          payerName: response.response.payer?.name || data.payer.name,
+          providerNpi: data.provider.npi,
+          providerName: data.provider.type === "1"
+            ? `${data.provider.firstName} ${data.provider.lastName}`
+            : data.provider.organizationName || '',
+          subscriberMemberId: response.response.subscriber?.plan?.subscriberId || data.patient.memberId,
+          subscriberFirstName: response.response.subscriber?.firstName,
+          subscriberLastName: response.response.subscriber?.lastName,
+          subscriberDob: response.response.subscriber?.dateOfBirth,
+          patientFirstName: response.response.patient?.firstName,
+          patientLastName: response.response.patient?.lastName,
+          patientDob: response.response.patient?.dateOfBirth,
+          patientRelationship: response.response.patient?.relationship,
+          coverageStatus: isActive ? "active" : "inactive",
+          groupNumber: response.response.patient?.plan?.groupNumber || data.groupNumber || null,
+          groupName: response.response.patient?.plan?.groupName || null,
+          effectiveDateFrom: response.response.patient?.plan?.effectiveDateFrom || null,
+          effectiveDateTo: response.response.patient?.plan?.effectiveDateTo || null,
+          planCoverageDescription: response.response.activeCoverage?.[0]?.planCoverageDescription || null,
+          insuranceType: response.response.activeCoverage?.[0]?.insuranceType || null,
+          transactionId: response.transactionId?.toString() || null,
+          responseCode: response.status.code,
+          responseDescription: response.status.description,
+          responseMessages: response.messages || [],
+          rawResponse: JSON.stringify(response),
+          status: "completed",
+          errorMessage: null,
+        });
+
+        // Store benefits breakdown
+        const benefitsToStore: any[] = [];
+
+        // Store co-insurance
+        if (response.response.coInsurance) {
+          for (const coIns of response.response.coInsurance) {
+            benefitsToStore.push({
+              verificationId: verification.id,
+              benefitType: "coInsurance",
+              serviceType: coIns.serviceType || null,
+              procedureCode: coIns.code || null,
+              network: coIns.network,
+              coverageLevel: coIns.coverageLevel || null,
+              percent: coIns.percent,
+              authorizationRequired: coIns.authorizationRequired === "Yes",
+              message: coIns.message || null,
+            });
+          }
+        }
+
+        // Store deductibles
+        if (response.response.deductibles) {
+          for (const ded of response.response.deductibles) {
+            benefitsToStore.push({
+              verificationId: verification.id,
+              benefitType: "deductible",
+              serviceType: ded.serviceType,
+              network: ded.network,
+              coverageLevel: ded.coverageLevel,
+              amount: ded.amount,
+              remaining: ded.remaining,
+              timePeriod: ded.timePeriod || null,
+            });
+          }
+        }
+
+        // Store maximums
+        if (response.response.maximums) {
+          for (const max of response.response.maximums) {
+            benefitsToStore.push({
+              verificationId: verification.id,
+              benefitType: "maximum",
+              serviceType: max.serviceType,
+              network: max.network,
+              coverageLevel: max.coverageLevel,
+              amount: max.amount,
+              remaining: max.remaining,
+              timePeriod: max.timePeriod || null,
+            });
+          }
+        }
+
+        // Store limitations
+        if (response.response.limitations) {
+          for (const lim of response.response.limitations) {
+            benefitsToStore.push({
+              verificationId: verification.id,
+              benefitType: "limitation",
+              serviceType: lim.serviceType || null,
+              procedureCode: lim.code || null,
+              network: "Both",
+              quantity: lim.quantity,
+              quantityQualifier: lim.quantityQualifier,
+              timePeriod: lim.timePeriod || null,
+              message: lim.message || null,
+            });
+          }
+        }
+
+        if (benefitsToStore.length > 0) {
+          await storage.createEligibilityBenefits(benefitsToStore);
+        }
+
+        res.json({
+          success: true,
+          simulated: false,
+          verification,
+          benefits: benefitsToStore,
+        });
+      } catch (apiError: any) {
+        // Store failed verification
+        const failedVerification = await storage.createEligibilityVerification({
+          patientId: data.patientId || null,
+          policyId: data.policyId || null,
+          practiceId: data.practiceId || null,
+          locationId: data.locationId || null,
+          payerIdCode: data.payer.payerIdCode,
+          payerName: data.payer.name,
+          providerNpi: data.provider.npi,
+          providerName: data.provider.type === "1"
+            ? `${data.provider.firstName} ${data.provider.lastName}`
+            : data.provider.organizationName || '',
+          subscriberMemberId: data.patient.memberId,
+          subscriberFirstName: data.patient.firstName,
+          subscriberLastName: data.patient.lastName,
+          patientFirstName: data.patient.firstName,
+          patientLastName: data.patient.lastName,
+          patientDob: data.patient.dateOfBirth,
+          patientRelationship: data.patient.relationship,
+          coverageStatus: "unknown",
+          status: "error",
+          errorMessage: apiError.message || "API call failed",
+        });
+
+        res.status(500).json({
+          success: false,
+          error: apiError.message,
+          verification: failedVerification,
+        });
+      }
+    } catch (error) {
+      console.error("Error checking eligibility:", error);
+      res.status(500).json({ error: "Failed to check eligibility" });
+    }
+  });
+
+  // Get eligibility verification by ID
+  app.get("/api/eligibility/verifications/:id", async (req, res) => {
+    try {
+      const result = await storage.getEligibilityVerificationWithBenefits(req.params.id);
+      if (!result) {
+        return res.status(404).json({ error: "Verification not found" });
+      }
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching verification:", error);
+      res.status(500).json({ error: "Failed to fetch verification" });
+    }
+  });
+
+  // Get eligibility history for a patient
+  app.get("/api/patients/:id/eligibility", async (req, res) => {
+    try {
+      const verifications = await storage.getPatientEligibilityVerifications(req.params.id);
+      res.json(verifications);
+    } catch (error) {
+      console.error("Error fetching patient eligibility:", error);
+      res.status(500).json({ error: "Failed to fetch eligibility history" });
+    }
+  });
+
+  // Get eligibility history for a policy
+  app.get("/api/policies/:id/eligibility", async (req, res) => {
+    try {
+      const verifications = await storage.getPolicyEligibilityVerifications(req.params.id);
+      res.json(verifications);
+    } catch (error) {
+      console.error("Error fetching policy eligibility:", error);
+      res.status(500).json({ error: "Failed to fetch eligibility history" });
+    }
+  });
+
+  // Get recent eligibility verifications
+  app.get("/api/eligibility/verifications", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const verifications = await storage.getRecentEligibilityVerifications(limit);
+      res.json(verifications);
+    } catch (error) {
+      console.error("Error fetching verifications:", error);
+      res.status(500).json({ error: "Failed to fetch verifications" });
+    }
+  });
+
+  // Get supported payers
+  app.get("/api/eligibility/payers", async (req, res) => {
+    try {
+      // First check database
+      const dbPayers = await storage.getDentalxchangePayers();
+      
+      if (dbPayers.length > 0) {
+        return res.json(dbPayers);
+      }
+
+      // Return common payers from service if none in DB
+      const { CommonDentalPayers } = await import("./services/dentalxchange");
+      res.json(CommonDentalPayers.map(p => ({
+        payerIdCode: p.payerIdCode,
+        name: p.name,
+        eligibilitySupported: true,
+        claimsSupported: true,
+        isActive: true,
+      })));
+    } catch (error) {
+      console.error("Error fetching payers:", error);
+      res.status(500).json({ error: "Failed to fetch payers" });
+    }
+  });
+
+  // Sync payers to database
+  app.post("/api/eligibility/payers/sync", async (req, res) => {
+    try {
+      const { CommonDentalPayers } = await import("./services/dentalxchange");
+      
+      for (const payer of CommonDentalPayers) {
+        await storage.upsertDentalxchangePayer({
+          payerIdCode: payer.payerIdCode,
+          name: payer.name,
+          eligibilitySupported: true,
+          claimsSupported: true,
+          isActive: true,
+        });
+      }
+
+      const payers = await storage.getDentalxchangePayers();
+      res.json({ success: true, count: payers.length, payers });
+    } catch (error) {
+      console.error("Error syncing payers:", error);
+      res.status(500).json({ error: "Failed to sync payers" });
+    }
+  });
+
+  // Get service type codes reference
+  app.get("/api/eligibility/service-types", async (_req, res) => {
+    const { ServiceTypeCodes } = await import("./services/dentalxchange");
+    res.json(ServiceTypeCodes);
+  });
+
+  // Get relationship codes reference
+  app.get("/api/eligibility/relationship-codes", async (_req, res) => {
+    const { RelationshipCodes } = await import("./services/dentalxchange");
+    res.json(RelationshipCodes);
+  });
+
   return httpServer;
 }
