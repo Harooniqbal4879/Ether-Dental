@@ -1502,7 +1502,7 @@ function MyPreferencesView({ professionalId }: { professionalId: string }) {
   );
 }
 
-function MyCredentialsView({ professionalId }: { professionalId: string }) {
+function MyCredentialsView({ professionalId, canEdit = true }: { professionalId: string; canEdit?: boolean }) {
   const { toast } = useToast();
   const [activeCredentialTab, setActiveCredentialTab] = useState("certifications");
 
@@ -1874,12 +1874,47 @@ function ProfessionalCard({ professional }: { professional: ProfessionalWithBadg
 }
 
 function ProfessionalDetail({ professional }: { professional: ProfessionalWithBadges }) {
+  const [activeTab, setActiveTab] = useState("profile");
+
   return (
-    <ProfessionalProfileDisplay
-      professional={professional}
-      canEdit={false}
-      showBackButton={true}
-    />
+    <div className="space-y-6">
+      <div className="flex items-center gap-4 mb-6">
+        <Button variant="ghost" size="sm" asChild>
+          <Link href="/professionals" data-testid="button-back-to-professionals">
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Back to Professionals
+          </Link>
+        </Button>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <TabsTrigger value="profile" data-testid="admin-tab-profile">
+            <Users className="h-4 w-4 mr-2" />
+            Profile
+          </TabsTrigger>
+          <TabsTrigger value="credentials" data-testid="admin-tab-credentials">
+            <Award className="h-4 w-4 mr-2" />
+            Credentials
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="profile" className="mt-6">
+          <ProfessionalProfileDisplay
+            professional={professional}
+            canEdit={false}
+            showBackButton={false}
+          />
+        </TabsContent>
+
+        <TabsContent value="credentials" className="mt-6">
+          <MyCredentialsView
+            professionalId={professional.id}
+            canEdit={false}
+          />
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 }
 
