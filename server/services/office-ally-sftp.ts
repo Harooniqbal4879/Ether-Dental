@@ -127,9 +127,29 @@ export class OfficeAllySftpService {
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      
+      // Provide more helpful error messages based on common issues
+      let helpfulMessage = `Failed to connect to Office Ally SFTP: ${errorMessage}`;
+      
+      if (errorMessage.includes("PROTOCOL_ERROR") || errorMessage.includes("handshake")) {
+        helpfulMessage = `Connection failed with protocol error. Common causes:
+1. The host address may be incorrect - Office Ally uses servers like ftp10.officeally.com, ftp11.officeally.com, etc.
+2. SFTP credentials are DIFFERENT from your web portal login - you need to request SFTP access by emailing support@officeally.com
+3. Your SFTP account may not be activated yet (typically takes 24-48 hours after requesting)
+Current host: ${this.config.host}, Port: ${this.config.port}`;
+      } else if (errorMessage.includes("ENOTFOUND") || errorMessage.includes("getaddrinfo")) {
+        helpfulMessage = `Host not found: ${this.config.host}. Please verify the SFTP server address is correct (e.g., ftp10.officeally.com)`;
+      } else if (errorMessage.includes("ECONNREFUSED")) {
+        helpfulMessage = `Connection refused on port ${this.config.port}. Office Ally SFTP typically uses port 22.`;
+      } else if (errorMessage.includes("Authentication") || errorMessage.includes("permission denied")) {
+        helpfulMessage = `Authentication failed. Note: SFTP credentials are different from your Office Ally web portal login. Contact support@officeally.com to obtain your SFTP credentials.`;
+      } else if (errorMessage.includes("ETIMEDOUT") || errorMessage.includes("timeout")) {
+        helpfulMessage = `Connection timed out. The server may be unreachable or there may be a firewall issue.`;
+      }
+      
       return {
         success: false,
-        message: `Failed to connect to Office Ally SFTP: ${errorMessage}`,
+        message: helpfulMessage,
       };
     } finally {
       try {
