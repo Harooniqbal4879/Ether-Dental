@@ -135,11 +135,16 @@ export class OfficeAllySftpService {
       let helpfulMessage = `Failed to connect to Office Ally SFTP: ${errorMessage}`;
       
       if (errorMessage.includes("PROTOCOL_ERROR") || errorMessage.includes("handshake")) {
-        helpfulMessage = `Connection failed with protocol error. Common causes:
-1. The host address may be incorrect - Office Ally uses servers like ftp10.officeally.com, ftp11.officeally.com, etc.
-2. SFTP credentials are DIFFERENT from your web portal login - you need to request SFTP access by emailing support@officeally.com
-3. Your SFTP account may not be activated yet (typically takes 24-48 hours after requesting)
-Current host: ${this.config.host}, Port: ${this.config.port}`;
+        helpfulMessage = `Authentication failed - the server rejected the password. This typically means:
+1. The SFTP password is incorrect - double-check for typos or extra spaces
+2. Your SFTP account may not be activated yet (takes 24-48 hours after requesting)
+3. The account may be locked due to too many failed login attempts
+4. SFTP credentials are DIFFERENT from your Office Ally web portal login
+
+Important: Office Ally sends the password in a SEPARATE email from the username. Make sure you're using the SFTP password, not your web login password.
+
+Contact support@officeally.com if you need to reset or verify your SFTP credentials.
+Current host: ${this.config.host}, Port: ${this.config.port}, Username: ${this.config.username}`;
       } else if (errorMessage.includes("ENOTFOUND") || errorMessage.includes("getaddrinfo")) {
         helpfulMessage = `Host not found: ${this.config.host}. Please verify the SFTP server address is correct (e.g., ftp10.officeally.com)`;
       } else if (errorMessage.includes("ECONNREFUSED")) {
