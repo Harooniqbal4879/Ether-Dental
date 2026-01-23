@@ -23,6 +23,7 @@ import ProfessionalsHub from "@/pages/professionals-hub";
 import PlatformSettings from "@/pages/platform-settings";
 import PracticeManagement from "@/pages/practice-management";
 import RegisterPractice from "@/pages/register-practice";
+import Eligibility from "@/pages/eligibility";
 import NotFound from "@/pages/not-found";
 
 function MainRouter() {
@@ -48,6 +49,7 @@ function MainRouter() {
       <Route path="/professionals/:id" component={ProfessionalsHub} />
       <Route path="/platform-settings" component={PlatformSettings} />
       <Route path="/practices" component={PracticeManagement} />
+      <Route path="/eligibility" component={Eligibility} />
       <Route component={NotFound} />
     </Switch>
   );
