@@ -919,6 +919,124 @@ export default function EligibilityPage() {
                 )}
               </CardContent>
             </Card>
+
+            {selectedVerification && verificationDetails && (
+              <Card className="mt-6" data-testid="verification-details">
+                <CardHeader>
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <CardTitle className="flex items-center gap-2">
+                      <User className="w-5 h-5" />
+                      <span data-testid="patient-name">
+                        {verificationDetails.verification.patientFirstName} {verificationDetails.verification.patientLastName}
+                      </span>
+                    </CardTitle>
+                    <div className="flex items-center gap-2">
+                      <span data-testid="coverage-status">
+                        {getCoverageStatusBadge(verificationDetails.verification.coverageStatus)}
+                      </span>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => setSelectedVerification(null)}
+                        data-testid="button-close-details"
+                      >
+                        Close
+                      </Button>
+                    </div>
+                  </div>
+                  <CardDescription data-testid="payer-info">
+                    {verificationDetails.verification.payerName}
+                    {verificationDetails.verification.groupNumber && (
+                      <span className="ml-2">| Group: {verificationDetails.verification.groupNumber}</span>
+                    )}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {verificationDetails.verification.planCoverageDescription && (
+                    <div className="p-3 bg-muted rounded-lg text-sm">
+                      {verificationDetails.verification.planCoverageDescription}
+                    </div>
+                  )}
+
+                  {verificationDetails.verification.effectiveDateFrom && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Calendar className="w-4 h-4 text-muted-foreground" />
+                      <span>Effective: {verificationDetails.verification.effectiveDateFrom}</span>
+                      {verificationDetails.verification.effectiveDateTo && (
+                        <span>to {verificationDetails.verification.effectiveDateTo}</span>
+                      )}
+                    </div>
+                  )}
+
+                  {verificationDetails.benefits.length > 0 && (
+                    <div className="space-y-4">
+                      <h4 className="font-medium" data-testid="benefits-breakdown-title">Benefits Breakdown</h4>
+                      
+                      {Object.entries(groupBenefitsByType(verificationDetails.benefits)).map(([type, benefits]) => (
+                        <div key={type} className="space-y-2" data-testid={`history-benefit-section-${type}`}>
+                          <h5 className="text-sm font-medium capitalize text-muted-foreground">
+                            {type === "coInsurance" ? "Co-Insurance" : type}
+                          </h5>
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Service</TableHead>
+                                <TableHead>Network</TableHead>
+                                <TableHead className="text-right">
+                                  {type === "coInsurance" ? "Patient %" : "Amount"}
+                                </TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {benefits.slice(0, 5).map((benefit, idx) => (
+                                <TableRow key={benefit.id} data-testid={`history-benefit-row-${idx}`}>
+                                  <TableCell className="font-medium">
+                                    {benefit.procedureCode || benefit.serviceType || "General"}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant={benefit.network === "In-Network" ? "default" : "outline"} className="text-xs">
+                                      {benefit.network}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    {benefit.percent ? (
+                                      <span className="flex items-center justify-end gap-1">
+                                        <Percent className="w-3 h-3" />
+                                        {benefit.percent}
+                                      </span>
+                                    ) : benefit.amount ? (
+                                      <span className="flex items-center justify-end gap-1">
+                                        <DollarSign className="w-3 h-3" />
+                                        {benefit.amount}
+                                        {benefit.remaining && (
+                                          <span className="text-muted-foreground">
+                                            (${benefit.remaining} left)
+                                          </span>
+                                        )}
+                                      </span>
+                                    ) : "-"}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {verificationDetails.verification.responseMessages && 
+                   verificationDetails.verification.responseMessages.length > 0 && (
+                    <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg text-sm">
+                      <h5 className="font-medium mb-1">Messages</h5>
+                      {verificationDetails.verification.responseMessages.map((msg, i) => (
+                        <p key={i} className="text-muted-foreground">{msg}</p>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
       </div>
