@@ -63,7 +63,7 @@ Set these environment variables to enable live API calls:
 
 ### UI Location
 - Platform Settings → Eligibility tab (System Admin only) - Configure DentalXchange credentials
-- Eligibility page (/eligibility) - Practice-level verification for Practice Admin, Front Desk, Treatment Coordinator, Billing Manager
+- Patients → Eligibility tab (/patients/eligibility) - Practice-level verification for Practice Admin, Front Desk, Treatment Coordinator, Billing Manager
 
 ### Practice-Level Eligibility Features
 - Patient selector with auto-fill of demographics from practice records

@@ -176,7 +176,7 @@ export default function EligibilityPage() {
 
   useEffect(() => {
     if (!ALLOWED_PERSONAS.includes(currentPersona)) {
-      navigate("/");
+      navigate("/patients");
     }
   }, [currentPersona, navigate]);
 

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation, useSearch } from "wouter";
 import { format, isToday, isTomorrow } from "date-fns";
-import { Plus, Users, ChevronRight, Phone, Mail, ClipboardCheck, Calendar, Clock, RefreshCw } from "lucide-react";
+import { Plus, Users, ChevronRight, Phone, Mail, ClipboardCheck, Calendar, Clock, RefreshCw, Shield } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -565,7 +565,7 @@ export default function Patients() {
       />
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-        <TabsList className="grid w-full max-w-md grid-cols-3">
+        <TabsList className="grid w-full max-w-lg grid-cols-4">
           <TabsTrigger value="patients" className="flex items-center gap-2" data-testid="tab-patients">
             <Users className="h-4 w-4" />
             Patients
@@ -577,6 +577,12 @@ export default function Patients() {
           <TabsTrigger value="appointments" className="flex items-center gap-2" data-testid="tab-appointments">
             <Calendar className="h-4 w-4" />
             Appointments
+          </TabsTrigger>
+          <TabsTrigger value="eligibility" className="flex items-center gap-2" data-testid="tab-eligibility" asChild>
+            <Link href="/patients/eligibility">
+              <Shield className="h-4 w-4" />
+              Eligibility
+            </Link>
           </TabsTrigger>
         </TabsList>
 

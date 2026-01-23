@@ -74,12 +74,6 @@ const allNavItems = [
     icon: Contact,
     personas: ["system_admin", "admin", "front_desk", "professional"],
   },
-  {
-    title: "Eligibility",
-    url: "/eligibility",
-    icon: Shield,
-    personas: ["admin", "front_desk", "treatment_coordinator", "billing_manager"],
-  },
 ];
 
 const configNavItems = [
