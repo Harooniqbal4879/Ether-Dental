@@ -62,8 +62,17 @@ Set these environment variables to enable live API calls:
 - `dentalxchange_payers` - Cache of supported payers
 
 ### UI Location
-Platform Settings → Eligibility tab (System Admin only)
+- Platform Settings → Eligibility tab (System Admin only) - Configure DentalXchange credentials
+- Eligibility page (/eligibility) - Practice-level verification for Practice Admin, Front Desk, Treatment Coordinator, Billing Manager
+
+### Practice-Level Eligibility Features
+- Patient selector with auto-fill of demographics from practice records
+- Policy selector with auto-population of insurance details and payer matching
+- Provider info auto-populated from practice settings (NPI, Tax ID, organization name)
+- Verification results stored with patient/policy links for tracking
+- Benefits breakdown display with coverage percentages, deductibles, and maximums
 
 ### Key Files
 - `server/services/dentalxchange.ts` - DentalXchange API service
-- `client/src/components/eligibility-check.tsx` - Eligibility check UI component
+- `client/src/components/eligibility-check.tsx` - Eligibility check UI component (platform settings)
+- `client/src/pages/eligibility.tsx` - Practice-level eligibility verification page
