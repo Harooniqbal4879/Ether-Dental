@@ -3051,5 +3051,85 @@ export async function registerRoutes(
     }
   });
 
+  // ========================================
+  // Shift Invitations API
+  // ========================================
+
+  // Send shift invitation messages to selected professionals
+  app.post("/api/shifts/invite", async (req, res) => {
+    try {
+      const { shiftId, professionalIds } = req.body;
+      
+      if (!shiftId || !professionalIds || !Array.isArray(professionalIds) || professionalIds.length === 0) {
+        return res.status(400).json({ error: "Shift ID and at least one professional ID are required" });
+      }
+
+      // Get shift details
+      const shift = await storage.getShift(shiftId);
+      if (!shift) {
+        return res.status(404).json({ error: "Shift not found" });
+      }
+
+      const practiceAdminId = "practice-admin-1"; // In production, get from session
+      let invitesSent = 0;
+
+      // Format shift date
+      const shiftDate = new Date(shift.date + "T00:00:00");
+      const formattedDate = shiftDate.toLocaleDateString("en-US", {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      });
+
+      // Format rate info
+      let rateInfo = "";
+      if (shift.pricingMode === "fixed" && shift.fixedHourlyRate) {
+        rateInfo = `$${parseFloat(shift.fixedHourlyRate).toFixed(2)}/hr`;
+      } else if (shift.pricingMode === "smart" && shift.minHourlyRate && shift.maxHourlyRate) {
+        rateInfo = `$${parseFloat(shift.minHourlyRate).toFixed(2)} - $${parseFloat(shift.maxHourlyRate).toFixed(2)}/hr`;
+      }
+
+      // Create invitation message
+      const invitationMessage = `You're invited to bid on a ${shift.role} shift!\n\n` +
+        `Date: ${formattedDate}\n` +
+        `Time: ${shift.arrivalTime} - ${shift.endTime}\n` +
+        (rateInfo ? `Rate: ${rateInfo}\n` : "") +
+        (shift.specialties && shift.specialties.length > 0 
+          ? `Specialties needed: ${shift.specialties.join(", ")}\n` 
+          : "") +
+        `\nPlease respond if you're interested in this opportunity!`;
+
+      // Send message to each selected professional
+      for (const professionalId of professionalIds) {
+        try {
+          // Get or create conversation with the professional
+          const conversation = await storage.getOrCreateConversation(practiceAdminId, professionalId);
+          
+          // Send the invitation message
+          await storage.createMessage({
+            conversationId: conversation.id,
+            senderId: practiceAdminId,
+            senderType: "practice_admin",
+            content: invitationMessage,
+          });
+          
+          invitesSent++;
+        } catch (error) {
+          console.error(`Error sending invitation to professional ${professionalId}:`, error);
+        }
+      }
+
+      res.json({ 
+        success: true, 
+        invitesSent,
+        message: `Sent ${invitesSent} invitation${invitesSent !== 1 ? "s" : ""}`
+      });
+    } catch (error) {
+      console.error("Error sending shift invitations:", error);
+      res.status(500).json({ error: "Failed to send shift invitations" });
+    }
+  });
+
   return httpServer;
 }

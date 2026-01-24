@@ -41,9 +41,11 @@ import {
   CheckCircle2,
   XCircle,
   Receipt,
+  Send,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { StaffShift, ShiftTransactionWithDetails, ProfessionalWithBadges } from "@shared/schema";
+import { ShiftInviteModal } from "@/components/shift-invite-modal";
 
 const STAFF_ROLES = {
   all: { label: "All Roles", category: "all" },
@@ -112,6 +114,8 @@ function ShiftDetailDialog({
   open: boolean; 
   onOpenChange: (open: boolean) => void;
 }) {
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  
   const { data: transaction, isLoading: txLoading } = useQuery<ShiftTransactionWithDetails>({
     queryKey: [`/api/shifts/${shift?.id}/transaction`],
     enabled: !!shift?.id && shift?.status === "completed",
@@ -324,7 +328,28 @@ function ShiftDetailDialog({
               </CardContent>
             </Card>
           )}
+
+          {shift.status === "open" && (
+            <div className="pt-2">
+              <Button 
+                className="w-full" 
+                onClick={() => setInviteModalOpen(true)}
+                data-testid="button-invite-to-bid"
+              >
+                <Send className="h-4 w-4 mr-2" />
+                Invite Professionals to Bid
+              </Button>
+            </div>
+          )}
         </div>
+
+        {shift.status === "open" && (
+          <ShiftInviteModal
+            shift={shift}
+            open={inviteModalOpen}
+            onOpenChange={setInviteModalOpen}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );
