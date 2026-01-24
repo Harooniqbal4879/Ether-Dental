@@ -2938,5 +2938,118 @@ export async function registerRoutes(
     }
   });
 
+  // ========================================
+  // Messaging Center API
+  // ========================================
+
+  // Get all conversations for practice admin
+  app.get("/api/messaging/conversations", async (req, res) => {
+    try {
+      // For now, use a fixed practice admin ID (in production, use session)
+      const practiceAdminId = "practice-admin-1";
+      const conversations = await storage.getConversations(practiceAdminId);
+      res.json(conversations);
+    } catch (error) {
+      console.error("Error fetching conversations:", error);
+      res.status(500).json({ error: "Failed to fetch conversations" });
+    }
+  });
+
+  // Get or create a conversation with a professional
+  app.post("/api/messaging/conversations", async (req, res) => {
+    try {
+      const { professionalId } = req.body;
+      if (!professionalId) {
+        return res.status(400).json({ error: "Professional ID is required" });
+      }
+      const practiceAdminId = "practice-admin-1";
+      const conversation = await storage.getOrCreateConversation(practiceAdminId, professionalId);
+      res.json(conversation);
+    } catch (error) {
+      console.error("Error creating conversation:", error);
+      res.status(500).json({ error: "Failed to create conversation" });
+    }
+  });
+
+  // Get messages for a conversation
+  app.get("/api/messaging/conversations/:id/messages", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const messages = await storage.getMessages(id, limit);
+      res.json(messages);
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+      res.status(500).json({ error: "Failed to fetch messages" });
+    }
+  });
+
+  // Send a message
+  app.post("/api/messaging/conversations/:id/messages", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { content, senderType } = req.body;
+      
+      if (!content) {
+        return res.status(400).json({ error: "Message content is required" });
+      }
+
+      const senderId = senderType === "professional" 
+        ? req.body.senderId 
+        : "practice-admin-1";
+
+      const message = await storage.createMessage({
+        conversationId: id,
+        senderId,
+        senderType: senderType || "practice_admin",
+        content,
+      });
+      
+      res.json(message);
+    } catch (error) {
+      console.error("Error sending message:", error);
+      res.status(500).json({ error: "Failed to send message" });
+    }
+  });
+
+  // Mark messages as read
+  app.post("/api/messaging/conversations/:id/read", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const userId = "practice-admin-1"; // In production, get from session
+      await storage.markMessagesAsRead(id, userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error marking messages as read:", error);
+      res.status(500).json({ error: "Failed to mark messages as read" });
+    }
+  });
+
+  // Get all hygienists with online status
+  app.get("/api/messaging/hygienists", async (req, res) => {
+    try {
+      const hygienists = await storage.getOnlineHygienists();
+      res.json(hygienists);
+    } catch (error) {
+      console.error("Error fetching hygienists:", error);
+      res.status(500).json({ error: "Failed to fetch hygienists" });
+    }
+  });
+
+  // Update user online status (heartbeat)
+  app.post("/api/messaging/status", async (req, res) => {
+    try {
+      const { userId, userType, isOnline } = req.body;
+      if (!userId || !userType) {
+        return res.status(400).json({ error: "User ID and type are required" });
+      }
+      const status = await storage.updateUserOnlineStatus(userId, userType, isOnline ?? true);
+      res.json(status);
+    } catch (error) {
+      console.error("Error updating online status:", error);
+      res.status(500).json({ error: "Failed to update online status" });
+    }
+  });
+
   return httpServer;
 }
