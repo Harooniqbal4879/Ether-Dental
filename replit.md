@@ -145,3 +145,28 @@ Real-time messaging system for Practice Admins to communicate with hygienists.
 - `server/routes.ts` - Messaging API endpoints (search for "Messaging Center API")
 - `server/storage.ts` - Database operations for messaging
 - `shared/schema.ts` - Database schema for conversations, messages, userOnlineStatus
+
+## Shift Invitation System (January 2026)
+Practice Admins can invite professionals to bid on open shifts through the messaging system.
+
+### Features
+- "Invite Professionals to Bid" button appears on open shifts in the staffing page
+- Modal displays all professionals matching the shift role
+- Select individual professionals or use "Select All"
+- Sends formatted invitation messages with shift details (date, time, rate, specialties)
+- Invitations appear as messages in the Messaging Center
+
+### UI Location
+- Staffing Page → Click on an open shift → "Invite Professionals to Bid" button
+- Invitations appear in Messaging Center (/messaging)
+
+### API Endpoints
+- `POST /api/shifts/invite` - Send invitation messages to selected professionals
+  - Request: `{ shiftId: string, professionalIds: string[] }`
+  - Response: `{ success: true, invitesSent: number, message: string }`
+  - Validates shift exists and is open
+  - Verifies each professional exists before sending
+
+### Key Files
+- `client/src/components/shift-invite-modal.tsx` - Modal for selecting professionals to invite
+- `client/src/pages/staffing.tsx` - Staffing page with invite button in shift detail dialog
