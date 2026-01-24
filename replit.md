@@ -111,3 +111,37 @@ Set environment variables for live medical eligibility:
 - `AVAILITY_CLIENT_ID` - OAuth client ID
 - `AVAILITY_CLIENT_SECRET` - OAuth client secret
 - `AVAILITY_ENVIRONMENT` - sandbox or production
+
+## Messaging Center (January 2026)
+Real-time messaging system for Practice Admins to communicate with hygienists.
+
+### Features
+- Practice Admins can view all hygienists with online/offline status indicators
+- Start new conversations with any hygienist
+- Real-time message history with polling updates (5s for conversations, 3s for messages)
+- Green dot = online, grey dot = offline status
+- Message bubbles styled differently for sent (right, primary color) vs received (left, muted)
+
+### UI Location
+- Sidebar Navigation → Messaging (Practice Admin persona only)
+- Route: `/messaging`
+
+### API Endpoints
+- `GET /api/messaging/conversations` - List conversations for practice admin
+- `POST /api/messaging/conversations` - Create/get conversation with a professional
+- `GET /api/messaging/conversations/:id/messages` - Get messages for a conversation
+- `POST /api/messaging/conversations/:id/messages` - Send a message
+- `POST /api/messaging/conversations/:id/read` - Mark messages as read
+- `GET /api/messaging/hygienists` - Get all hygienists with online status
+- `POST /api/messaging/status` - Update user online status (heartbeat)
+
+### Database Tables
+- `conversations` - Stores conversation records between practice admins and professionals
+- `messages` - Stores individual messages within conversations
+- `user_online_status` - Tracks online/offline status for users
+
+### Key Files
+- `client/src/pages/messaging.tsx` - Messaging center UI
+- `server/routes.ts` - Messaging API endpoints (search for "Messaging Center API")
+- `server/storage.ts` - Database operations for messaging
+- `shared/schema.ts` - Database schema for conversations, messages, userOnlineStatus
