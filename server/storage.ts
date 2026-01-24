@@ -109,6 +109,7 @@ import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
 export interface IStorage {
   // Insurance Carriers
   getCarriers(): Promise<InsuranceCarrier[]>;
+  getCarriersByType(type: "dental" | "medical"): Promise<InsuranceCarrier[]>;
   getCarrier(id: string): Promise<InsuranceCarrier | undefined>;
   createCarrier(carrier: InsertInsuranceCarrier): Promise<InsuranceCarrier>;
 
@@ -310,6 +311,12 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(insuranceCarriers).orderBy(insuranceCarriers.name);
   }
 
+  async getCarriersByType(type: "dental" | "medical"): Promise<InsuranceCarrier[]> {
+    return db.select().from(insuranceCarriers)
+      .where(eq(insuranceCarriers.insuranceType, type))
+      .orderBy(insuranceCarriers.name);
+  }
+
   async getCarrier(id: string): Promise<InsuranceCarrier | undefined> {
     const [carrier] = await db.select().from(insuranceCarriers).where(eq(insuranceCarriers.id, id));
     return carrier;
@@ -340,11 +347,34 @@ export class DatabaseStorage implements IStorage {
         const benefit = await this.getBenefitForVerification(patientVerifications[0].id);
         latestVerification = { ...patientVerifications[0], benefits: benefit };
       }
+
+      // Get latest verification per insurance type
+      const dentalVerifications = await db
+        .select()
+        .from(verifications)
+        .where(and(
+          eq(verifications.patientId, patient.id),
+          eq(verifications.insuranceType, "dental")
+        ))
+        .orderBy(desc(verifications.createdAt))
+        .limit(1);
+      
+      const medicalVerifications = await db
+        .select()
+        .from(verifications)
+        .where(and(
+          eq(verifications.patientId, patient.id),
+          eq(verifications.insuranceType, "medical")
+        ))
+        .orderBy(desc(verifications.createdAt))
+        .limit(1);
       
       result.push({
         ...patient,
         insurancePolicies: policies,
         latestVerification,
+        latestDentalVerification: dentalVerifications[0],
+        latestMedicalVerification: medicalVerifications[0],
       });
     }
     
@@ -368,11 +398,34 @@ export class DatabaseStorage implements IStorage {
       const benefit = await this.getBenefitForVerification(patientVerifications[0].id);
       latestVerification = { ...patientVerifications[0], benefits: benefit };
     }
+
+    // Get latest verification per insurance type
+    const dentalVerifications = await db
+      .select()
+      .from(verifications)
+      .where(and(
+        eq(verifications.patientId, patient.id),
+        eq(verifications.insuranceType, "dental")
+      ))
+      .orderBy(desc(verifications.createdAt))
+      .limit(1);
+    
+    const medicalVerifications = await db
+      .select()
+      .from(verifications)
+      .where(and(
+        eq(verifications.patientId, patient.id),
+        eq(verifications.insuranceType, "medical")
+      ))
+      .orderBy(desc(verifications.createdAt))
+      .limit(1);
     
     return {
       ...patient,
       insurancePolicies: policies,
       latestVerification,
+      latestDentalVerification: dentalVerifications[0],
+      latestMedicalVerification: medicalVerifications[0],
     };
   }
 

@@ -7,10 +7,12 @@ import { z } from "zod";
 export const insuranceCarriers = pgTable("insurance_carriers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
+  insuranceType: text("insurance_type").notNull().default("dental"), // dental, medical
   phone: text("phone"),
   website: text("website"),
   logoUrl: text("logo_url"),
   clearinghouseCompatible: boolean("clearinghouse_compatible").default(false),
+  payerId: text("payer_id"), // Clearinghouse payer ID (DentalXchange for dental, Availity for medical)
 });
 
 export const insertInsuranceCarrierSchema = createInsertSchema(insuranceCarriers).omit({ id: true });
@@ -105,13 +107,46 @@ export const verifications = pgTable("verifications", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   patientId: varchar("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
   policyId: varchar("policy_id").notNull().references(() => insurancePolicies.id, { onDelete: "cascade" }),
+  insuranceType: text("insurance_type").notNull().default("dental"), // dental, medical
   status: text("status").notNull().default("pending"), // pending, in_progress, completed, failed
-  method: text("method"), // clearinghouse, phone, manual
+  method: text("method"), // clearinghouse, phone, manual, automated
+  trigger: text("trigger"), // manual, scheduled, new_patient, new_appointment, policy_change
   verifiedAt: timestamp("verified_at"),
-  verifiedBy: text("verified_by"), // user id or "System - AI"
+  verifiedBy: text("verified_by"), // user id or "System - Automated"
   notes: text("notes"),
+  expiresAt: timestamp("expires_at"), // When this verification should be refreshed
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+// Verification Queue (for automated background verification)
+export const verificationQueue = pgTable("verification_queue", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  patientId: varchar("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
+  policyId: varchar("policy_id").notNull().references(() => insurancePolicies.id, { onDelete: "cascade" }),
+  priority: integer("priority").notNull().default(5), // 1=highest, 10=lowest
+  trigger: text("trigger").notNull(), // scheduled, new_patient, new_appointment, policy_change
+  scheduledFor: timestamp("scheduled_for").notNull(),
+  status: text("status").notNull().default("pending"), // pending, processing, completed, failed
+  attempts: integer("attempts").notNull().default(0),
+  lastAttempt: timestamp("last_attempt"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const verificationQueueRelations = relations(verificationQueue, ({ one }) => ({
+  patient: one(patients, {
+    fields: [verificationQueue.patientId],
+    references: [patients.id],
+  }),
+  policy: one(insurancePolicies, {
+    fields: [verificationQueue.policyId],
+    references: [insurancePolicies.id],
+  }),
+}));
+
+export const insertVerificationQueueSchema = createInsertSchema(verificationQueue).omit({ id: true, createdAt: true });
+export type InsertVerificationQueue = z.infer<typeof insertVerificationQueueSchema>;
+export type VerificationQueue = typeof verificationQueue.$inferSelect;
 
 export const verificationsRelations = relations(verifications, ({ one, many }) => ({
   patient: one(patients, {
@@ -172,6 +207,8 @@ export type Benefit = typeof benefits.$inferSelect;
 export type PatientWithInsurance = Patient & {
   insurancePolicies: (InsurancePolicy & { carrier: InsuranceCarrier })[];
   latestVerification?: Verification & { benefits?: Benefit };
+  latestDentalVerification?: Verification;
+  latestMedicalVerification?: Verification;
 };
 
 export type VerificationWithDetails = Verification & {

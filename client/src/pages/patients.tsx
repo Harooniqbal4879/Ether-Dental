@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation, useSearch } from "wouter";
 import { format, isToday, isTomorrow } from "date-fns";
-import { Plus, Users, ChevronRight, Phone, Mail, ClipboardCheck, Calendar, Clock, RefreshCw, Shield } from "lucide-react";
+import { Plus, Users, ChevronRight, Phone, Mail, Calendar, Clock, RefreshCw, Shield } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -22,10 +22,8 @@ import { VerificationStatusBadge } from "@/components/verification-status-badge"
 import { PatientCardSkeleton, TableRowSkeleton } from "@/components/loading-skeleton";
 import { EmptyState } from "@/components/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { PatientWithInsurance, VerificationWithDetails, Appointment, Patient, Verification } from "@shared/schema";
+import type { PatientWithInsurance, Appointment, Patient, Verification } from "@shared/schema";
 import { EligibilityTabContent } from "./eligibility";
-
-type StatusFilter = "all" | "completed" | "pending" | "in_progress" | "failed";
 
 type AppointmentWithDetails = Appointment & {
   patient: Patient & { latestVerification?: Verification };
@@ -58,9 +56,22 @@ function PatientsTab() {
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
   };
 
-  const getVerificationStatus = (patient: PatientWithInsurance) => {
-    if (!patient.latestVerification) return "pending";
-    return patient.latestVerification.status as "completed" | "pending" | "in_progress" | "failed";
+  const getVerificationStatus = (patient: PatientWithInsurance, insuranceType: "dental" | "medical" = "dental") => {
+    // Use per-insurance-type verification fields if available
+    const verification = insuranceType === "dental" 
+      ? patient.latestDentalVerification 
+      : patient.latestMedicalVerification;
+    
+    if (verification) {
+      return verification.status as "completed" | "pending" | "in_progress" | "failed";
+    }
+    
+    // Fall back to legacy latestVerification for dental
+    if (insuranceType === "dental" && patient.latestVerification) {
+      return patient.latestVerification.status as "completed" | "pending" | "in_progress" | "failed";
+    }
+    
+    return "pending";
   };
 
   return (
@@ -115,13 +126,39 @@ function PatientsTab() {
                   </div>
 
                   <div className="mt-4 space-y-2">
-                    {patient.insurancePolicies?.[0] && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">
-                          {patient.insurancePolicies[0].carrier.name}
-                        </span>
+                    {/* Show dental insurance if present */}
+                    {patient.insurancePolicies?.filter(p => 
+                      p.carrier.insuranceType === "dental" || !p.carrier.insuranceType
+                    )[0] && (
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <Badge variant="outline" className="shrink-0 text-xs px-1.5">D</Badge>
+                          <span className="text-sm text-muted-foreground truncate">
+                            {patient.insurancePolicies.filter(p => 
+                              p.carrier.insuranceType === "dental" || !p.carrier.insuranceType
+                            )[0].carrier.name}
+                          </span>
+                        </div>
                         <VerificationStatusBadge
-                          status={getVerificationStatus(patient)}
+                          status={getVerificationStatus(patient, "dental")}
+                        />
+                      </div>
+                    )}
+                    {/* Show medical insurance if present */}
+                    {patient.insurancePolicies?.filter(p => 
+                      p.carrier.insuranceType === "medical"
+                    )[0] && (
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <Badge variant="outline" className="shrink-0 text-xs px-1.5 border-blue-300 text-blue-600 dark:border-blue-700 dark:text-blue-400">M</Badge>
+                          <span className="text-sm text-muted-foreground truncate">
+                            {patient.insurancePolicies.filter(p => 
+                              p.carrier.insuranceType === "medical"
+                            )[0].carrier.name}
+                          </span>
+                        </div>
+                        <VerificationStatusBadge
+                          status={getVerificationStatus(patient, "medical")}
                         />
                       </div>
                     )}
@@ -167,204 +204,6 @@ function PatientsTab() {
           }
         />
       )}
-    </div>
-  );
-}
-
-function VerificationsTab() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-
-  const { data: verifications, isLoading } = useQuery<VerificationWithDetails[]>({
-    queryKey: ["/api/verifications"],
-  });
-
-  const filteredVerifications = verifications?.filter((v) => {
-    const matchesStatus = statusFilter === "all" || v.status === statusFilter;
-    const matchesSearch =
-      !searchQuery ||
-      `${v.patient.firstName} ${v.patient.lastName}`
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase()) ||
-      v.policy.carrier.name.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesStatus && matchesSearch;
-  });
-
-  const statusCounts = {
-    all: verifications?.length ?? 0,
-    completed: verifications?.filter((v) => v.status === "completed").length ?? 0,
-    pending: verifications?.filter((v) => v.status === "pending").length ?? 0,
-    in_progress: verifications?.filter((v) => v.status === "in_progress").length ?? 0,
-    failed: verifications?.filter((v) => v.status === "failed").length ?? 0,
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <Card
-          className={`cursor-pointer transition-colors hover-elevate ${statusFilter === "all" ? "border-primary" : ""}`}
-          onClick={() => setStatusFilter("all")}
-          data-testid="filter-all"
-        >
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold">{statusCounts.all}</div>
-            <div className="text-sm text-muted-foreground">All</div>
-          </CardContent>
-        </Card>
-        <Card
-          className={`cursor-pointer transition-colors hover-elevate ${statusFilter === "completed" ? "border-emerald-500" : ""}`}
-          onClick={() => setStatusFilter("completed")}
-          data-testid="filter-completed"
-        >
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-              {statusCounts.completed}
-            </div>
-            <div className="text-sm text-muted-foreground">Verified</div>
-          </CardContent>
-        </Card>
-        <Card
-          className={`cursor-pointer transition-colors hover-elevate ${statusFilter === "pending" ? "border-amber-500" : ""}`}
-          onClick={() => setStatusFilter("pending")}
-          data-testid="filter-pending"
-        >
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-              {statusCounts.pending}
-            </div>
-            <div className="text-sm text-muted-foreground">Pending</div>
-          </CardContent>
-        </Card>
-        <Card
-          className={`cursor-pointer transition-colors hover-elevate ${statusFilter === "in_progress" ? "border-blue-500" : ""}`}
-          onClick={() => setStatusFilter("in_progress")}
-          data-testid="filter-in-progress"
-        >
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-              {statusCounts.in_progress}
-            </div>
-            <div className="text-sm text-muted-foreground">In Progress</div>
-          </CardContent>
-        </Card>
-        <Card
-          className={`cursor-pointer transition-colors hover-elevate ${statusFilter === "failed" ? "border-red-500" : ""}`}
-          onClick={() => setStatusFilter("failed")}
-          data-testid="filter-failed"
-        >
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-              {statusCounts.failed}
-            </div>
-            <div className="text-sm text-muted-foreground">Failed</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <PatientSearch
-          value={searchQuery}
-          onChange={setSearchQuery}
-          placeholder="Search by patient or carrier..."
-          className="flex-1 max-w-md"
-        />
-      </div>
-
-      <Card>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Patient</TableHead>
-                  <TableHead>Insurance</TableHead>
-                  <TableHead>Method</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <TableRowSkeleton key={i} columns={6} />
-                ))}
-              </TableBody>
-            </Table>
-          ) : filteredVerifications && filteredVerifications.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Patient</TableHead>
-                  <TableHead>Insurance</TableHead>
-                  <TableHead>Method</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredVerifications.map((v) => (
-                  <TableRow
-                    key={v.id}
-                    className="cursor-pointer"
-                    data-testid={`row-verification-${v.id}`}
-                  >
-                    <TableCell>
-                      <Link
-                        href={`/patients/${v.patientId}`}
-                        className="font-medium hover:underline"
-                      >
-                        {v.patient.firstName} {v.patient.lastName}
-                      </Link>
-                      <div className="text-sm text-muted-foreground">
-                        DOB: {format(new Date(v.patient.dateOfBirth), "MM/dd/yyyy")}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-medium">{v.policy.carrier.name}</div>
-                      <div className="font-mono text-sm text-muted-foreground">
-                        {v.policy.policyNumber}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="capitalize text-muted-foreground">
-                        {v.method || "—"}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <VerificationStatusBadge
-                        status={v.status as "completed" | "pending" | "in_progress" | "failed"}
-                      />
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {v.verifiedAt
-                        ? format(new Date(v.verifiedAt), "MMM d, yyyy h:mm a")
-                        : format(new Date(v.createdAt!), "MMM d, yyyy h:mm a")}
-                    </TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="icon" asChild>
-                        <Link href={`/patients/${v.patientId}`}>
-                          <ChevronRight className="h-4 w-4" />
-                        </Link>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <EmptyState
-              icon={ClipboardCheck}
-              title={searchQuery || statusFilter !== "all" ? "No verifications found" : "No verifications yet"}
-              description={
-                searchQuery || statusFilter !== "all"
-                  ? "Try adjusting your filters"
-                  : "Verifications will appear here when you verify patient insurance."
-              }
-            />
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }
@@ -538,8 +377,10 @@ export default function Patients() {
   
   const params = new URLSearchParams(searchString);
   const tabFromUrl = params.get("tab") || "patients";
-  const activeTab = ["patients", "verifications", "appointments", "eligibility"].includes(tabFromUrl) 
-    ? tabFromUrl 
+  // Support legacy tab names for backward compatibility
+  const normalizedTab = tabFromUrl === "verifications" || tabFromUrl === "eligibility" ? "insurance" : tabFromUrl;
+  const activeTab = ["patients", "appointments", "insurance"].includes(normalizedTab) 
+    ? normalizedTab 
     : "patients";
 
   const handleTabChange = (value: string) => {
@@ -566,22 +407,18 @@ export default function Patients() {
       />
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-        <TabsList className="grid w-full max-w-lg grid-cols-4">
+        <TabsList className="grid w-full max-w-md grid-cols-3">
           <TabsTrigger value="patients" className="flex items-center gap-2" data-testid="tab-patients">
             <Users className="h-4 w-4" />
             Patients
-          </TabsTrigger>
-          <TabsTrigger value="verifications" className="flex items-center gap-2" data-testid="tab-verifications">
-            <ClipboardCheck className="h-4 w-4" />
-            Verifications
           </TabsTrigger>
           <TabsTrigger value="appointments" className="flex items-center gap-2" data-testid="tab-appointments">
             <Calendar className="h-4 w-4" />
             Appointments
           </TabsTrigger>
-          <TabsTrigger value="eligibility" className="flex items-center gap-2" data-testid="tab-eligibility">
+          <TabsTrigger value="insurance" className="flex items-center gap-2" data-testid="tab-insurance">
             <Shield className="h-4 w-4" />
-            Eligibility
+            Insurance
           </TabsTrigger>
         </TabsList>
 
@@ -589,15 +426,11 @@ export default function Patients() {
           <PatientsTab />
         </TabsContent>
 
-        <TabsContent value="verifications">
-          <VerificationsTab />
-        </TabsContent>
-
         <TabsContent value="appointments">
           <AppointmentsTab />
         </TabsContent>
 
-        <TabsContent value="eligibility">
+        <TabsContent value="insurance">
           <EligibilityTabContent />
         </TabsContent>
       </Tabs>

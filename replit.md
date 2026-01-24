@@ -73,6 +73,39 @@ Set these environment variables to enable live API calls:
 - Benefits breakdown display with coverage percentages, deductibles, and maximums
 
 ### Key Files
-- `server/services/dentalxchange.ts` - DentalXchange API service
+- `server/services/dentalxchange.ts` - DentalXchange API service (dental insurance)
+- `server/services/availity.ts` - Availity API service (medical insurance)
+- `server/services/verification-automation.ts` - Automated verification queue processor
 - `client/src/components/eligibility-check.tsx` - Eligibility check UI component (platform settings)
 - `client/src/pages/eligibility.tsx` - Practice-level eligibility verification page
+
+## Automated Verification System (January 2026)
+Dual-insurance verification supporting both dental (DentalXchange) and medical (Availity) insurance with automated background processing.
+
+### Dual Insurance Support
+- **Dental Insurance**: Verified through DentalXchange API (950+ payers)
+- **Medical Insurance**: Verified through Availity API (simulated, ready for production integration)
+- Insurance carriers now have `insuranceType` field (dental/medical)
+- Patients can have both dental and medical policies
+
+### Automated Verification Features
+- Background queue processor runs verifications automatically
+- Verification triggers: new_patient, new_appointment, policy_change, scheduled, manual
+- Priority-based queue processing (1=highest, 10=lowest)
+- Automatic re-verification scheduling (30-day expiry)
+- Real-time manual verification still available for immediate checks
+
+### API Endpoints - Automated Verification
+- `POST /api/verification/queue` - Queue verification for background processing
+- `POST /api/verification/run` - Run immediate real-time verification
+- `GET /api/verification/queue/stats` - Get queue statistics
+- `POST /api/verification/queue/process` - Trigger manual queue processing
+- `GET /api/carriers/:type` - Get carriers by type (dental/medical)
+- `GET /api/eligibility/medical-payers` - List medical insurance payers
+- `POST /api/eligibility/medical/check` - Check medical insurance eligibility
+
+### Medical Insurance Credentials (Availity)
+Set environment variables for live medical eligibility:
+- `AVAILITY_CLIENT_ID` - OAuth client ID
+- `AVAILITY_CLIENT_SECRET` - OAuth client secret
+- `AVAILITY_ENVIRONMENT` - sandbox or production

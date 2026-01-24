@@ -133,14 +133,16 @@ export async function registerRoutes(
         isPrimary: true,
       });
       
-      // Create initial verification record (pending)
-      const policies = await storage.getPoliciesForPatient(patient.id);
-      if (policies.length > 0) {
-        await storage.createVerification({
-          patientId: patient.id,
-          policyId: policies[0].id,
-          status: "pending",
-        });
+      // Queue automated verification for all patient policies
+      try {
+        const { verificationAutomationService } = await import("./services/verification-automation");
+        await verificationAutomationService.queuePatientVerifications(
+          patient.id,
+          "new_patient",
+          1 // High priority for new patients
+        );
+      } catch (err) {
+        console.error("Failed to queue verification for new patient:", err);
       }
       
       // Return patient with policies
@@ -2774,6 +2776,166 @@ export async function registerRoutes(
   app.get("/api/eligibility/relationship-codes", async (_req, res) => {
     const { RelationshipCodes } = await import("./services/dentalxchange");
     res.json(RelationshipCodes);
+  });
+
+  // ============================================
+  // Automated Verification Routes
+  // ============================================
+
+  // Validation schemas for verification queue endpoints
+  const queueVerificationSchema = z.object({
+    patientId: z.number().int().positive(),
+    policyId: z.number().int().positive().optional(),
+    trigger: z.enum(["new_patient", "new_appointment", "policy_change", "scheduled", "manual"]).default("manual"),
+    priority: z.number().int().min(1).max(10).default(5),
+  });
+
+  const runVerificationSchema = z.object({
+    patientId: z.number().int().positive(),
+    policyId: z.number().int().positive(),
+    userId: z.number().int().positive().optional(),
+  });
+
+  const processQueueSchema = z.object({
+    batchSize: z.number().int().min(1).max(50).default(10),
+  });
+
+  // Queue a verification for a patient's policies
+  app.post("/api/verification/queue", async (req, res) => {
+    try {
+      const validation = queueVerificationSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: "Invalid request", details: validation.error.flatten() });
+      }
+
+      const { verificationAutomationService } = await import("./services/verification-automation");
+      const { patientId, policyId, trigger, priority } = validation.data;
+
+      if (policyId) {
+        const queueId = await verificationAutomationService.queueVerification(
+          patientId,
+          policyId,
+          trigger,
+          priority
+        );
+        res.json({ success: true, queueId });
+      } else {
+        const queueIds = await verificationAutomationService.queuePatientVerifications(
+          patientId,
+          trigger,
+          priority
+        );
+        res.json({ success: true, queueIds });
+      }
+    } catch (error) {
+      console.error("Error queueing verification:", error);
+      res.status(500).json({ error: "Failed to queue verification" });
+    }
+  });
+
+  // Run immediate verification (manual real-time check)
+  app.post("/api/verification/run", async (req, res) => {
+    try {
+      const validation = runVerificationSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: "Invalid request", details: validation.error.flatten() });
+      }
+
+      const { verificationAutomationService } = await import("./services/verification-automation");
+      const { patientId, policyId, userId } = validation.data;
+
+      const result = await verificationAutomationService.runImmediateVerification(
+        patientId,
+        policyId,
+        userId
+      );
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error running verification:", error);
+      res.status(500).json({ error: "Failed to run verification" });
+    }
+  });
+
+  // Get verification queue stats
+  app.get("/api/verification/queue/stats", async (_req, res) => {
+    try {
+      const { verificationAutomationService } = await import("./services/verification-automation");
+      const stats = await verificationAutomationService.getQueueStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching queue stats:", error);
+      res.status(500).json({ error: "Failed to fetch queue stats" });
+    }
+  });
+
+  // Process verification queue (trigger manual processing)
+  app.post("/api/verification/queue/process", async (req, res) => {
+    try {
+      const validation = processQueueSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: "Invalid request", details: validation.error.flatten() });
+      }
+
+      const { verificationAutomationService } = await import("./services/verification-automation");
+      const { batchSize } = validation.data;
+      const processed = await verificationAutomationService.processQueue(batchSize);
+      res.json({ success: true, processed });
+    } catch (error) {
+      console.error("Error processing queue:", error);
+      res.status(500).json({ error: "Failed to process queue" });
+    }
+  });
+
+  // Get medical payers list
+  app.get("/api/eligibility/medical-payers", async (_req, res) => {
+    try {
+      const { availityService } = await import("./services/availity");
+      const payers = await availityService.getMedicalPayers();
+      res.json(payers);
+    } catch (error) {
+      console.error("Error fetching medical payers:", error);
+      res.status(500).json({ error: "Failed to fetch medical payers" });
+    }
+  });
+
+  // Sync medical payers to database
+  app.post("/api/eligibility/medical-payers/sync", async (_req, res) => {
+    try {
+      const { availityService } = await import("./services/availity");
+      const count = await availityService.syncMedicalPayersToDatabase();
+      res.json({ success: true, synced: count });
+    } catch (error) {
+      console.error("Error syncing medical payers:", error);
+      res.status(500).json({ error: "Failed to sync medical payers" });
+    }
+  });
+
+  // Check medical insurance eligibility
+  app.post("/api/eligibility/medical/check", async (req, res) => {
+    try {
+      const { availityService } = await import("./services/availity");
+      const response = await availityService.checkEligibility(req.body);
+      res.json(response);
+    } catch (error) {
+      console.error("Error checking medical eligibility:", error);
+      res.status(500).json({ error: "Failed to check medical eligibility" });
+    }
+  });
+
+  // Get carriers by type (dental or medical)
+  app.get("/api/carriers/:type", async (req, res) => {
+    try {
+      const { type } = req.params;
+      if (type !== "dental" && type !== "medical") {
+        return res.status(400).json({ error: "Invalid carrier type" });
+      }
+      const carriers = await storage.getCarriersByType(type);
+      res.json(carriers);
+    } catch (error) {
+      console.error("Error fetching carriers:", error);
+      res.status(500).json({ error: "Failed to fetch carriers" });
+    }
   });
 
   return httpServer;
