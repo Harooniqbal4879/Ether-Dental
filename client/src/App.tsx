@@ -32,7 +32,6 @@ function MainRouter() {
       <Route path="/" component={Dashboard} />
       <Route path="/patients" component={Patients} />
       <Route path="/patients/new" component={PatientForm} />
-      <Route path="/patients/eligibility" component={Eligibility} />
       <Route path="/patients/:id" component={PatientDetail} />
       <Route path="/verifications">
         <Redirect to="/patients?tab=verifications" />
@@ -51,7 +50,7 @@ function MainRouter() {
       <Route path="/platform-settings" component={PlatformSettings} />
       <Route path="/practices" component={PracticeManagement} />
       <Route path="/eligibility">
-        <Redirect to="/patients/eligibility" />
+        <Redirect to="/patients?tab=eligibility" />
       </Route>
       <Route component={NotFound} />
     </Switch>

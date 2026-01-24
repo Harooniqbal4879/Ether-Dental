@@ -165,7 +165,7 @@ interface Practice {
   taxId?: string;
 }
 
-export default function EligibilityPage() {
+export function EligibilityTabContent() {
   const { toast } = useToast();
   const { currentPersona } = usePersona();
   const { currentPracticeId } = useLocationContext();
@@ -360,23 +360,8 @@ export default function EligibilityPage() {
   };
 
   return (
-    <div className="flex flex-col h-full">
-      <header className="border-b bg-background px-6 py-4">
-        <div className="flex items-center gap-3">
-          <Shield className="h-6 w-6 text-primary" />
-          <div>
-            <h1 className="text-2xl font-semibold" data-testid="text-eligibility-title">
-              Insurance Eligibility Verification
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Verify patient insurance coverage and benefits in real-time
-            </p>
-          </div>
-        </div>
-      </header>
-
-      <div className="flex-1 overflow-auto p-6">
-        <Tabs defaultValue="check" className="w-full">
+    <div className="space-y-4">
+      <Tabs defaultValue="check" className="w-full">
           <TabsList className="grid w-full grid-cols-2 max-w-md">
             <TabsTrigger value="check" data-testid="tab-check-eligibility">
               <Search className="w-4 h-4 mr-2" />
@@ -1039,6 +1024,42 @@ export default function EligibilityPage() {
             )}
           </TabsContent>
         </Tabs>
+    </div>
+  );
+}
+
+export default function EligibilityPage() {
+  const { currentPersona } = usePersona();
+  const [, navigate] = useLocation();
+
+  useEffect(() => {
+    if (!ALLOWED_PERSONAS.includes(currentPersona)) {
+      navigate("/patients");
+    }
+  }, [currentPersona, navigate]);
+
+  if (!ALLOWED_PERSONAS.includes(currentPersona)) {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      <header className="border-b bg-background px-6 py-4">
+        <div className="flex items-center gap-3">
+          <Shield className="h-6 w-6 text-primary" />
+          <div>
+            <h1 className="text-2xl font-semibold" data-testid="text-eligibility-title">
+              Insurance Eligibility Verification
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Verify patient insurance coverage and benefits in real-time
+            </p>
+          </div>
+        </div>
+      </header>
+
+      <div className="flex-1 overflow-auto p-6">
+        <EligibilityTabContent />
       </div>
     </div>
   );

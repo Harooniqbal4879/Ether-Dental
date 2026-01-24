@@ -23,6 +23,7 @@ import { PatientCardSkeleton, TableRowSkeleton } from "@/components/loading-skel
 import { EmptyState } from "@/components/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { PatientWithInsurance, VerificationWithDetails, Appointment, Patient, Verification } from "@shared/schema";
+import { EligibilityTabContent } from "./eligibility";
 
 type StatusFilter = "all" | "completed" | "pending" | "in_progress" | "failed";
 
@@ -537,7 +538,7 @@ export default function Patients() {
   
   const params = new URLSearchParams(searchString);
   const tabFromUrl = params.get("tab") || "patients";
-  const activeTab = ["patients", "verifications", "appointments"].includes(tabFromUrl) 
+  const activeTab = ["patients", "verifications", "appointments", "eligibility"].includes(tabFromUrl) 
     ? tabFromUrl 
     : "patients";
 
@@ -578,11 +579,9 @@ export default function Patients() {
             <Calendar className="h-4 w-4" />
             Appointments
           </TabsTrigger>
-          <TabsTrigger value="eligibility" className="flex items-center gap-2" data-testid="tab-eligibility" asChild>
-            <Link href="/patients/eligibility">
-              <Shield className="h-4 w-4" />
-              Eligibility
-            </Link>
+          <TabsTrigger value="eligibility" className="flex items-center gap-2" data-testid="tab-eligibility">
+            <Shield className="h-4 w-4" />
+            Eligibility
           </TabsTrigger>
         </TabsList>
 
@@ -596,6 +595,10 @@ export default function Patients() {
 
         <TabsContent value="appointments">
           <AppointmentsTab />
+        </TabsContent>
+
+        <TabsContent value="eligibility">
+          <EligibilityTabContent />
         </TabsContent>
       </Tabs>
     </div>
