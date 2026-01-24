@@ -1314,6 +1314,76 @@ export const insertDentalxchangePayerSchema = createInsertSchema(dentalxchangePa
 export type InsertDentalxchangePayer = z.infer<typeof insertDentalxchangePayerSchema>;
 export type DentalxchangePayer = typeof dentalxchangePayers.$inferSelect;
 
+// Messaging - Conversations
+export const conversations = pgTable("conversations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  practiceAdminId: varchar("practice_admin_id").notNull(), // Practice admin user ID
+  professionalId: varchar("professional_id").notNull().references(() => professionals.id),
+  lastMessageAt: timestamp("last_message_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const conversationsRelations = relations(conversations, ({ one, many }) => ({
+  professional: one(professionals, {
+    fields: [conversations.professionalId],
+    references: [professionals.id],
+  }),
+  messages: many(messages),
+}));
+
+export const insertConversationSchema = createInsertSchema(conversations).omit({ id: true, createdAt: true, lastMessageAt: true });
+export type InsertConversation = z.infer<typeof insertConversationSchema>;
+export type Conversation = typeof conversations.$inferSelect;
+
+// Messaging - Messages
+export const messages = pgTable("messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").notNull().references(() => conversations.id, { onDelete: "cascade" }),
+  senderId: varchar("sender_id").notNull(), // Can be practice admin or professional
+  senderType: text("sender_type").notNull(), // "practice_admin" or "professional"
+  content: text("content").notNull(),
+  readAt: timestamp("read_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const messagesRelations = relations(messages, ({ one }) => ({
+  conversation: one(conversations, {
+    fields: [messages.conversationId],
+    references: [conversations.id],
+  }),
+}));
+
+export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true, readAt: true });
+export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type Message = typeof messages.$inferSelect;
+
+// User Online Status - tracks when users were last active
+export const userOnlineStatus = pgTable("user_online_status", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().unique(), // professional ID or admin identifier
+  userType: text("user_type").notNull(), // "practice_admin" or "professional"
+  lastSeenAt: timestamp("last_seen_at").defaultNow(),
+  isOnline: boolean("is_online").default(false),
+});
+
+export const insertUserOnlineStatusSchema = createInsertSchema(userOnlineStatus).omit({ id: true });
+export type InsertUserOnlineStatus = z.infer<typeof insertUserOnlineStatusSchema>;
+export type UserOnlineStatus = typeof userOnlineStatus.$inferSelect;
+
+// Conversation with related data for UI
+export type ConversationWithDetails = Conversation & {
+  professional: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    photoUrl: string | null;
+    role: string;
+  };
+  lastMessage?: Message;
+  unreadCount: number;
+  isOnline: boolean;
+};
+
 // US States for dropdown
 export const US_STATES = [
   { code: "AL", name: "Alabama" },

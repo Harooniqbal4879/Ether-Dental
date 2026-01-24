@@ -30,6 +30,9 @@ import {
   eligibilityVerifications,
   eligibilityBenefits,
   dentalxchangePayers,
+  conversations,
+  messages,
+  userOnlineStatus,
   type Patient,
   type InsertPatient,
   type InsuranceCarrier,
@@ -102,6 +105,13 @@ import {
   type InsertEligibilityBenefit,
   type DentalxchangePayer,
   type InsertDentalxchangePayer,
+  type Conversation,
+  type InsertConversation,
+  type Message,
+  type InsertMessage,
+  type UserOnlineStatus,
+  type InsertUserOnlineStatus,
+  type ConversationWithDetails,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -303,6 +313,21 @@ export interface IStorage {
   createLocation(location: InsertPracticeLocation): Promise<PracticeLocation>;
   updateLocation(id: string, data: Partial<PracticeLocation>): Promise<PracticeLocation | undefined>;
   deleteLocation(id: string): Promise<boolean>;
+
+  // Messaging - Conversations
+  getConversations(practiceAdminId: string): Promise<ConversationWithDetails[]>;
+  getConversation(id: string): Promise<Conversation | undefined>;
+  getOrCreateConversation(practiceAdminId: string, professionalId: string): Promise<Conversation>;
+  
+  // Messaging - Messages
+  getMessages(conversationId: string, limit?: number): Promise<Message[]>;
+  createMessage(message: InsertMessage): Promise<Message>;
+  markMessagesAsRead(conversationId: string, userId: string): Promise<void>;
+  
+  // User Online Status
+  updateUserOnlineStatus(userId: string, userType: string, isOnline: boolean): Promise<UserOnlineStatus>;
+  getUserOnlineStatus(userId: string): Promise<UserOnlineStatus | undefined>;
+  getOnlineHygienists(): Promise<{ id: string; firstName: string; lastName: string; photoUrl: string | null; isOnline: boolean }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2080,6 +2105,188 @@ export class DatabaseStorage implements IStorage {
     for (const payer of payers) {
       await this.upsertDentalxchangePayer(payer);
     }
+  }
+
+  // Messaging - Conversations
+  async getConversations(practiceAdminId: string): Promise<ConversationWithDetails[]> {
+    const allConversations = await db
+      .select()
+      .from(conversations)
+      .where(eq(conversations.practiceAdminId, practiceAdminId))
+      .orderBy(desc(conversations.lastMessageAt));
+
+    const result: ConversationWithDetails[] = [];
+    
+    for (const conv of allConversations) {
+      const [professional] = await db
+        .select({
+          id: professionals.id,
+          firstName: professionals.firstName,
+          lastName: professionals.lastName,
+          photoUrl: professionals.photoUrl,
+          role: professionals.role,
+        })
+        .from(professionals)
+        .where(eq(professionals.id, conv.professionalId));
+
+      if (!professional) continue;
+
+      const [lastMessage] = await db
+        .select()
+        .from(messages)
+        .where(eq(messages.conversationId, conv.id))
+        .orderBy(desc(messages.createdAt))
+        .limit(1);
+
+      const unreadMessages = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(messages)
+        .where(
+          and(
+            eq(messages.conversationId, conv.id),
+            eq(messages.senderType, "professional"),
+            sql`${messages.readAt} IS NULL`
+          )
+        );
+
+      const [onlineStatus] = await db
+        .select()
+        .from(userOnlineStatus)
+        .where(eq(userOnlineStatus.userId, conv.professionalId));
+
+      result.push({
+        ...conv,
+        professional,
+        lastMessage,
+        unreadCount: Number(unreadMessages[0]?.count || 0),
+        isOnline: onlineStatus?.isOnline || false,
+      });
+    }
+
+    return result;
+  }
+
+  async getConversation(id: string): Promise<Conversation | undefined> {
+    const [conversation] = await db
+      .select()
+      .from(conversations)
+      .where(eq(conversations.id, id));
+    return conversation;
+  }
+
+  async getOrCreateConversation(practiceAdminId: string, professionalId: string): Promise<Conversation> {
+    const [existing] = await db
+      .select()
+      .from(conversations)
+      .where(
+        and(
+          eq(conversations.practiceAdminId, practiceAdminId),
+          eq(conversations.professionalId, professionalId)
+        )
+      );
+
+    if (existing) return existing;
+
+    const [created] = await db
+      .insert(conversations)
+      .values({ practiceAdminId, professionalId })
+      .returning();
+    return created;
+  }
+
+  // Messaging - Messages
+  async getMessages(conversationId: string, limit: number = 50): Promise<Message[]> {
+    return db
+      .select()
+      .from(messages)
+      .where(eq(messages.conversationId, conversationId))
+      .orderBy(desc(messages.createdAt))
+      .limit(limit);
+  }
+
+  async createMessage(message: InsertMessage): Promise<Message> {
+    const [created] = await db.insert(messages).values(message).returning();
+    
+    // Update conversation's lastMessageAt
+    await db
+      .update(conversations)
+      .set({ lastMessageAt: new Date() })
+      .where(eq(conversations.id, message.conversationId));
+    
+    return created;
+  }
+
+  async markMessagesAsRead(conversationId: string, userId: string): Promise<void> {
+    await db
+      .update(messages)
+      .set({ readAt: new Date() })
+      .where(
+        and(
+          eq(messages.conversationId, conversationId),
+          sql`${messages.senderId} != ${userId}`,
+          sql`${messages.readAt} IS NULL`
+        )
+      );
+  }
+
+  // User Online Status
+  async updateUserOnlineStatus(userId: string, userType: string, isOnline: boolean): Promise<UserOnlineStatus> {
+    const [existing] = await db
+      .select()
+      .from(userOnlineStatus)
+      .where(eq(userOnlineStatus.userId, userId));
+
+    if (existing) {
+      const [updated] = await db
+        .update(userOnlineStatus)
+        .set({ isOnline, lastSeenAt: new Date() })
+        .where(eq(userOnlineStatus.userId, userId))
+        .returning();
+      return updated;
+    }
+
+    const [created] = await db
+      .insert(userOnlineStatus)
+      .values({ userId, userType, isOnline, lastSeenAt: new Date() })
+      .returning();
+    return created;
+  }
+
+  async getUserOnlineStatus(userId: string): Promise<UserOnlineStatus | undefined> {
+    const [status] = await db
+      .select()
+      .from(userOnlineStatus)
+      .where(eq(userOnlineStatus.userId, userId));
+    return status;
+  }
+
+  async getOnlineHygienists(): Promise<{ id: string; firstName: string; lastName: string; photoUrl: string | null; isOnline: boolean }[]> {
+    // Get all hygienists with their online status
+    const hygienists = await db
+      .select({
+        id: professionals.id,
+        firstName: professionals.firstName,
+        lastName: professionals.lastName,
+        photoUrl: professionals.photoUrl,
+        role: professionals.role,
+      })
+      .from(professionals)
+      .where(eq(professionals.role, "Hygienist"));
+
+    const result = [];
+    for (const hyg of hygienists) {
+      const [status] = await db
+        .select()
+        .from(userOnlineStatus)
+        .where(eq(userOnlineStatus.userId, hyg.id));
+      
+      result.push({
+        ...hyg,
+        isOnline: status?.isOnline || false,
+      });
+    }
+
+    return result;
   }
 }
 
