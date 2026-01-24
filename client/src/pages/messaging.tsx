@@ -30,6 +30,7 @@ export default function MessagingPage() {
     firstName: string;
     lastName: string;
     photoUrl: string | null;
+    role: string;
     isOnline: boolean;
   }[]>({
     queryKey: ["/api/messaging/hygienists"],
@@ -45,11 +46,12 @@ export default function MessagingPage() {
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
       if (!selectedConversation) return;
-      return apiRequest(`/api/messaging/conversations/${selectedConversation.id}/messages`, {
-        method: "POST",
-        body: JSON.stringify({ content, senderType: "practice_admin" }),
-        headers: { "Content-Type": "application/json" },
-      });
+      const res = await apiRequest(
+        "POST",
+        `/api/messaging/conversations/${selectedConversation.id}/messages`,
+        { content, senderType: "practice_admin" }
+      );
+      return res.json();
     },
     onSuccess: () => {
       setMessageInput("");
@@ -60,22 +62,21 @@ export default function MessagingPage() {
 
   const startConversationMutation = useMutation({
     mutationFn: async (professionalId: string) => {
-      return apiRequest("/api/messaging/conversations", {
-        method: "POST",
-        body: JSON.stringify({ professionalId }),
-        headers: { "Content-Type": "application/json" },
-      });
+      const res = await apiRequest("POST", "/api/messaging/conversations", { professionalId });
+      return res.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/messaging/conversations"] });
-      const hyg = hygienists.find(h => h.id === data.professionalId);
-      if (hyg) {
-        setSelectedConversation({
-          ...data,
-          professional: hyg,
-          unreadCount: 0,
-          isOnline: hyg.isOnline,
-        });
+      if (data) {
+        const hyg = hygienists.find(h => h.id === data.professionalId);
+        if (hyg) {
+          setSelectedConversation({
+            ...data,
+            professional: hyg,
+            unreadCount: 0,
+            isOnline: hyg.isOnline,
+          });
+        }
       }
     },
   });
