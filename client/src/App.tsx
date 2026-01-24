@@ -24,6 +24,7 @@ import PlatformSettings from "@/pages/platform-settings";
 import PracticeManagement from "@/pages/practice-management";
 import RegisterPractice from "@/pages/register-practice";
 import Eligibility from "@/pages/eligibility";
+import Messaging from "@/pages/messaging";
 import NotFound from "@/pages/not-found";
 
 function MainRouter() {
@@ -52,6 +53,7 @@ function MainRouter() {
       <Route path="/eligibility">
         <Redirect to="/patients?tab=insurance" />
       </Route>
+      <Route path="/messaging" component={Messaging} />
       <Route component={NotFound} />
     </Switch>
   );

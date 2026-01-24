@@ -13,6 +13,7 @@ import {
   Sliders,
   Building2,
   MapPin,
+  MessageSquare,
 } from "lucide-react";
 import {
   Sidebar,
@@ -73,6 +74,12 @@ const allNavItems = [
     url: "/professionals",
     icon: Contact,
     personas: ["system_admin", "admin", "front_desk", "professional"],
+  },
+  {
+    title: "Messaging",
+    url: "/messaging",
+    icon: MessageSquare,
+    personas: ["admin"],
   },
 ];
 
