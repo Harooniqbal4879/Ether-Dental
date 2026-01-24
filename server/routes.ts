@@ -3058,11 +3058,21 @@ export async function registerRoutes(
   // Send shift invitation messages to selected professionals
   app.post("/api/shifts/invite", async (req, res) => {
     try {
-      const { shiftId, professionalIds } = req.body;
+      // Validate request body
+      const inviteSchema = z.object({
+        shiftId: z.string().min(1, "Shift ID is required"),
+        professionalIds: z.array(z.string()).min(1, "At least one professional ID is required"),
+      });
       
-      if (!shiftId || !professionalIds || !Array.isArray(professionalIds) || professionalIds.length === 0) {
-        return res.status(400).json({ error: "Shift ID and at least one professional ID are required" });
+      const parseResult = inviteSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          error: "Invalid request", 
+          details: parseResult.error.errors 
+        });
       }
+      
+      const { shiftId, professionalIds } = parseResult.data;
 
       // Get shift details
       const shift = await storage.getShift(shiftId);
@@ -3070,7 +3080,14 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Shift not found" });
       }
 
-      const practiceAdminId = "practice-admin-1"; // In production, get from session
+      // Verify shift is open for bidding
+      if (shift.status !== "open") {
+        return res.status(400).json({ error: "Only open shifts can receive bid invitations" });
+      }
+
+      // In production, get practiceAdminId from session/auth context
+      // For now, using a fixed ID for demo purposes
+      const practiceAdminId = "practice-admin-1";
       let invitesSent = 0;
 
       // Format shift date
@@ -3100,9 +3117,16 @@ export async function registerRoutes(
           : "") +
         `\nPlease respond if you're interested in this opportunity!`;
 
-      // Send message to each selected professional
+      // Verify professionals exist and send invitations
       for (const professionalId of professionalIds) {
         try {
+          // Verify professional exists
+          const professional = await storage.getProfessional(professionalId);
+          if (!professional) {
+            console.warn(`Professional ${professionalId} not found, skipping`);
+            continue;
+          }
+          
           // Get or create conversation with the professional
           const conversation = await storage.getOrCreateConversation(practiceAdminId, professionalId);
           
@@ -3118,6 +3142,10 @@ export async function registerRoutes(
         } catch (error) {
           console.error(`Error sending invitation to professional ${professionalId}:`, error);
         }
+      }
+      
+      if (invitesSent === 0) {
+        return res.status(400).json({ error: "No valid professionals found to invite" });
       }
 
       res.json({ 

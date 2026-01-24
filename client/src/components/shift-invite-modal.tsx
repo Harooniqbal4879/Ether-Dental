@@ -32,7 +32,7 @@ export function ShiftInviteModal({ shift, open, onOpenChange }: ShiftInviteModal
   const [selectedProfessionals, setSelectedProfessionals] = useState<string[]>([]);
 
   const { data: professionals = [], isLoading } = useQuery<Professional[]>({
-    queryKey: ["/api/professionals", { role: shift.role }],
+    queryKey: ["/api/professionals"],
     enabled: open,
   });
 
