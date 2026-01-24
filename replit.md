@@ -63,7 +63,9 @@ Set these environment variables to enable live API calls:
 
 ### UI Location
 - Platform Settings → Eligibility tab (System Admin only) - Configure DentalXchange credentials
-- Patients → Eligibility tab (/patients?tab=eligibility) - Practice-level verification inline with other patient tabs (Practice Admin, Front Desk, Treatment Coordinator, Billing Manager)
+- Patients → Insurance tab (/patients?tab=insurance) - Unified practice-level verification tab for both dental and medical insurance (Practice Admin, Front Desk, Treatment Coordinator, Billing Manager)
+- Patient cards display dual insurance status with "D" (dental) and "M" (medical) badges showing per-type verification status
+- Legacy URLs (/patients?tab=verifications, /patients?tab=eligibility) redirect to the Insurance tab
 
 ### Practice-Level Eligibility Features
 - Patient selector with auto-fill of demographics from practice records
