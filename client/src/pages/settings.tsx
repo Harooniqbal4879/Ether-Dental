@@ -1059,10 +1059,22 @@ function OfficeProfileTab() {
   );
 }
 
+interface Practice {
+  id: string;
+  name: string;
+  npiNumber?: string | null;
+  taxId?: string | null;
+}
+
 function PracticeInformationTab() {
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
   const { currentLocationId, currentLocation } = useLocation();
+
+  // Load practice data for NPI and Tax ID
+  const { data: practice } = useQuery<Practice>({
+    queryKey: ["/api/practices", PRACTICE_ID],
+  });
 
   // Load location-specific profile data
   const { data: profile, isLoading: isLoadingProfile } = useQuery<LocationProfile>({
@@ -1096,12 +1108,22 @@ function PracticeInformationTab() {
     dressCode: "",
   });
 
+  // Sync practice data (NPI, Tax ID) when it loads
+  useEffect(() => {
+    if (practice) {
+      setPracticeData(prev => ({
+        ...prev,
+        npi: practice.npiNumber || "",
+        taxId: practice.taxId || "",
+      }));
+    }
+  }, [practice]);
+
   // Sync profile data to local state when it loads or location changes
   useEffect(() => {
     if (profile) {
-      setPracticeData({
-        npi: "",
-        taxId: "",
+      setPracticeData(prev => ({
+        ...prev,
         practiceManagementSoftware: profile.practiceManagementSoftware || "",
         xraySoftware: profile.xraySoftware || "",
         hasOverheadLights: profile.hasOverheadLights ?? true,
@@ -1123,7 +1145,7 @@ function PracticeInformationTab() {
         dedicatedHygieneRooms: profile.dedicatedHygieneRooms || 0,
         arrivalInstructions: profile.arrivalInstructions || "",
         dressCode: profile.dressCode || "",
-      });
+      }));
     }
   }, [profile, currentLocationId]);
 
@@ -1135,10 +1157,6 @@ function PracticeInformationTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/locations", currentLocationId, "profile"] });
-      toast({
-        title: "Practice Info Saved",
-        description: `${currentLocation?.name || "Location"} information has been updated successfully.`,
-      });
     },
     onError: (error: Error) => {
       toast({
@@ -1149,7 +1167,24 @@ function PracticeInformationTab() {
     },
   });
 
-  const handleSavePracticeInfo = () => {
+  const updatePracticeMutation = useMutation({
+    mutationFn: async (data: { npiNumber?: string; taxId?: string }) => {
+      const res = await apiRequest("PATCH", `/api/practices/${PRACTICE_ID}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/practices", PRACTICE_ID] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save practice identifiers",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSavePracticeInfo = async () => {
     if (!currentLocationId) {
       toast({
         title: "No Location Selected",
@@ -1158,28 +1193,43 @@ function PracticeInformationTab() {
       });
       return;
     }
-    updateProfileMutation.mutate({
-      practiceManagementSoftware: practiceData.practiceManagementSoftware,
-      xraySoftware: practiceData.xraySoftware,
-      hasOverheadLights: practiceData.hasOverheadLights,
-      preferredScrubColor: practiceData.preferredScrubColor,
-      clinicalAttireProvided: practiceData.clinicalAttireProvided,
-      useAirPolishers: practiceData.useAirPolishers,
-      scalerType: practiceData.scalerType,
-      assistedHygieneSchedule: practiceData.assistedHygieneSchedule,
-      rootPlaningProcedures: practiceData.rootPlaningProcedures,
-      seeNewPatients: practiceData.seeNewPatients,
-      administerLocalAnesthesia: practiceData.administerLocalAnesthesia,
-      workWithNitrousPatients: practiceData.workWithNitrousPatients,
-      appointmentLengthAdults: practiceData.appointmentLengthAdults,
-      appointmentLengthKids: practiceData.appointmentLengthKids,
-      appointmentLengthPerio: practiceData.appointmentLengthPerio,
-      appointmentLengthScaling: practiceData.appointmentLengthScaling,
-      dentalTreatmentRooms: practiceData.dentalTreatmentRooms,
-      dedicatedHygieneRooms: practiceData.dedicatedHygieneRooms,
-      arrivalInstructions: practiceData.arrivalInstructions,
-      dressCode: practiceData.dressCode,
-    });
+
+    try {
+      await Promise.all([
+        updatePracticeMutation.mutateAsync({
+          npiNumber: practiceData.npi,
+          taxId: practiceData.taxId,
+        }),
+        updateProfileMutation.mutateAsync({
+          practiceManagementSoftware: practiceData.practiceManagementSoftware,
+          xraySoftware: practiceData.xraySoftware,
+          hasOverheadLights: practiceData.hasOverheadLights,
+          preferredScrubColor: practiceData.preferredScrubColor,
+          clinicalAttireProvided: practiceData.clinicalAttireProvided,
+          useAirPolishers: practiceData.useAirPolishers,
+          scalerType: practiceData.scalerType,
+          assistedHygieneSchedule: practiceData.assistedHygieneSchedule,
+          rootPlaningProcedures: practiceData.rootPlaningProcedures,
+          seeNewPatients: practiceData.seeNewPatients,
+          administerLocalAnesthesia: practiceData.administerLocalAnesthesia,
+          workWithNitrousPatients: practiceData.workWithNitrousPatients,
+          appointmentLengthAdults: practiceData.appointmentLengthAdults,
+          appointmentLengthKids: practiceData.appointmentLengthKids,
+          appointmentLengthPerio: practiceData.appointmentLengthPerio,
+          appointmentLengthScaling: practiceData.appointmentLengthScaling,
+          dentalTreatmentRooms: practiceData.dentalTreatmentRooms,
+          dedicatedHygieneRooms: practiceData.dedicatedHygieneRooms,
+          arrivalInstructions: practiceData.arrivalInstructions,
+          dressCode: practiceData.dressCode,
+        }),
+      ]);
+      toast({
+        title: "Practice Info Saved",
+        description: `${currentLocation?.name || "Location"} information has been updated successfully.`,
+      });
+    } catch (error) {
+      // Errors are handled by individual mutation onError callbacks
+    }
   };
 
   return (
@@ -1570,10 +1620,10 @@ function PracticeInformationTab() {
       <div className="flex justify-end">
         <Button 
           onClick={handleSavePracticeInfo}
-          disabled={updateProfileMutation.isPending}
+          disabled={updateProfileMutation.isPending || updatePracticeMutation.isPending}
           data-testid="button-save-practice-info"
         >
-          {updateProfileMutation.isPending ? "Saving..." : "Save Changes"}
+          {(updateProfileMutation.isPending || updatePracticeMutation.isPending) ? "Saving..." : "Save Changes"}
         </Button>
       </div>
     </div>
