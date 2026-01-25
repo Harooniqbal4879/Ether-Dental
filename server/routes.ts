@@ -3401,14 +3401,14 @@ export async function registerRoutes(
       }
       
       const service = createDentrixService(practiceId);
-      await service.loadConfig(practiceId);
       const simulatedPatients = service.generateSimulatedPatients(count);
       
       let created = 0;
       let updated = 0;
       
-      for (const patient of simulatedPatients) {
-        const result = await service.syncSinglePatient(patient.id);
+      // Use service's importSimulatedPatients method which handles DB operations
+      for (const simPatient of simulatedPatients) {
+        const result = await service.importSimulatedPatient(simPatient);
         if (result.action === "created") created++;
         if (result.action === "updated") updated++;
       }
@@ -3417,7 +3417,7 @@ export async function registerRoutes(
         success: true,
         patientsCreated: created,
         patientsUpdated: updated,
-        message: `Imported ${created} new patients, updated ${updated} existing patients`,
+        message: `Imported ${created} new patients, updated ${updated} existing patients from simulated Dentrix data`,
       });
     } catch (error) {
       console.error("Error importing simulated patients:", error);

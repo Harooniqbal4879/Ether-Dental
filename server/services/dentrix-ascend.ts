@@ -458,6 +458,88 @@ export class DentrixAscendService {
       zipCode: "90210",
     }));
   }
+
+  /**
+   * Import a simulated patient directly into the database without making API calls.
+   * Used for testing/demo purposes when Dentrix credentials are not configured.
+   */
+  async importSimulatedPatient(simPatient: DentrixPatient): Promise<{
+    success: boolean;
+    action: "created" | "updated" | "skipped";
+    localPatientId?: string;
+    message?: string;
+  }> {
+    try {
+      // Check if already mapped
+      const existingMapping = await db
+        .select()
+        .from(dentrixPatientMapping)
+        .where(eq(dentrixPatientMapping.dentrixPatientId, simPatient.id))
+        .limit(1);
+
+      const patientData: InsertPatient = {
+        firstName: simPatient.firstName,
+        lastName: simPatient.lastName,
+        dateOfBirth: simPatient.dateOfBirth,
+        ssnLast4: simPatient.ssn?.slice(-4),
+        phone: simPatient.cellPhone || simPatient.homePhone || simPatient.workPhone,
+        email: simPatient.email,
+        address: [simPatient.address1, simPatient.address2].filter(Boolean).join(", "),
+        city: simPatient.city,
+        state: simPatient.state,
+        zipCode: simPatient.zipCode,
+        emergencyContactName: simPatient.emergencyContactName,
+        emergencyContactPhone: simPatient.emergencyContactPhone,
+      };
+
+      if (existingMapping.length > 0) {
+        // Update existing patient
+        await db
+          .update(patients)
+          .set(patientData)
+          .where(eq(patients.id, existingMapping[0].localPatientId));
+
+        await db
+          .update(dentrixPatientMapping)
+          .set({
+            lastSyncedAt: new Date(),
+            dentrixData: JSON.stringify(simPatient),
+          })
+          .where(eq(dentrixPatientMapping.id, existingMapping[0].id));
+
+        return {
+          success: true,
+          action: "updated",
+          localPatientId: existingMapping[0].localPatientId,
+        };
+      } else {
+        // Create new patient
+        const [newPatient] = await db
+          .insert(patients)
+          .values(patientData)
+          .returning();
+
+        await db.insert(dentrixPatientMapping).values({
+          dentrixPatientId: simPatient.id,
+          localPatientId: newPatient.id,
+          dentrixData: JSON.stringify(simPatient),
+        });
+
+        return {
+          success: true,
+          action: "created",
+          localPatientId: newPatient.id,
+        };
+      }
+    } catch (error) {
+      console.error("Error importing simulated patient:", error);
+      return {
+        success: false,
+        action: "skipped",
+        message: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  }
 }
 
 /**
