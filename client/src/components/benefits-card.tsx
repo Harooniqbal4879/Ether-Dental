@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Stethoscope } from "lucide-react";
+import { Calendar, Stethoscope, ChevronRight } from "lucide-react";
 import { BenefitsProgress } from "./benefits-progress";
 import { CoverageBadge } from "./coverage-badge";
 import type { Benefit } from "@shared/schema";
@@ -11,13 +11,19 @@ interface BenefitsCardProps {
   insuranceType: "dental" | "medical";
   benefits: Benefit;
   className?: string;
+  onClick?: () => void;
 }
 
-export function BenefitsCard({ title, insuranceType, benefits, className }: BenefitsCardProps) {
+export function BenefitsCard({ title, insuranceType, benefits, className, onClick }: BenefitsCardProps) {
   const isDental = insuranceType === "dental";
+  const isClickable = !!onClick;
   
   return (
-    <Card className={className} data-testid={`card-${insuranceType}-benefits`}>
+    <Card 
+      className={`${className || ''} ${isClickable ? 'cursor-pointer hover-elevate active-elevate-2 transition-colors' : ''}`}
+      data-testid={`card-${insuranceType}-benefits`}
+      onClick={onClick}
+    >
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -32,12 +38,17 @@ export function BenefitsCard({ title, insuranceType, benefits, className }: Bene
             )}
             {title}
           </CardTitle>
-          {benefits.renewalDate && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Calendar className="h-3.5 w-3.5" />
-              Renews: {benefits.renewalDate}
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {benefits.renewalDate && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Calendar className="h-3.5 w-3.5" />
+                Renews: {benefits.renewalDate}
+              </div>
+            )}
+            {isClickable && (
+              <ChevronRight className="h-5 w-5 text-muted-foreground" />
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-5">

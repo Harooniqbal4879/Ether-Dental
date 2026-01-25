@@ -39,11 +39,16 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { PatientWithInsurance, Verification, Benefit, InsurancePolicy, InsuranceCarrier } from "@shared/schema";
 
 type PolicyWithCarrier = InsurancePolicy & { carrier: InsuranceCarrier };
+type SelectedBenefits = {
+  type: 'dental' | 'medical';
+  benefits: Benefit;
+  verification: Verification;
+} | null;
 
 export default function PatientDetail() {
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
-  const [selectedPolicy, setSelectedPolicy] = useState<PolicyWithCarrier | null>(null);
+  const [selectedBenefits, setSelectedBenefits] = useState<SelectedBenefits>(null);
 
   const { data: patient, isLoading } = useQuery<PatientWithInsurance>({
     queryKey: ["/api/patients", id],
@@ -260,68 +265,69 @@ export default function PatientDetail() {
                   Insurance Information
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="space-y-4">
                 {patient.insurancePolicies.map((policy, index) => (
-                  <div key={policy.id}>
-                    {index > 0 && <Separator className="my-3" />}
-                    <button
-                      type="button"
-                      onClick={() => setSelectedPolicy(policy as PolicyWithCarrier)}
-                      className="w-full text-left rounded-lg p-3 -mx-3 hover-elevate active-elevate-2 transition-colors cursor-pointer"
-                      data-testid={`policy-card-${policy.carrier.insuranceType || 'dental'}`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted text-sm font-semibold">
-                          {policy.carrier.name.slice(0, 2).toUpperCase()}
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium">{policy.carrier.name}</p>
-                            <Badge 
-                              variant="outline" 
-                              className={policy.carrier.insuranceType === 'medical' 
-                                ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 border-purple-200 dark:border-purple-800'
-                                : 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300 border-teal-200 dark:border-teal-800'
-                              }
-                            >
-                              {policy.carrier.insuranceType === 'medical' ? 'M' : 'D'}
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-muted-foreground">
-                            {policy.isPrimary ? 'Primary Insurance' : 'Secondary Insurance'}
-                          </p>
-                        </div>
-                        <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                  <div key={policy.id} data-testid={`policy-card-${policy.carrier.insuranceType || 'dental'}`}>
+                    {index > 0 && <Separator className="my-4" />}
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted text-sm font-semibold">
+                        {policy.carrier.name.slice(0, 2).toUpperCase()}
                       </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{policy.carrier.name}</p>
+                          <Badge 
+                            variant="outline" 
+                            className={policy.carrier.insuranceType === 'medical' 
+                              ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+                              : 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300 border-teal-200 dark:border-teal-800'
+                            }
+                          >
+                            {policy.carrier.insuranceType === 'medical' ? 'M' : 'D'}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {policy.isPrimary ? 'Primary Insurance' : 'Secondary Insurance'}
+                        </p>
+                      </div>
+                    </div>
 
-                      <div className="grid grid-cols-2 gap-3 text-sm mt-3">
+                    <div className="grid grid-cols-2 gap-4 text-sm mt-3">
+                      <div>
+                        <p className="text-muted-foreground">Policy Number</p>
+                        <p className="font-mono font-medium">
+                          {policy.policyNumber}
+                        </p>
+                      </div>
+                      {policy.groupNumber && (
                         <div>
-                          <p className="text-muted-foreground text-xs">Policy Number</p>
-                          <p className="font-mono font-medium text-sm">
-                            {policy.policyNumber}
+                          <p className="text-muted-foreground">Group Number</p>
+                          <p className="font-mono font-medium">
+                            {policy.groupNumber}
                           </p>
                         </div>
-                        {policy.groupNumber && (
-                          <div>
-                            <p className="text-muted-foreground text-xs">Group Number</p>
-                            <p className="font-mono font-medium text-sm">
-                              {policy.groupNumber}
-                            </p>
-                          </div>
-                        )}
+                      )}
+                      <div>
+                        <p className="text-muted-foreground">Subscriber</p>
+                        <p className="font-medium">{policy.subscriberName}</p>
                       </div>
+                      <div>
+                        <p className="text-muted-foreground">Relationship</p>
+                        <p className="font-medium capitalize">
+                          {policy.subscriberRelationship}
+                        </p>
+                      </div>
+                    </div>
 
-                      <div className="flex items-center justify-between mt-3 text-xs">
-                        <span className="text-muted-foreground">
-                          Subscriber: {policy.subscriberName} ({policy.subscriberRelationship})
+                    {policy.effectiveDate && (
+                      <div className="flex items-center gap-2 text-sm mt-3">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">Effective:</span>
+                        <span className="font-medium">
+                          {format(new Date(policy.effectiveDate), "MMM d, yyyy")}
                         </span>
-                        {policy.effectiveDate && (
-                          <span className="text-muted-foreground">
-                            Effective: {format(new Date(policy.effectiveDate), "MMM d, yyyy")}
-                          </span>
-                        )}
                       </div>
-                    </button>
+                    )}
                   </div>
                 ))}
               </CardContent>
@@ -369,19 +375,29 @@ export default function PatientDetail() {
 
               {hasBenefits ? (
                 <div className="grid gap-6">
-                  {dentalBenefits && (
+                  {dentalBenefits && dentalVerification && (
                     <BenefitsCard
                       title="Dental Benefits"
                       insuranceType="dental"
                       benefits={dentalBenefits}
+                      onClick={() => setSelectedBenefits({
+                        type: 'dental',
+                        benefits: dentalBenefits,
+                        verification: dentalVerification
+                      })}
                     />
                   )}
                   
-                  {medicalBenefits && (
+                  {medicalBenefits && medicalVerification && (
                     <BenefitsCard
                       title="Medical Benefits"
                       insuranceType="medical"
                       benefits={medicalBenefits}
+                      onClick={() => setSelectedBenefits({
+                        type: 'medical',
+                        benefits: medicalBenefits,
+                        verification: medicalVerification
+                      })}
                     />
                   )}
                 </div>
@@ -428,94 +444,168 @@ export default function PatientDetail() {
         </div>
       </div>
 
-      {/* Insurance Benefits Dialog */}
-      <Dialog open={!!selectedPolicy} onOpenChange={() => setSelectedPolicy(null)}>
+      {/* Benefits Details Dialog */}
+      <Dialog open={!!selectedBenefits} onOpenChange={() => setSelectedBenefits(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
-              {selectedPolicy && (
+              {selectedBenefits && (
                 <>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted text-sm font-semibold">
-                    {selectedPolicy.carrier.name.slice(0, 2).toUpperCase()}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span>{selectedPolicy.carrier.name}</span>
-                      <Badge 
-                        variant="outline" 
-                        className={selectedPolicy.carrier.insuranceType === 'medical' 
-                          ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 border-purple-200 dark:border-purple-800'
-                          : 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300 border-teal-200 dark:border-teal-800'
-                        }
-                      >
-                        {selectedPolicy.carrier.insuranceType === 'medical' ? 'Medical' : 'Dental'}
-                      </Badge>
-                    </div>
-                    <p className="text-sm font-normal text-muted-foreground">
-                      {selectedPolicy.isPrimary ? 'Primary Insurance' : 'Secondary Insurance'} · Policy: {selectedPolicy.policyNumber}
-                    </p>
-                  </div>
+                  <Badge 
+                    variant="outline" 
+                    className={selectedBenefits.type === 'medical' 
+                      ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 border-purple-200 dark:border-purple-800 text-lg px-3 py-1'
+                      : 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300 border-teal-200 dark:border-teal-800 text-lg px-3 py-1'
+                    }
+                  >
+                    {selectedBenefits.type === 'medical' ? 'M' : 'D'}
+                  </Badge>
+                  <span>{selectedBenefits.type === 'medical' ? 'Medical' : 'Dental'} Benefits Details</span>
                 </>
               )}
             </DialogTitle>
           </DialogHeader>
 
-          {selectedPolicy && (
+          {selectedBenefits && patient && (
             <div className="space-y-6 mt-4">
-              {/* Policy Details Section */}
-              <div className="grid grid-cols-2 gap-4 p-4 rounded-lg bg-muted/50">
-                <div>
-                  <p className="text-xs text-muted-foreground">Policy Number</p>
-                  <p className="font-mono font-medium">{selectedPolicy.policyNumber}</p>
+              {/* Benefits Summary */}
+              <div className="p-4 rounded-lg bg-muted/50">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="font-semibold">Annual Maximum</h4>
+                  <span className="text-muted-foreground text-sm">
+                    ${Number(selectedBenefits.benefits.annualRemaining) || 0} remaining
+                  </span>
                 </div>
-                {selectedPolicy.groupNumber && (
-                  <div>
-                    <p className="text-xs text-muted-foreground">Group Number</p>
-                    <p className="font-mono font-medium">{selectedPolicy.groupNumber}</p>
-                  </div>
-                )}
-                <div>
-                  <p className="text-xs text-muted-foreground">Subscriber</p>
-                  <p className="font-medium">{selectedPolicy.subscriberName}</p>
+                <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
+                  <div 
+                    className="h-full bg-primary rounded-full transition-all"
+                    style={{ 
+                      width: `${Math.min(100, ((Number(selectedBenefits.benefits.annualUsed) || 0) / (Number(selectedBenefits.benefits.annualMaximum) || 1)) * 100)}%` 
+                    }}
+                  />
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Relationship</p>
-                  <p className="font-medium capitalize">{selectedPolicy.subscriberRelationship}</p>
+                <div className="flex justify-between text-sm mt-2">
+                  <span className="text-muted-foreground">Used: ${Number(selectedBenefits.benefits.annualUsed) || 0}</span>
+                  <span className="text-muted-foreground">Maximum: ${Number(selectedBenefits.benefits.annualMaximum) || 0}</span>
                 </div>
-                {selectedPolicy.effectiveDate && (
-                  <div>
-                    <p className="text-xs text-muted-foreground">Effective Date</p>
-                    <p className="font-medium">
-                      {format(new Date(selectedPolicy.effectiveDate), "MMM d, yyyy")}
-                    </p>
-                  </div>
-                )}
               </div>
 
-              {/* Benefits Section */}
-              {getBenefitsForPolicy(selectedPolicy) ? (
-                <BenefitsCard
-                  title={selectedPolicy.carrier.insuranceType === 'medical' ? 'Medical Benefits' : 'Dental Benefits'}
-                  benefits={getBenefitsForPolicy(selectedPolicy)!}
-                  insuranceType={(selectedPolicy.carrier.insuranceType as 'dental' | 'medical') || 'dental'}
-                />
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <CreditCard className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p className="font-medium">No Benefits Available</p>
-                  <p className="text-sm mt-1">
-                    Benefits will appear here after insurance verification is completed.
-                  </p>
-                  <Button 
-                    className="mt-4" 
-                    onClick={() => {
-                      setSelectedPolicy(null);
-                      verifyMutation.mutate();
-                    }}
-                  >
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Verify Insurance
-                  </Button>
+              {/* Subscriber (Primary Holder) Section */}
+              <div>
+                <h4 className="font-semibold mb-3 flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Subscriber (Primary)
+                </h4>
+                <Card>
+                  <CardContent className="pt-4">
+                    <div className="flex items-center gap-4">
+                      <Avatar className="h-12 w-12 border border-border">
+                        <AvatarFallback className="bg-primary/10 text-primary font-medium">
+                          {patient.firstName.charAt(0)}{patient.lastName.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <p className="font-medium">{patient.firstName} {patient.lastName}</p>
+                        <p className="text-sm text-muted-foreground">
+                          DOB: {format(new Date(patient.dateOfBirth), "MMM d, yyyy")}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-muted-foreground">Individual Used</p>
+                        <p className="font-semibold text-lg">
+                          ${Number(selectedBenefits.benefits.deductibleIndividualMet) || 0}
+                          <span className="text-sm text-muted-foreground font-normal">
+                            {" "}/ ${Number(selectedBenefits.benefits.deductibleIndividual) || 0}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Dependents Section */}
+              <div>
+                <h4 className="font-semibold mb-3 flex items-center gap-2">
+                  <Building2 className="h-4 w-4" />
+                  Dependents
+                </h4>
+                <div className="space-y-3">
+                  {/* Example dependent - In production this would come from a dependents table */}
+                  <Card>
+                    <CardContent className="pt-4">
+                      <div className="flex items-center gap-4">
+                        <Avatar className="h-10 w-10 border border-border">
+                          <AvatarFallback className="bg-muted text-muted-foreground text-sm">
+                            MJ
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                          <p className="font-medium">Michael Johnson Jr.</p>
+                          <p className="text-sm text-muted-foreground">
+                            DOB: Aug 15, 2015 · Child
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-muted-foreground">Benefits Used</p>
+                          <p className="font-medium">
+                            $125 <span className="text-xs text-muted-foreground">/ ${Number(selectedBenefits.benefits.deductibleIndividual) || 0}</span>
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-4">
+                      <div className="flex items-center gap-4">
+                        <Avatar className="h-10 w-10 border border-border">
+                          <AvatarFallback className="bg-muted text-muted-foreground text-sm">
+                            EJ
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                          <p className="font-medium">Emily Johnson</p>
+                          <p className="text-sm text-muted-foreground">
+                            DOB: Mar 22, 2018 · Child
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-muted-foreground">Benefits Used</p>
+                          <p className="font-medium">
+                            $75 <span className="text-xs text-muted-foreground">/ ${Number(selectedBenefits.benefits.deductibleIndividual) || 0}</span>
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+
+              {/* Family Deductible Summary */}
+              {selectedBenefits.benefits.deductibleFamily && (
+                <div className="p-4 rounded-lg border bg-card">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">Family Deductible</p>
+                      <p className="text-sm text-muted-foreground">Combined usage across all members</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold">
+                        ${Number(selectedBenefits.benefits.deductibleFamilyMet) || 0}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        of ${Number(selectedBenefits.benefits.deductibleFamily) || 0}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-2 mt-3 overflow-hidden">
+                    <div 
+                      className="h-full bg-primary rounded-full transition-all"
+                      style={{ 
+                        width: `${Math.min(100, ((Number(selectedBenefits.benefits.deductibleFamilyMet) || 0) / (Number(selectedBenefits.benefits.deductibleFamily) || 1)) * 100)}%` 
+                      }}
+                    />
+                  </div>
                 </div>
               )}
             </div>
