@@ -22,8 +22,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/page-header";
 import { VerificationStatusBadge } from "@/components/verification-status-badge";
-import { BenefitsProgress } from "@/components/benefits-progress";
-import { CoverageBadge } from "@/components/coverage-badge";
+import { BenefitsCard } from "@/components/benefits-card";
 import { VerificationTimeline } from "@/components/verification-timeline";
 import { BenefitsDetailSkeleton } from "@/components/loading-skeleton";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -95,7 +94,13 @@ export default function PatientDetail() {
   }
 
   const primaryPolicy = patient.insurancePolicies?.find((p) => p.isPrimary);
-  const latestBenefits = patient.latestVerification?.benefits;
+  
+  // Get benefits by insurance type
+  const dentalVerification = verifications?.find(v => v.insuranceType === "dental" && v.status === "completed" && v.benefits);
+  const medicalVerification = verifications?.find(v => v.insuranceType === "medical" && v.status === "completed" && v.benefits);
+  const dentalBenefits = dentalVerification?.benefits;
+  const medicalBenefits = medicalVerification?.benefits;
+  const hasBenefits = dentalBenefits || medicalBenefits;
 
   const getInitials = (firstName: string, lastName: string) => {
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
@@ -325,170 +330,22 @@ export default function PatientDetail() {
                 </div>
               )}
 
-              {latestBenefits ? (
+              {hasBenefits ? (
                 <div className="grid gap-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base font-semibold">
-                        Annual Benefits
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      <BenefitsProgress
-                        label="Annual Maximum"
-                        used={Number(latestBenefits.annualUsed) || 0}
-                        total={Number(latestBenefits.annualMaximum) || 0}
-                      />
-
-                      <Separator />
-
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div>
-                          <p className="text-sm text-muted-foreground">
-                            Individual Deductible
-                          </p>
-                          <div className="mt-1 flex items-baseline gap-2">
-                            <span className="text-2xl font-bold tabular-nums">
-                              ${Number(latestBenefits.deductibleIndividualMet) || 0}
-                            </span>
-                            <span className="text-muted-foreground">
-                              / ${Number(latestBenefits.deductibleIndividual) || 0}
-                            </span>
-                          </div>
-                        </div>
-                        {latestBenefits.deductibleFamily && (
-                          <div>
-                            <p className="text-sm text-muted-foreground">
-                              Family Deductible
-                            </p>
-                            <div className="mt-1 flex items-baseline gap-2">
-                              <span className="text-2xl font-bold tabular-nums">
-                                ${Number(latestBenefits.deductibleFamilyMet) || 0}
-                              </span>
-                              <span className="text-muted-foreground">
-                                / ${Number(latestBenefits.deductibleFamily) || 0}
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {latestBenefits.renewalDate && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-muted-foreground">
-                            Benefits renew:
-                          </span>
-                          <span className="font-medium">
-                            {latestBenefits.renewalDate}
-                          </span>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base font-semibold">
-                        Coverage by Category
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="flex items-center justify-between rounded-md bg-muted/50 p-4">
-                          <div>
-                            <p className="font-medium">Preventive</p>
-                            <p className="text-sm text-muted-foreground">
-                              Cleanings, X-rays, Exams
-                            </p>
-                          </div>
-                          <CoverageBadge
-                            percentage={latestBenefits.preventiveCoverage || 0}
-                          />
-                        </div>
-                        <div className="flex items-center justify-between rounded-md bg-muted/50 p-4">
-                          <div>
-                            <p className="font-medium">Basic</p>
-                            <p className="text-sm text-muted-foreground">
-                              Fillings, Extractions
-                            </p>
-                          </div>
-                          <CoverageBadge
-                            percentage={latestBenefits.basicCoverage || 0}
-                          />
-                        </div>
-                        <div className="flex items-center justify-between rounded-md bg-muted/50 p-4">
-                          <div>
-                            <p className="font-medium">Major</p>
-                            <p className="text-sm text-muted-foreground">
-                              Crowns, Bridges, Dentures
-                            </p>
-                          </div>
-                          <CoverageBadge
-                            percentage={latestBenefits.majorCoverage || 0}
-                          />
-                        </div>
-                        {latestBenefits.orthodonticCoverage && (
-                          <div className="flex items-center justify-between rounded-md bg-muted/50 p-4">
-                            <div>
-                              <p className="font-medium">Orthodontic</p>
-                              <p className="text-sm text-muted-foreground">
-                                Braces, Aligners
-                              </p>
-                            </div>
-                            <CoverageBadge
-                              percentage={latestBenefits.orthodonticCoverage}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {(latestBenefits.cleaningsPerYear ||
-                    latestBenefits.xraysFrequency ||
-                    latestBenefits.fluorideAgeLimit) && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-base font-semibold">
-                          Frequency Limitations
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="grid gap-4 sm:grid-cols-3">
-                          {latestBenefits.cleaningsPerYear && (
-                            <div>
-                              <p className="text-sm text-muted-foreground">
-                                Cleanings
-                              </p>
-                              <p className="font-medium">
-                                {latestBenefits.cleaningsPerYear} per year
-                              </p>
-                            </div>
-                          )}
-                          {latestBenefits.xraysFrequency && (
-                            <div>
-                              <p className="text-sm text-muted-foreground">
-                                X-rays
-                              </p>
-                              <p className="font-medium">
-                                {latestBenefits.xraysFrequency}
-                              </p>
-                            </div>
-                          )}
-                          {latestBenefits.fluorideAgeLimit && (
-                            <div>
-                              <p className="text-sm text-muted-foreground">
-                                Fluoride
-                              </p>
-                              <p className="font-medium">
-                                Up to age {latestBenefits.fluorideAgeLimit}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
+                  {dentalBenefits && (
+                    <BenefitsCard
+                      title="Dental Benefits"
+                      insuranceType="dental"
+                      benefits={dentalBenefits}
+                    />
+                  )}
+                  
+                  {medicalBenefits && (
+                    <BenefitsCard
+                      title="Medical Benefits"
+                      insuranceType="medical"
+                      benefits={medicalBenefits}
+                    />
                   )}
                 </div>
               ) : (
