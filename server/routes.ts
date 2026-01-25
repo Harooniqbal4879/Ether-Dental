@@ -1279,6 +1279,21 @@ export async function registerRoutes(
     }
   });
 
+  // Get online status for all professionals
+  app.get("/api/professionals/online-status", async (req, res) => {
+    try {
+      const statusMap = await storage.getProfessionalsOnlineStatus();
+      const statusObject: Record<string, boolean> = {};
+      statusMap.forEach((isOnline, id) => {
+        statusObject[id] = isOnline;
+      });
+      res.json(statusObject);
+    } catch (error) {
+      console.error("Error fetching online status:", error);
+      res.status(500).json({ error: "Failed to fetch online status" });
+    }
+  });
+
   app.get("/api/professionals/:id", async (req, res) => {
     try {
       const professional = await storage.getProfessional(req.params.id);

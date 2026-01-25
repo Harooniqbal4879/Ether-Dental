@@ -328,6 +328,7 @@ export interface IStorage {
   updateUserOnlineStatus(userId: string, userType: string, isOnline: boolean): Promise<UserOnlineStatus>;
   getUserOnlineStatus(userId: string): Promise<UserOnlineStatus | undefined>;
   getOnlineHygienists(): Promise<{ id: string; firstName: string; lastName: string; photoUrl: string | null; isOnline: boolean }[]>;
+  getProfessionalsOnlineStatus(): Promise<Map<string, boolean>>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2287,6 +2288,16 @@ export class DatabaseStorage implements IStorage {
     }
 
     return result;
+  }
+
+  async getProfessionalsOnlineStatus(): Promise<Map<string, boolean>> {
+    // Get online status for all professionals
+    const allStatus = await db.select().from(userOnlineStatus);
+    const statusMap = new Map<string, boolean>();
+    for (const status of allStatus) {
+      statusMap.set(status.userId, status.isOnline);
+    }
+    return statusMap;
   }
 }
 

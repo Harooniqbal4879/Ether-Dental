@@ -1812,7 +1812,7 @@ function CredentialSection<T extends { id: string }>({
   );
 }
 
-function ProfessionalCard({ professional }: { professional: ProfessionalWithBadges }) {
+function ProfessionalCard({ professional, isOnline }: { professional: ProfessionalWithBadges; isOnline?: boolean }) {
   const initials = `${professional.firstName[0]}${professional.lastName[0]}`;
   const rating = parseFloat(professional.rating || "0");
 
@@ -1821,12 +1821,21 @@ function ProfessionalCard({ professional }: { professional: ProfessionalWithBadg
       <Card className="hover-elevate cursor-pointer" data-testid={`card-professional-${professional.id}`}>
         <CardContent className="p-4">
           <div className="flex items-start gap-4">
-            <Avatar className="h-14 w-14">
-              <AvatarImage src={professional.photoUrl || undefined} alt={`${professional.firstName} ${professional.lastName}`} />
-              <AvatarFallback className="bg-primary text-primary-foreground text-lg">
-                {initials}
-              </AvatarFallback>
-            </Avatar>
+            <div className="relative">
+              <Avatar className="h-14 w-14">
+                <AvatarImage src={professional.photoUrl || undefined} alt={`${professional.firstName} ${professional.lastName}`} />
+                <AvatarFallback className="bg-primary text-primary-foreground text-lg">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <div
+                className={`absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-background ${
+                  isOnline ? "bg-green-500" : "bg-gray-400"
+                }`}
+                title={isOnline ? "Online" : "Offline"}
+                data-testid={`status-indicator-${professional.id}`}
+              />
+            </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold text-base truncate">
@@ -1836,7 +1845,12 @@ function ProfessionalCard({ professional }: { professional: ProfessionalWithBadg
                   <BadgeCheck className="h-4 w-4 text-primary shrink-0" />
                 )}
               </div>
-              <p className="text-sm text-muted-foreground">{professional.role}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm text-muted-foreground">{professional.role}</p>
+                <span className={`text-xs ${isOnline ? "text-green-600" : "text-muted-foreground"}`}>
+                  {isOnline ? "Online" : "Offline"}
+                </span>
+              </div>
               <div className="flex items-center gap-2 mt-1">
                 {rating > 0 && (
                   <div className="flex items-center gap-1">
@@ -1930,6 +1944,12 @@ export default function ProfessionalsHub() {
 
   const { data: professionals, isLoading } = useQuery<ProfessionalWithBadges[]>({
     queryKey: ["/api/professionals"],
+  });
+
+  // Fetch online status for all professionals - poll every 30 seconds
+  const { data: onlineStatus } = useQuery<Record<string, boolean>>({
+    queryKey: ["/api/professionals/online-status"],
+    refetchInterval: 30000,
   });
 
   const { data: selectedProfessional, isLoading: isLoadingDetail } = useQuery<ProfessionalWithBadges>({
@@ -2050,7 +2070,11 @@ export default function ProfessionalsHub() {
       ) : filteredProfessionals && filteredProfessionals.length > 0 ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filteredProfessionals.map((professional) => (
-            <ProfessionalCard key={professional.id} professional={professional} />
+            <ProfessionalCard 
+              key={professional.id} 
+              professional={professional} 
+              isOnline={onlineStatus?.[professional.id] || false}
+            />
           ))}
         </div>
       ) : (
