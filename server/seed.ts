@@ -72,10 +72,36 @@ async function seed() {
         website: "https://www.principal.com",
         clearinghouseCompatible: true,
       },
+      // Medical Insurance Carriers
+      {
+        name: "Blue Cross Blue Shield",
+        phone: "1-800-262-2583",
+        website: "https://www.bcbs.com",
+        clearinghouseCompatible: true,
+        insuranceType: "medical",
+      },
+      {
+        name: "Aetna Medical",
+        phone: "1-800-872-3862",
+        website: "https://www.aetna.com",
+        clearinghouseCompatible: true,
+        insuranceType: "medical",
+      },
+      {
+        name: "UnitedHealthcare",
+        phone: "1-800-328-5979",
+        website: "https://www.uhc.com",
+        clearinghouseCompatible: true,
+        insuranceType: "medical",
+      },
     ])
     .returning();
 
-  console.log(`Created ${carriers.length} insurance carriers`);
+  // Separate carriers by type
+  const dentalCarriers = carriers.filter(c => c.insuranceType !== "medical");
+  const medicalCarriers = carriers.filter(c => c.insuranceType === "medical");
+  
+  console.log(`Created ${dentalCarriers.length} dental and ${medicalCarriers.length} medical insurance carriers`);
 
   // Seed Platform Settings (global fee configuration)
   const [platformSettingsCreated] = await db.insert(platformSettings).values({
@@ -207,13 +233,14 @@ async function seed() {
   // Create insurance policies for each patient
   for (let i = 0; i < createdPatients.length; i++) {
     const patient = createdPatients[i];
-    const carrier = carriers[i % carriers.length];
+    const dentalCarrier = dentalCarriers[i % dentalCarriers.length];
 
-    const [policy] = await db
+    // Create dental insurance policy
+    const [dentalPolicy] = await db
       .insert(insurancePolicies)
       .values({
         patientId: patient.id,
-        carrierId: carrier.id,
+        carrierId: dentalCarrier.id,
         policyNumber: `POL${String(100000 + i).slice(1)}`,
         groupNumber: `GRP${String(1000 + i).slice(1)}`,
         subscriberName: `${patient.firstName} ${patient.lastName}`,
@@ -224,29 +251,30 @@ async function seed() {
       })
       .returning();
 
-    // Create verification records with varying statuses
+    // Create dental verification records with varying statuses
     const statuses = ["completed", "completed", "pending", "completed", "pending", "in_progress"];
     const status = statuses[i % statuses.length];
     
-    const [verification] = await db
+    const [dentalVerification] = await db
       .insert(verifications)
       .values({
         patientId: patient.id,
-        policyId: policy.id,
+        policyId: dentalPolicy.id,
+        insuranceType: "dental",
         status,
-        method: carrier.clearinghouseCompatible ? "clearinghouse" : "phone",
+        method: dentalCarrier.clearinghouseCompatible ? "clearinghouse" : "phone",
         verifiedAt: status === "completed" ? new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000) : null,
         verifiedBy: status === "completed" 
-          ? (carrier.clearinghouseCompatible ? "System - Clearinghouse" : "System - AI")
+          ? (dentalCarrier.clearinghouseCompatible ? "System - Clearinghouse" : "System - AI")
           : null,
       })
       .returning();
 
-    // Create benefits data for completed verifications
+    // Create dental benefits data for completed verifications
     if (status === "completed") {
       const usedAmount = Math.floor(Math.random() * 800);
       await db.insert(benefits).values({
-        verificationId: verification.id,
+        verificationId: dentalVerification.id,
         annualMaximum: "1500.00",
         annualUsed: String(usedAmount),
         annualRemaining: String(1500 - usedAmount),
@@ -268,9 +296,69 @@ async function seed() {
         inNetwork: true,
       });
     }
+
+    // Add medical insurance for the first 3 patients (dual insurance)
+    if (i < 3 && medicalCarriers.length > 0) {
+      const medicalCarrier = medicalCarriers[i % medicalCarriers.length];
+      
+      // Create medical insurance policy
+      const [medicalPolicy] = await db
+        .insert(insurancePolicies)
+        .values({
+          patientId: patient.id,
+          carrierId: medicalCarrier.id,
+          policyNumber: `MED${String(200000 + i).slice(1)}`,
+          groupNumber: `MGRP${String(2000 + i).slice(1)}`,
+          subscriberName: `${patient.firstName} ${patient.lastName}`,
+          subscriberRelationship: "self",
+          subscriberDob: patient.dateOfBirth,
+          isPrimary: false,
+          effectiveDate: "2024-01-01",
+        })
+        .returning();
+
+      // Create medical verification (completed)
+      const [medicalVerification] = await db
+        .insert(verifications)
+        .values({
+          patientId: patient.id,
+          policyId: medicalPolicy.id,
+          insuranceType: "medical",
+          status: "completed",
+          method: "clearinghouse",
+          verifiedAt: new Date(Date.now() - Math.random() * 5 * 24 * 60 * 60 * 1000),
+          verifiedBy: "System - Availity",
+        })
+        .returning();
+
+      // Create medical benefits data
+      const medicalUsed = Math.floor(Math.random() * 2000);
+      await db.insert(benefits).values({
+        verificationId: medicalVerification.id,
+        annualMaximum: "5000.00",
+        annualUsed: String(medicalUsed),
+        annualRemaining: String(5000 - medicalUsed),
+        deductibleIndividual: "500.00",
+        deductibleIndividualMet: String(Math.min(500, Math.floor(Math.random() * 600))),
+        deductibleFamily: "1500.00",
+        deductibleFamilyMet: String(Math.min(1500, Math.floor(Math.random() * 1600))),
+        preventiveCoverage: 80,
+        basicCoverage: 60,
+        majorCoverage: null,
+        orthodonticCoverage: null,
+        orthodonticMaximum: null,
+        orthodonticUsed: null,
+        cleaningsPerYear: null,
+        xraysFrequency: null,
+        fluorideAgeLimit: null,
+        planYear: "calendar",
+        renewalDate: "January 1",
+        inNetwork: true,
+      });
+    }
   }
 
-  console.log("Created insurance policies and verifications");
+  console.log("Created insurance policies and verifications (dental + medical)");
 
   // Create upcoming appointments
   const appointmentTypes = ["Cleaning", "Exam", "Filling", "Crown", "Root Canal", "Extraction"];
