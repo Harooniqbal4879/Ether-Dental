@@ -3159,5 +3159,209 @@ export async function registerRoutes(
     }
   });
 
+  // ============================================================
+  // Dentrix Ascend Integration API
+  // ============================================================
+
+  // Get Dentrix Ascend configuration
+  app.get("/api/dentrix/config", async (req, res) => {
+    try {
+      const { dentrixAscendService } = await import("./services/dentrix-ascend");
+      const config = await dentrixAscendService.loadConfig();
+      
+      if (!config) {
+        return res.json({ configured: false });
+      }
+      
+      res.json({
+        configured: true,
+        isEnabled: config.isEnabled,
+        autoSyncEnabled: config.autoSyncEnabled,
+        syncIntervalMinutes: config.syncIntervalMinutes,
+        lastSyncAt: config.lastSyncAt,
+        lastSyncStatus: config.lastSyncStatus,
+        lastSyncError: config.lastSyncError,
+        hasCredentials: !!(config.clientId && config.clientSecret && config.apiKey),
+        clientId: config.clientId ? config.clientId.slice(0, 4) + "****" : "",
+        hasClientSecret: !!config.clientSecret,
+        hasApiKey: !!config.apiKey,
+      });
+    } catch (error) {
+      console.error("Error fetching Dentrix config:", error);
+      res.status(500).json({ error: "Failed to fetch Dentrix configuration" });
+    }
+  });
+
+  // Save Dentrix Ascend configuration
+  app.post("/api/dentrix/config", async (req, res) => {
+    try {
+      const { dentrixAscendService } = await import("./services/dentrix-ascend");
+      const { clientId, clientSecret, apiKey, baseUrl, isEnabled, autoSyncEnabled, syncIntervalMinutes } = req.body;
+      
+      const updateData: Record<string, any> = {
+        isEnabled,
+        autoSyncEnabled,
+        syncIntervalMinutes,
+      };
+      
+      if (clientId && clientId.trim()) updateData.clientId = clientId;
+      if (clientSecret && clientSecret.trim()) updateData.clientSecret = clientSecret;
+      if (apiKey && apiKey.trim()) updateData.apiKey = apiKey;
+      if (baseUrl && baseUrl.trim()) updateData.baseUrl = baseUrl;
+      
+      const config = await dentrixAscendService.saveConfig(updateData);
+      
+      res.json({
+        success: true,
+        isEnabled: config.isEnabled,
+        hasCredentials: !!(config.clientId && config.clientSecret && config.apiKey),
+      });
+    } catch (error) {
+      console.error("Error saving Dentrix config:", error);
+      res.status(500).json({ error: "Failed to save Dentrix configuration" });
+    }
+  });
+
+  // Test Dentrix Ascend connection
+  app.post("/api/dentrix/test-connection", async (req, res) => {
+    try {
+      const { dentrixAscendService } = await import("./services/dentrix-ascend");
+      const result = await dentrixAscendService.testConnection();
+      res.json(result);
+    } catch (error) {
+      console.error("Error testing Dentrix connection:", error);
+      res.status(500).json({ success: false, message: "Connection test failed" });
+    }
+  });
+
+  // Start bulk patient sync
+  app.post("/api/dentrix/sync/patients", async (req, res) => {
+    try {
+      const { dentrixAscendService } = await import("./services/dentrix-ascend");
+      const { syncType = "full" } = req.body;
+      
+      const syncLogId = await dentrixAscendService.syncAllPatients(syncType);
+      
+      res.json({
+        success: true,
+        syncLogId,
+        message: "Sync started successfully",
+      });
+    } catch (error) {
+      console.error("Error starting Dentrix sync:", error);
+      const message = error instanceof Error ? error.message : "Failed to start sync";
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // Sync single patient
+  app.post("/api/dentrix/sync/patient/:dentrixPatientId", async (req, res) => {
+    try {
+      const { dentrixAscendService } = await import("./services/dentrix-ascend");
+      const { dentrixPatientId } = req.params;
+      
+      const result = await dentrixAscendService.syncSinglePatient(dentrixPatientId);
+      res.json(result);
+    } catch (error) {
+      console.error("Error syncing single patient:", error);
+      res.status(500).json({ success: false, message: "Failed to sync patient" });
+    }
+  });
+
+  // Get sync status
+  app.get("/api/dentrix/sync/:syncLogId", async (req, res) => {
+    try {
+      const { dentrixAscendService } = await import("./services/dentrix-ascend");
+      const { syncLogId } = req.params;
+      
+      const status = await dentrixAscendService.getSyncStatus(syncLogId);
+      
+      if (!status) {
+        return res.status(404).json({ error: "Sync log not found" });
+      }
+      
+      res.json(status);
+    } catch (error) {
+      console.error("Error fetching sync status:", error);
+      res.status(500).json({ error: "Failed to fetch sync status" });
+    }
+  });
+
+  // Get recent sync logs
+  app.get("/api/dentrix/sync-history", async (req, res) => {
+    try {
+      const { dentrixAscendService } = await import("./services/dentrix-ascend");
+      const limit = parseInt(req.query.limit as string) || 10;
+      
+      const logs = await dentrixAscendService.getRecentSyncLogs(limit);
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching sync history:", error);
+      res.status(500).json({ error: "Failed to fetch sync history" });
+    }
+  });
+
+  // Get patient mapping by Dentrix ID
+  app.get("/api/dentrix/mapping/:dentrixPatientId", async (req, res) => {
+    try {
+      const { dentrixAscendService } = await import("./services/dentrix-ascend");
+      const { dentrixPatientId } = req.params;
+      
+      const mapping = await dentrixAscendService.getPatientMapping(dentrixPatientId);
+      
+      if (!mapping) {
+        return res.status(404).json({ error: "Mapping not found" });
+      }
+      
+      res.json(mapping);
+    } catch (error) {
+      console.error("Error fetching patient mapping:", error);
+      res.status(500).json({ error: "Failed to fetch patient mapping" });
+    }
+  });
+
+  // Generate simulated patients (for testing without live Dentrix connection)
+  app.get("/api/dentrix/simulated-patients", async (req, res) => {
+    try {
+      const { dentrixAscendService } = await import("./services/dentrix-ascend");
+      const count = parseInt(req.query.count as string) || 10;
+      
+      const patients = dentrixAscendService.generateSimulatedPatients(count);
+      res.json(patients);
+    } catch (error) {
+      console.error("Error generating simulated patients:", error);
+      res.status(500).json({ error: "Failed to generate simulated patients" });
+    }
+  });
+
+  // Import simulated patients (for testing)
+  app.post("/api/dentrix/import-simulated", async (req, res) => {
+    try {
+      const { dentrixAscendService } = await import("./services/dentrix-ascend");
+      const { count = 5 } = req.body;
+      
+      const simulatedPatients = dentrixAscendService.generateSimulatedPatients(count);
+      
+      let created = 0;
+      let updated = 0;
+      
+      for (const patient of simulatedPatients) {
+        const result = await dentrixAscendService.syncSinglePatient(patient.id);
+        if (result.action === "created") created++;
+        if (result.action === "updated") updated++;
+      }
+      
+      res.json({
+        success: true,
+        patientsCreated: created,
+        patientsUpdated: updated,
+        message: `Imported ${created} new patients, updated ${updated} existing patients`,
+      });
+    } catch (error) {
+      console.error("Error importing simulated patients:", error);
+      res.status(500).json({ error: "Failed to import simulated patients" });
+    }
+  });
+
   return httpServer;
 }

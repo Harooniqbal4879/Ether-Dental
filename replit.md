@@ -170,3 +170,42 @@ Practice Admins can invite professionals to bid on open shifts through the messa
 ### Key Files
 - `client/src/components/shift-invite-modal.tsx` - Modal for selecting professionals to invite
 - `client/src/pages/staffing.tsx` - Staffing page with invite button in shift detail dialog
+
+## Dentrix Ascend Integration (January 2026)
+Patient data synchronization from Dentrix Ascend practice management system.
+
+### Overview
+Integrates with Dentrix Ascend via REST API to import and sync patient data. Supports both bulk sync operations and individual patient imports, with full tracking of sync history.
+
+### Credentials Required
+Configure in Platform Settings → Dentrix Ascend tab:
+- `Client ID` - OAuth 2.0 Client ID from Dentrix Developer Program
+- `Client Secret` - OAuth 2.0 Client Secret
+- `API Key` - API key from ddp.dentrix.com
+
+### API Endpoints
+- `GET /api/dentrix/config` - Get integration configuration status
+- `POST /api/dentrix/config` - Save integration configuration
+- `POST /api/dentrix/test-connection` - Test API connection
+- `POST /api/dentrix/sync/patients` - Start bulk patient sync
+- `POST /api/dentrix/sync/patient/:dentrixPatientId` - Sync single patient
+- `GET /api/dentrix/sync/:syncLogId` - Get sync operation status
+- `GET /api/dentrix/sync-history` - Get recent sync logs
+- `GET /api/dentrix/mapping/:dentrixPatientId` - Get patient mapping
+- `GET /api/dentrix/simulated-patients` - Generate test patients
+- `POST /api/dentrix/import-simulated` - Import test patients for demo
+
+### Database Tables
+- `dentrix_ascend_config` - Stores OAuth credentials and sync settings
+- `dentrix_sync_log` - Tracks sync operations with statistics
+- `dentrix_patient_mapping` - Links Dentrix patient IDs to local patient records
+
+### UI Location
+- Platform Settings → Dentrix Ascend tab (System Admin only)
+- Configure credentials, enable/disable sync, view sync history
+- Import test patients for demonstration
+
+### Key Files
+- `server/services/dentrix-ascend.ts` - Dentrix Ascend API service with OAuth handling
+- `client/src/pages/platform-settings.tsx` - DentrixAscendIntegrationTab component
+- `shared/schema.ts` - Database schema for Dentrix tables

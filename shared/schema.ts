@@ -1384,6 +1384,70 @@ export type ConversationWithDetails = Conversation & {
   isOnline: boolean;
 };
 
+// Dentrix Ascend Integration Configuration
+export const dentrixAscendConfig = pgTable("dentrix_ascend_config", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  practiceId: varchar("practice_id"), // Links to practice if multi-tenant
+  clientId: text("client_id"), // OAuth client ID
+  clientSecret: text("client_secret"), // OAuth client secret (encrypted)
+  apiKey: text("api_key"), // API key from Dentrix Developer Program
+  baseUrl: text("base_url").default("https://api.dentrixascend.com"),
+  accessToken: text("access_token"), // Current OAuth access token
+  refreshToken: text("refresh_token"), // OAuth refresh token
+  tokenExpiresAt: timestamp("token_expires_at"), // Token expiration
+  isEnabled: boolean("is_enabled").default(false),
+  autoSyncEnabled: boolean("auto_sync_enabled").default(false),
+  syncIntervalMinutes: integer("sync_interval_minutes").default(60),
+  lastSyncAt: timestamp("last_sync_at"),
+  lastSyncStatus: text("last_sync_status"), // success, failed, in_progress
+  lastSyncError: text("last_sync_error"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertDentrixAscendConfigSchema = createInsertSchema(dentrixAscendConfig).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertDentrixAscendConfig = z.infer<typeof insertDentrixAscendConfigSchema>;
+export type DentrixAscendConfig = typeof dentrixAscendConfig.$inferSelect;
+
+// Dentrix Ascend Sync Log - tracks individual sync operations
+export const dentrixSyncLog = pgTable("dentrix_sync_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  configId: varchar("config_id").references(() => dentrixAscendConfig.id, { onDelete: "cascade" }),
+  syncType: text("sync_type").notNull(), // full, incremental, single_patient
+  status: text("status").notNull(), // pending, in_progress, completed, failed
+  patientsProcessed: integer("patients_processed").default(0),
+  patientsCreated: integer("patients_created").default(0),
+  patientsUpdated: integer("patients_updated").default(0),
+  patientsSkipped: integer("patients_skipped").default(0),
+  errorMessage: text("error_message"),
+  startedAt: timestamp("started_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const insertDentrixSyncLogSchema = createInsertSchema(dentrixSyncLog).omit({ id: true, startedAt: true });
+export type InsertDentrixSyncLog = z.infer<typeof insertDentrixSyncLogSchema>;
+export type DentrixSyncLog = typeof dentrixSyncLog.$inferSelect;
+
+// Dentrix Patient Mapping - links Dentrix patient IDs to local patient IDs
+export const dentrixPatientMapping = pgTable("dentrix_patient_mapping", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dentrixPatientId: text("dentrix_patient_id").notNull().unique(),
+  localPatientId: varchar("local_patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
+  lastSyncedAt: timestamp("last_synced_at").defaultNow(),
+  dentrixData: text("dentrix_data"), // JSON snapshot of last synced Dentrix data
+});
+
+export const dentrixPatientMappingRelations = relations(dentrixPatientMapping, ({ one }) => ({
+  patient: one(patients, {
+    fields: [dentrixPatientMapping.localPatientId],
+    references: [patients.id],
+  }),
+}));
+
+export const insertDentrixPatientMappingSchema = createInsertSchema(dentrixPatientMapping).omit({ id: true, lastSyncedAt: true });
+export type InsertDentrixPatientMapping = z.infer<typeof insertDentrixPatientMappingSchema>;
+export type DentrixPatientMapping = typeof dentrixPatientMapping.$inferSelect;
+
 // US States for dropdown
 export const US_STATES = [
   { code: "AL", name: "Alabama" },
