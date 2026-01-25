@@ -67,7 +67,19 @@ import {
   Calendar,
   UserCheck,
   Search,
+  Database,
+  Link2,
+  RefreshCw,
+  Save,
 } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import type { ClearinghouseConfig, InsertClearinghouseConfig, InsuranceCarrier, PracticeLocation, InsertPracticeLocation, US_STATES } from "@shared/schema";
 import { useForm } from "react-hook-form";
@@ -2910,6 +2922,422 @@ function InsuranceCarriersTab() {
   );
 }
 
+interface DentrixConfig {
+  configured: boolean;
+  isEnabled: boolean;
+  autoSyncEnabled: boolean;
+  syncIntervalMinutes: number;
+  lastSyncAt: string | null;
+  lastSyncStatus: string | null;
+  lastSyncError: string | null;
+  hasCredentials: boolean;
+  clientId: string;
+  hasClientSecret: boolean;
+  hasApiKey: boolean;
+}
+
+interface DentrixSyncLog {
+  id: string;
+  syncType: string;
+  status: string;
+  patientsProcessed: number;
+  patientsCreated: number;
+  patientsUpdated: number;
+  patientsSkipped: number;
+  errorMessage: string | null;
+  startedAt: string;
+  completedAt: string | null;
+}
+
+function IntegrationsTab() {
+  const { toast } = useToast();
+  const [clientId, setClientId] = useState("");
+  const [clientSecret, setClientSecret] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [isEnabled, setIsEnabled] = useState(false);
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState(false);
+  const [syncIntervalMinutes, setSyncIntervalMinutes] = useState("60");
+  const [showCredentials, setShowCredentials] = useState(false);
+
+  const practiceId = "default-practice";
+
+  const { data: config, isLoading } = useQuery<DentrixConfig>({
+    queryKey: ["/api/dentrix/config", practiceId],
+    queryFn: async () => {
+      const response = await fetch(`/api/dentrix/config?practiceId=${practiceId}`);
+      return response.json();
+    },
+  });
+
+  const { data: syncHistory } = useQuery<DentrixSyncLog[]>({
+    queryKey: ["/api/dentrix/sync-history"],
+  });
+
+  useEffect(() => {
+    if (config) {
+      setIsEnabled(config.isEnabled);
+      setAutoSyncEnabled(config.autoSyncEnabled);
+      setSyncIntervalMinutes(String(config.syncIntervalMinutes));
+    }
+  }, [config]);
+
+  const saveMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await apiRequest("POST", "/api/dentrix/config", { ...data, practiceId });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/dentrix/config", practiceId] });
+      toast({ title: "Configuration saved", description: "Dentrix Ascend settings have been updated." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to save configuration.", variant: "destructive" });
+    },
+  });
+
+  const testConnectionMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/dentrix/test-connection", { practiceId });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        toast({ title: "Connection successful", description: data.message });
+      } else {
+        toast({ title: "Connection failed", description: data.message, variant: "destructive" });
+      }
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Connection test failed.", variant: "destructive" });
+    },
+  });
+
+  const syncMutation = useMutation({
+    mutationFn: async (syncType: string) => {
+      const response = await apiRequest("POST", "/api/dentrix/sync/patients", { syncType, practiceId });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/dentrix/sync-history"] });
+      toast({ title: "Sync started", description: data.message });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to start sync.", variant: "destructive" });
+    },
+  });
+
+  const importSimulatedMutation = useMutation({
+    mutationFn: async (count: number) => {
+      const response = await apiRequest("POST", "/api/dentrix/import-simulated", { count, practiceId });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dentrix/sync-history"] });
+      toast({ title: "Import complete", description: data.message });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to import patients.", variant: "destructive" });
+    },
+  });
+
+  const handleSave = () => {
+    saveMutation.mutate({
+      clientId: clientId || undefined,
+      clientSecret: clientSecret || undefined,
+      apiKey: apiKey || undefined,
+      isEnabled,
+      autoSyncEnabled,
+      syncIntervalMinutes: parseInt(syncIntervalMinutes),
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Database className="h-6 w-6 text-primary" />
+              <div>
+                <CardTitle>Dentrix Ascend Integration</CardTitle>
+                <CardDescription>
+                  Connect to Dentrix Ascend to sync patient data automatically
+                </CardDescription>
+              </div>
+            </div>
+            {config?.hasCredentials && (
+              <Badge variant={config.isEnabled ? "default" : "secondary"}>
+                {config.isEnabled ? "Enabled" : "Disabled"}
+              </Badge>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
+            <div className="flex items-center gap-3">
+              <Switch
+                id="dentrix-enabled"
+                checked={isEnabled}
+                onCheckedChange={setIsEnabled}
+                data-testid="switch-dentrix-enabled"
+              />
+              <div>
+                <Label htmlFor="dentrix-enabled" className="font-medium">Enable Integration</Label>
+                <p className="text-sm text-muted-foreground">
+                  Allow patient data sync from Dentrix Ascend
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="font-medium">API Credentials</h4>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowCredentials(!showCredentials)}
+                data-testid="button-toggle-credentials"
+              >
+                {showCredentials ? "Hide" : "Show"} Credentials
+              </Button>
+            </div>
+
+            {showCredentials && (
+              <div className="grid gap-4 md:grid-cols-2 p-4 border rounded-lg">
+                <div className="space-y-2">
+                  <Label htmlFor="clientId">Client ID</Label>
+                  <Input
+                    id="clientId"
+                    type="text"
+                    placeholder={config?.clientId || "Enter OAuth Client ID"}
+                    value={clientId}
+                    onChange={(e) => setClientId(e.target.value)}
+                    data-testid="input-dentrix-client-id"
+                  />
+                  {config?.clientId && !clientId && (
+                    <p className="text-xs text-muted-foreground">Current: {config.clientId}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="clientSecret">Client Secret</Label>
+                  <Input
+                    id="clientSecret"
+                    type="password"
+                    placeholder={config?.hasClientSecret ? "********" : "Enter OAuth Client Secret"}
+                    value={clientSecret}
+                    onChange={(e) => setClientSecret(e.target.value)}
+                    data-testid="input-dentrix-client-secret"
+                  />
+                  {config?.hasClientSecret && !clientSecret && (
+                    <p className="text-xs text-green-600">Secret is configured</p>
+                  )}
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="apiKey">API Key</Label>
+                  <Input
+                    id="apiKey"
+                    type="password"
+                    placeholder={config?.hasApiKey ? "********" : "Enter Dentrix Developer Program API Key"}
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    data-testid="input-dentrix-api-key"
+                  />
+                  {config?.hasApiKey && !apiKey ? (
+                    <p className="text-xs text-green-600">API Key is configured</p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Get your API key from the Dentrix Developer Program at ddp.dentrix.com
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-4">
+            <h4 className="font-medium">Sync Settings</h4>
+            <div className="flex items-center justify-between p-4 rounded-lg border">
+              <div className="flex items-center gap-3">
+                <Switch
+                  id="auto-sync"
+                  checked={autoSyncEnabled}
+                  onCheckedChange={setAutoSyncEnabled}
+                  data-testid="switch-auto-sync"
+                />
+                <div>
+                  <Label htmlFor="auto-sync">Automatic Sync</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Automatically sync patient data on a schedule
+                  </p>
+                </div>
+              </div>
+              {autoSyncEnabled && (
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="syncInterval" className="text-sm text-muted-foreground">Every</Label>
+                  <Select value={syncIntervalMinutes} onValueChange={setSyncIntervalMinutes}>
+                    <SelectTrigger className="w-32" data-testid="select-sync-interval">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="15">15 minutes</SelectItem>
+                      <SelectItem value="30">30 minutes</SelectItem>
+                      <SelectItem value="60">1 hour</SelectItem>
+                      <SelectItem value="120">2 hours</SelectItem>
+                      <SelectItem value="240">4 hours</SelectItem>
+                      <SelectItem value="1440">Daily</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Button 
+              onClick={handleSave} 
+              disabled={saveMutation.isPending}
+              data-testid="button-save-dentrix-config"
+            >
+              {saveMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</>
+              ) : (
+                <><Save className="h-4 w-4 mr-2" /> Save Configuration</>
+              )}
+            </Button>
+            <Button 
+              variant="outline"
+              onClick={() => testConnectionMutation.mutate()}
+              disabled={testConnectionMutation.isPending || !config?.hasCredentials}
+              data-testid="button-test-dentrix-connection"
+            >
+              {testConnectionMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Testing...</>
+              ) : (
+                <><Link2 className="h-4 w-4 mr-2" /> Test Connection</>
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Patient Sync</CardTitle>
+          <CardDescription>
+            Manually trigger patient data synchronization or import test data
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap gap-3">
+            <Button
+              onClick={() => syncMutation.mutate("full")}
+              disabled={syncMutation.isPending || !config?.isEnabled}
+              data-testid="button-full-sync"
+            >
+              {syncMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Syncing...</>
+              ) : (
+                <><RefreshCw className="h-4 w-4 mr-2" /> Full Sync</>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => syncMutation.mutate("incremental")}
+              disabled={syncMutation.isPending || !config?.isEnabled}
+              data-testid="button-incremental-sync"
+            >
+              <Clock className="h-4 w-4 mr-2" /> Incremental Sync
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => importSimulatedMutation.mutate(5)}
+              disabled={importSimulatedMutation.isPending}
+              data-testid="button-import-simulated"
+            >
+              {importSimulatedMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Importing...</>
+              ) : (
+                <><Database className="h-4 w-4 mr-2" /> Import Test Patients</>
+              )}
+            </Button>
+          </div>
+
+          {config?.lastSyncAt && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Clock className="h-4 w-4" />
+              Last sync: {new Date(config.lastSyncAt).toLocaleString()}
+              {config.lastSyncStatus && (
+                <Badge variant={config.lastSyncStatus === "success" ? "default" : "destructive"}>
+                  {config.lastSyncStatus}
+                </Badge>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {syncHistory && syncHistory.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Sync History</CardTitle>
+            <CardDescription>Recent patient synchronization operations</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Processed</TableHead>
+                  <TableHead className="text-right">Created</TableHead>
+                  <TableHead className="text-right">Updated</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {syncHistory.map((log) => (
+                  <TableRow key={log.id} data-testid={`sync-log-${log.id}`}>
+                    <TableCell className="text-sm">
+                      {new Date(log.startedAt).toLocaleString()}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{log.syncType}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge 
+                        variant={
+                          log.status === "completed" ? "default" : 
+                          log.status === "failed" ? "destructive" : 
+                          "secondary"
+                        }
+                      >
+                        {log.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">{log.patientsProcessed}</TableCell>
+                    <TableCell className="text-right text-green-600">{log.patientsCreated}</TableCell>
+                    <TableCell className="text-right text-blue-600">{log.patientsUpdated}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 export default function Settings() {
   const [activeTab, setActiveTab] = useState("office-profile");
 
@@ -2938,7 +3366,7 @@ export default function Settings() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="office-profile" className="flex items-center gap-2" data-testid="tab-office-profile">
             Office profile
             <Badge variant="secondary" className="h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
@@ -2970,6 +3398,10 @@ export default function Settings() {
               {tabCounts["billing"]}
             </Badge>
           </TabsTrigger>
+          <TabsTrigger value="integrations" className="flex items-center gap-2" data-testid="tab-integrations">
+            <Plug className="h-4 w-4" />
+            Integrations
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="office-profile">
@@ -2994,6 +3426,10 @@ export default function Settings() {
 
         <TabsContent value="billing">
           <BillingTab />
+        </TabsContent>
+
+        <TabsContent value="integrations">
+          <IntegrationsTab />
         </TabsContent>
       </Tabs>
     </div>

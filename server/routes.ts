@@ -3163,11 +3163,12 @@ export async function registerRoutes(
   // Dentrix Ascend Integration API
   // ============================================================
 
-  // Get Dentrix Ascend configuration
+  // Get Dentrix Ascend configuration (practice-level)
   app.get("/api/dentrix/config", async (req, res) => {
     try {
       const { dentrixAscendService } = await import("./services/dentrix-ascend");
-      const config = await dentrixAscendService.loadConfig();
+      const practiceId = req.query.practiceId as string | undefined;
+      const config = await dentrixAscendService.loadConfig(practiceId);
       
       if (!config) {
         return res.json({ configured: false });
@@ -3192,11 +3193,11 @@ export async function registerRoutes(
     }
   });
 
-  // Save Dentrix Ascend configuration
+  // Save Dentrix Ascend configuration (practice-level)
   app.post("/api/dentrix/config", async (req, res) => {
     try {
       const { dentrixAscendService } = await import("./services/dentrix-ascend");
-      const { clientId, clientSecret, apiKey, baseUrl, isEnabled, autoSyncEnabled, syncIntervalMinutes } = req.body;
+      const { clientId, clientSecret, apiKey, baseUrl, isEnabled, autoSyncEnabled, syncIntervalMinutes, practiceId } = req.body;
       
       const updateData: Record<string, any> = {
         isEnabled,
@@ -3209,7 +3210,7 @@ export async function registerRoutes(
       if (apiKey && apiKey.trim()) updateData.apiKey = apiKey;
       if (baseUrl && baseUrl.trim()) updateData.baseUrl = baseUrl;
       
-      const config = await dentrixAscendService.saveConfig(updateData);
+      const config = await dentrixAscendService.saveConfig(updateData, practiceId);
       
       res.json({
         success: true,
@@ -3222,10 +3223,12 @@ export async function registerRoutes(
     }
   });
 
-  // Test Dentrix Ascend connection
+  // Test Dentrix Ascend connection (practice-level)
   app.post("/api/dentrix/test-connection", async (req, res) => {
     try {
       const { dentrixAscendService } = await import("./services/dentrix-ascend");
+      const { practiceId } = req.body;
+      await dentrixAscendService.loadConfig(practiceId);
       const result = await dentrixAscendService.testConnection();
       res.json(result);
     } catch (error) {
@@ -3234,12 +3237,13 @@ export async function registerRoutes(
     }
   });
 
-  // Start bulk patient sync
+  // Start bulk patient sync (practice-level)
   app.post("/api/dentrix/sync/patients", async (req, res) => {
     try {
       const { dentrixAscendService } = await import("./services/dentrix-ascend");
-      const { syncType = "full" } = req.body;
+      const { syncType = "full", practiceId } = req.body;
       
+      await dentrixAscendService.loadConfig(practiceId);
       const syncLogId = await dentrixAscendService.syncAllPatients(syncType);
       
       res.json({
@@ -3254,12 +3258,14 @@ export async function registerRoutes(
     }
   });
 
-  // Sync single patient
+  // Sync single patient (practice-level)
   app.post("/api/dentrix/sync/patient/:dentrixPatientId", async (req, res) => {
     try {
       const { dentrixAscendService } = await import("./services/dentrix-ascend");
       const { dentrixPatientId } = req.params;
+      const { practiceId } = req.body;
       
+      await dentrixAscendService.loadConfig(practiceId);
       const result = await dentrixAscendService.syncSinglePatient(dentrixPatientId);
       res.json(result);
     } catch (error) {
@@ -3334,12 +3340,13 @@ export async function registerRoutes(
     }
   });
 
-  // Import simulated patients (for testing)
+  // Import simulated patients (for testing) - practice-level
   app.post("/api/dentrix/import-simulated", async (req, res) => {
     try {
       const { dentrixAscendService } = await import("./services/dentrix-ascend");
-      const { count = 5 } = req.body;
+      const { count = 5, practiceId } = req.body;
       
+      await dentrixAscendService.loadConfig(practiceId);
       const simulatedPatients = dentrixAscendService.generateSimulatedPatients(count);
       
       let created = 0;

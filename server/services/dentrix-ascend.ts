@@ -56,18 +56,28 @@ interface PatientListResponse {
 export class DentrixAscendService {
   private config: DentrixAscendConfig | null = null;
   private baseUrl: string = "https://api.dentrixascend.com";
+  private currentPracticeId: string | null = null;
 
-  async loadConfig(): Promise<DentrixAscendConfig | null> {
-    const configs = await db.select().from(dentrixAscendConfig).limit(1);
-    this.config = configs[0] || null;
+  async loadConfig(practiceId?: string): Promise<DentrixAscendConfig | null> {
+    if (practiceId) {
+      this.currentPracticeId = practiceId;
+      const configs = await db.select().from(dentrixAscendConfig)
+        .where(eq(dentrixAscendConfig.practiceId, practiceId))
+        .limit(1);
+      this.config = configs[0] || null;
+    } else {
+      const configs = await db.select().from(dentrixAscendConfig).limit(1);
+      this.config = configs[0] || null;
+    }
     if (this.config?.baseUrl) {
       this.baseUrl = this.config.baseUrl;
     }
     return this.config;
   }
 
-  async saveConfig(config: Partial<DentrixAscendConfig>): Promise<DentrixAscendConfig> {
-    const existing = await this.loadConfig();
+  async saveConfig(config: Partial<DentrixAscendConfig>, practiceId?: string): Promise<DentrixAscendConfig> {
+    const targetPracticeId = practiceId || this.currentPracticeId;
+    const existing = await this.loadConfig(targetPracticeId || undefined);
     
     if (existing) {
       const [updated] = await db
@@ -80,7 +90,7 @@ export class DentrixAscendService {
     } else {
       const [created] = await db
         .insert(dentrixAscendConfig)
-        .values(config as any)
+        .values({ ...config, practiceId: targetPracticeId } as any)
         .returning();
       this.config = created;
       return created;

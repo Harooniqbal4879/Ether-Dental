@@ -175,19 +175,20 @@ Practice Admins can invite professionals to bid on open shifts through the messa
 Patient data synchronization from Dentrix Ascend practice management system.
 
 ### Overview
-Integrates with Dentrix Ascend via REST API to import and sync patient data. Supports both bulk sync operations and individual patient imports, with full tracking of sync history.
+Integrates with Dentrix Ascend via REST API to import and sync patient data. Supports both bulk sync operations and individual patient imports, with full tracking of sync history. **This is a practice-level integration** - each practice configures their own Dentrix credentials.
 
 ### Credentials Required
-Configure in Platform Settings → Dentrix Ascend tab:
+Configure in Office Settings → Integrations tab (Practice Admin):
 - `Client ID` - OAuth 2.0 Client ID from Dentrix Developer Program
 - `Client Secret` - OAuth 2.0 Client Secret
 - `API Key` - API key from ddp.dentrix.com
 
-### API Endpoints
-- `GET /api/dentrix/config` - Get integration configuration status
-- `POST /api/dentrix/config` - Save integration configuration
-- `POST /api/dentrix/test-connection` - Test API connection
-- `POST /api/dentrix/sync/patients` - Start bulk patient sync
+### API Endpoints (Practice-Level)
+All endpoints accept `practiceId` parameter for practice-level isolation:
+- `GET /api/dentrix/config?practiceId=` - Get integration configuration status
+- `POST /api/dentrix/config` - Save integration configuration (includes practiceId in body)
+- `POST /api/dentrix/test-connection` - Test API connection (includes practiceId in body)
+- `POST /api/dentrix/sync/patients` - Start bulk patient sync (includes practiceId in body)
 - `POST /api/dentrix/sync/patient/:dentrixPatientId` - Sync single patient
 - `GET /api/dentrix/sync/:syncLogId` - Get sync operation status
 - `GET /api/dentrix/sync-history` - Get recent sync logs
@@ -196,16 +197,16 @@ Configure in Platform Settings → Dentrix Ascend tab:
 - `POST /api/dentrix/import-simulated` - Import test patients for demo
 
 ### Database Tables
-- `dentrix_ascend_config` - Stores OAuth credentials and sync settings
+- `dentrix_ascend_config` - Stores OAuth credentials and sync settings (practice-level via practiceId)
 - `dentrix_sync_log` - Tracks sync operations with statistics
 - `dentrix_patient_mapping` - Links Dentrix patient IDs to local patient records
 
 ### UI Location
-- Platform Settings → Dentrix Ascend tab (System Admin only)
+- Office Settings → Integrations tab (Practice Admin, Front Desk, Treatment Coordinator, Billing Manager)
 - Configure credentials, enable/disable sync, view sync history
 - Import test patients for demonstration
 
 ### Key Files
 - `server/services/dentrix-ascend.ts` - Dentrix Ascend API service with OAuth handling
-- `client/src/pages/platform-settings.tsx` - DentrixAscendIntegrationTab component
+- `client/src/pages/settings.tsx` - IntegrationsTab component
 - `shared/schema.ts` - Database schema for Dentrix tables
