@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/page-header";
@@ -223,7 +224,7 @@ export default function PatientDetail() {
             </CardContent>
           </Card>
 
-          {primaryPolicy && (
+          {patient.insurancePolicies && patient.insurancePolicies.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base font-semibold">
@@ -231,62 +232,73 @@ export default function PatientDetail() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted text-sm font-semibold">
-                    {primaryPolicy.carrier.name.slice(0, 2).toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="font-medium">{primaryPolicy.carrier.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Primary Insurance
-                    </p>
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="text-muted-foreground">Policy Number</p>
-                    <p className="font-mono font-medium">
-                      {primaryPolicy.policyNumber}
-                    </p>
-                  </div>
-                  {primaryPolicy.groupNumber && (
-                    <div>
-                      <p className="text-muted-foreground">Group Number</p>
-                      <p className="font-mono font-medium">
-                        {primaryPolicy.groupNumber}
-                      </p>
+                {patient.insurancePolicies.map((policy, index) => (
+                  <div key={policy.id} data-testid={`policy-card-${policy.carrier.insuranceType || 'dental'}`}>
+                    {index > 0 && <Separator className="my-4" />}
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted text-sm font-semibold">
+                        {policy.carrier.name.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{policy.carrier.name}</p>
+                          <Badge 
+                            variant="outline" 
+                            className={policy.carrier.insuranceType === 'medical' 
+                              ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+                              : 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300 border-teal-200 dark:border-teal-800'
+                            }
+                          >
+                            {policy.carrier.insuranceType === 'medical' ? 'M' : 'D'}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {policy.isPrimary ? 'Primary Insurance' : 'Secondary Insurance'}
+                        </p>
+                      </div>
                     </div>
-                  )}
-                  <div>
-                    <p className="text-muted-foreground">Subscriber</p>
-                    <p className="font-medium">{primaryPolicy.subscriberName}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Relationship</p>
-                    <p className="font-medium capitalize">
-                      {primaryPolicy.subscriberRelationship}
-                    </p>
-                  </div>
-                </div>
 
-                {primaryPolicy.effectiveDate && (
-                  <>
-                    <Separator />
-                    <div className="flex items-center gap-2 text-sm">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Effective:</span>
-                      <span className="font-medium">
-                        {format(
-                          new Date(primaryPolicy.effectiveDate),
-                          "MMM d, yyyy"
-                        )}
-                      </span>
+                    <div className="grid grid-cols-2 gap-4 text-sm mt-3">
+                      <div>
+                        <p className="text-muted-foreground">Policy Number</p>
+                        <p className="font-mono font-medium">
+                          {policy.policyNumber}
+                        </p>
+                      </div>
+                      {policy.groupNumber && (
+                        <div>
+                          <p className="text-muted-foreground">Group Number</p>
+                          <p className="font-mono font-medium">
+                            {policy.groupNumber}
+                          </p>
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-muted-foreground">Subscriber</p>
+                        <p className="font-medium">{policy.subscriberName}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Relationship</p>
+                        <p className="font-medium capitalize">
+                          {policy.subscriberRelationship}
+                        </p>
+                      </div>
                     </div>
-                  </>
-                )}
+
+                    {policy.effectiveDate && (
+                      <div className="flex items-center gap-2 text-sm mt-3">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">Effective:</span>
+                        <span className="font-medium">
+                          {format(
+                            new Date(policy.effectiveDate),
+                            "MMM d, yyyy"
+                          )}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </CardContent>
             </Card>
           )}
