@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
 import { format } from "date-fns";
@@ -12,6 +13,8 @@ import {
   Clock,
   User,
   Building2,
+  ChevronRight,
+  X,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,6 +23,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/page-header";
 import { VerificationStatusBadge } from "@/components/verification-status-badge";
@@ -27,11 +36,14 @@ import { BenefitsCard } from "@/components/benefits-card";
 import { VerificationTimeline } from "@/components/verification-timeline";
 import { BenefitsDetailSkeleton } from "@/components/loading-skeleton";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { PatientWithInsurance, Verification, Benefit } from "@shared/schema";
+import type { PatientWithInsurance, Verification, Benefit, InsurancePolicy, InsuranceCarrier } from "@shared/schema";
+
+type PolicyWithCarrier = InsurancePolicy & { carrier: InsuranceCarrier };
 
 export default function PatientDetail() {
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
+  const [selectedPolicy, setSelectedPolicy] = useState<PolicyWithCarrier | null>(null);
 
   const { data: patient, isLoading } = useQuery<PatientWithInsurance>({
     queryKey: ["/api/patients", id],
@@ -102,6 +114,23 @@ export default function PatientDetail() {
   const dentalBenefits = dentalVerification?.benefits;
   const medicalBenefits = medicalVerification?.benefits;
   const hasBenefits = dentalBenefits || medicalBenefits;
+
+  // Get benefits for a specific policy based on carrier insurance type
+  const getBenefitsForPolicy = (policy: PolicyWithCarrier) => {
+    const insuranceType = policy.carrier.insuranceType || 'dental';
+    const verification = verifications?.find(
+      v => v.insuranceType === insuranceType && v.status === "completed" && v.benefits
+    );
+    return verification?.benefits;
+  };
+
+  // Get verification for a specific policy
+  const getVerificationForPolicy = (policy: PolicyWithCarrier) => {
+    const insuranceType = policy.carrier.insuranceType || 'dental';
+    return verifications?.find(
+      v => v.insuranceType === insuranceType && v.status === "completed"
+    );
+  };
 
   const getInitials = (firstName: string, lastName: string) => {
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
@@ -231,72 +260,68 @@ export default function PatientDetail() {
                   Insurance Information
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-2">
                 {patient.insurancePolicies.map((policy, index) => (
-                  <div key={policy.id} data-testid={`policy-card-${policy.carrier.insuranceType || 'dental'}`}>
-                    {index > 0 && <Separator className="my-4" />}
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted text-sm font-semibold">
-                        {policy.carrier.name.slice(0, 2).toUpperCase()}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium">{policy.carrier.name}</p>
-                          <Badge 
-                            variant="outline" 
-                            className={policy.carrier.insuranceType === 'medical' 
-                              ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 border-purple-200 dark:border-purple-800'
-                              : 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300 border-teal-200 dark:border-teal-800'
-                            }
-                          >
-                            {policy.carrier.insuranceType === 'medical' ? 'M' : 'D'}
-                          </Badge>
+                  <div key={policy.id}>
+                    {index > 0 && <Separator className="my-3" />}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPolicy(policy as PolicyWithCarrier)}
+                      className="w-full text-left rounded-lg p-3 -mx-3 hover-elevate active-elevate-2 transition-colors cursor-pointer"
+                      data-testid={`policy-card-${policy.carrier.insuranceType || 'dental'}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted text-sm font-semibold">
+                          {policy.carrier.name.slice(0, 2).toUpperCase()}
                         </div>
-                        <p className="text-sm text-muted-foreground">
-                          {policy.isPrimary ? 'Primary Insurance' : 'Secondary Insurance'}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 text-sm mt-3">
-                      <div>
-                        <p className="text-muted-foreground">Policy Number</p>
-                        <p className="font-mono font-medium">
-                          {policy.policyNumber}
-                        </p>
-                      </div>
-                      {policy.groupNumber && (
-                        <div>
-                          <p className="text-muted-foreground">Group Number</p>
-                          <p className="font-mono font-medium">
-                            {policy.groupNumber}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">{policy.carrier.name}</p>
+                            <Badge 
+                              variant="outline" 
+                              className={policy.carrier.insuranceType === 'medical' 
+                                ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+                                : 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300 border-teal-200 dark:border-teal-800'
+                              }
+                            >
+                              {policy.carrier.insuranceType === 'medical' ? 'M' : 'D'}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {policy.isPrimary ? 'Primary Insurance' : 'Secondary Insurance'}
                           </p>
                         </div>
-                      )}
-                      <div>
-                        <p className="text-muted-foreground">Subscriber</p>
-                        <p className="font-medium">{policy.subscriberName}</p>
+                        <ChevronRight className="h-5 w-5 text-muted-foreground" />
                       </div>
-                      <div>
-                        <p className="text-muted-foreground">Relationship</p>
-                        <p className="font-medium capitalize">
-                          {policy.subscriberRelationship}
-                        </p>
-                      </div>
-                    </div>
 
-                    {policy.effectiveDate && (
-                      <div className="flex items-center gap-2 text-sm mt-3">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">Effective:</span>
-                        <span className="font-medium">
-                          {format(
-                            new Date(policy.effectiveDate),
-                            "MMM d, yyyy"
-                          )}
-                        </span>
+                      <div className="grid grid-cols-2 gap-3 text-sm mt-3">
+                        <div>
+                          <p className="text-muted-foreground text-xs">Policy Number</p>
+                          <p className="font-mono font-medium text-sm">
+                            {policy.policyNumber}
+                          </p>
+                        </div>
+                        {policy.groupNumber && (
+                          <div>
+                            <p className="text-muted-foreground text-xs">Group Number</p>
+                            <p className="font-mono font-medium text-sm">
+                              {policy.groupNumber}
+                            </p>
+                          </div>
+                        )}
                       </div>
-                    )}
+
+                      <div className="flex items-center justify-between mt-3 text-xs">
+                        <span className="text-muted-foreground">
+                          Subscriber: {policy.subscriberName} ({policy.subscriberRelationship})
+                        </span>
+                        {policy.effectiveDate && (
+                          <span className="text-muted-foreground">
+                            Effective: {format(new Date(policy.effectiveDate), "MMM d, yyyy")}
+                          </span>
+                        )}
+                      </div>
+                    </button>
                   </div>
                 ))}
               </CardContent>
@@ -402,6 +427,101 @@ export default function PatientDetail() {
           </Tabs>
         </div>
       </div>
+
+      {/* Insurance Benefits Dialog */}
+      <Dialog open={!!selectedPolicy} onOpenChange={() => setSelectedPolicy(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              {selectedPolicy && (
+                <>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted text-sm font-semibold">
+                    {selectedPolicy.carrier.name.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span>{selectedPolicy.carrier.name}</span>
+                      <Badge 
+                        variant="outline" 
+                        className={selectedPolicy.carrier.insuranceType === 'medical' 
+                          ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+                          : 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300 border-teal-200 dark:border-teal-800'
+                        }
+                      >
+                        {selectedPolicy.carrier.insuranceType === 'medical' ? 'Medical' : 'Dental'}
+                      </Badge>
+                    </div>
+                    <p className="text-sm font-normal text-muted-foreground">
+                      {selectedPolicy.isPrimary ? 'Primary Insurance' : 'Secondary Insurance'} · Policy: {selectedPolicy.policyNumber}
+                    </p>
+                  </div>
+                </>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+
+          {selectedPolicy && (
+            <div className="space-y-6 mt-4">
+              {/* Policy Details Section */}
+              <div className="grid grid-cols-2 gap-4 p-4 rounded-lg bg-muted/50">
+                <div>
+                  <p className="text-xs text-muted-foreground">Policy Number</p>
+                  <p className="font-mono font-medium">{selectedPolicy.policyNumber}</p>
+                </div>
+                {selectedPolicy.groupNumber && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Group Number</p>
+                    <p className="font-mono font-medium">{selectedPolicy.groupNumber}</p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-xs text-muted-foreground">Subscriber</p>
+                  <p className="font-medium">{selectedPolicy.subscriberName}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Relationship</p>
+                  <p className="font-medium capitalize">{selectedPolicy.subscriberRelationship}</p>
+                </div>
+                {selectedPolicy.effectiveDate && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Effective Date</p>
+                    <p className="font-medium">
+                      {format(new Date(selectedPolicy.effectiveDate), "MMM d, yyyy")}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Benefits Section */}
+              {getBenefitsForPolicy(selectedPolicy) ? (
+                <BenefitsCard
+                  title={selectedPolicy.carrier.insuranceType === 'medical' ? 'Medical Benefits' : 'Dental Benefits'}
+                  benefits={getBenefitsForPolicy(selectedPolicy)!}
+                  insuranceType={(selectedPolicy.carrier.insuranceType as 'dental' | 'medical') || 'dental'}
+                />
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <CreditCard className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p className="font-medium">No Benefits Available</p>
+                  <p className="text-sm mt-1">
+                    Benefits will appear here after insurance verification is completed.
+                  </p>
+                  <Button 
+                    className="mt-4" 
+                    onClick={() => {
+                      setSelectedPolicy(null);
+                      verifyMutation.mutate();
+                    }}
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Verify Insurance
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
