@@ -157,6 +157,86 @@ export async function registerRoutes(
     }
   });
 
+  // Import patients from CSV
+  app.post("/api/patients/import-csv", async (req, res) => {
+    try {
+      const { patients } = req.body;
+      
+      if (!Array.isArray(patients) || patients.length === 0) {
+        return res.status(400).json({ error: "No patients provided" });
+      }
+      
+      let created = 0;
+      let updated = 0;
+      let errors: string[] = [];
+      
+      for (const p of patients) {
+        try {
+          // Normalize field names (support both snake_case and camelCase)
+          const firstName = p.first_name || p.firstname || p.firstName || "";
+          const lastName = p.last_name || p.lastname || p.lastName || "";
+          
+          if (!firstName || !lastName) {
+            errors.push(`Missing name for row: ${JSON.stringify(p)}`);
+            continue;
+          }
+          
+          const dateOfBirth = p.date_of_birth || p.dateofbirth || p.dob || p.dateOfBirth || "";
+          const email = p.email || "";
+          const phone = p.phone || p.phone_number || p.phoneNumber || "";
+          const address = p.address || p.street_address || p.streetAddress || "";
+          const city = p.city || "";
+          const state = p.state || "";
+          const zipCode = p.zip_code || p.zipcode || p.zip || p.zipCode || "";
+          
+          // Check if patient already exists (by email or name+DOB)
+          const allPatients = await storage.getPatients();
+          const existingPatient = allPatients.find(existing => 
+            (email && existing.email?.toLowerCase() === email.toLowerCase()) ||
+            (existing.firstName.toLowerCase() === firstName.toLowerCase() && 
+             existing.lastName.toLowerCase() === lastName.toLowerCase() &&
+             existing.dateOfBirth === dateOfBirth)
+          );
+          
+          if (existingPatient) {
+            // Skip existing patient (don't overwrite existing data)
+            // Could implement update logic here if needed in future
+            updated++; // "updated" here means "skipped - already exists"
+          } else {
+            // Create new patient
+            await storage.createPatient({
+              firstName,
+              lastName,
+              dateOfBirth: dateOfBirth || null,
+              email: email || null,
+              phone: phone || null,
+              address: address || null,
+              city: city || null,
+              state: state || null,
+              zipCode: zipCode || null,
+            });
+            created++;
+          }
+        } catch (err) {
+          console.error("Error importing patient:", err);
+          errors.push(`Failed to import: ${p.first_name || p.firstname} ${p.last_name || p.lastname}`);
+        }
+      }
+      
+      res.json({
+        success: true,
+        created,
+        skipped: updated, // Renamed for clarity - these are existing patients that were skipped
+        updated: 0, // No actual updates performed
+        errors: errors.length > 0 ? errors : undefined,
+        message: `Imported ${created} new patients${updated > 0 ? ` (${updated} already existed)` : ""}`,
+      });
+    } catch (error) {
+      console.error("Error importing patients from CSV:", error);
+      res.status(500).json({ error: "Failed to import patients" });
+    }
+  });
+
   // Patient Verifications
   app.get("/api/patients/:id/verifications", async (req, res) => {
     try {

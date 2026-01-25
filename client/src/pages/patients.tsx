@@ -1,8 +1,9 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useRef } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation, useSearch } from "wouter";
 import { format, isToday, isTomorrow } from "date-fns";
-import { Plus, Users, ChevronRight, Phone, Mail, Calendar, Clock, RefreshCw, Shield } from "lucide-react";
+import { Plus, Users, ChevronRight, Phone, Mail, Calendar, Clock, RefreshCw, Shield, Upload, FileSpreadsheet, X, Download } from "lucide-react";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -22,6 +23,15 @@ import { VerificationStatusBadge } from "@/components/verification-status-badge"
 import { PatientCardSkeleton, TableRowSkeleton } from "@/components/loading-skeleton";
 import { EmptyState } from "@/components/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 import type { PatientWithInsurance, Appointment, Patient, Verification } from "@shared/schema";
 import { EligibilityTabContent } from "./eligibility";
 
@@ -374,6 +384,11 @@ function AppointmentsTab() {
 export default function Patients() {
   const searchString = useSearch();
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [importPreview, setImportPreview] = useState<any[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const params = new URLSearchParams(searchString);
   const tabFromUrl = params.get("tab") || "patients";
@@ -391,20 +406,252 @@ export default function Patients() {
     }
   };
 
+  const importMutation = useMutation({
+    mutationFn: async (data: { patients: any[] }) => {
+      const response = await apiRequest("POST", "/api/patients/import-csv", data);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Import Successful",
+        description: data.message || `Imported ${data.created} new patients${data.skipped > 0 ? ` (${data.skipped} already existed)` : ""}`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
+      setShowImportDialog(false);
+      setSelectedFile(null);
+      setImportPreview([]);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Import Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Parse a CSV line handling quoted fields
+  const parseCSVLine = (line: string): string[] => {
+    const result: string[] = [];
+    let current = "";
+    let inQuotes = false;
+    
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === "," && !inQuotes) {
+        result.push(current.trim());
+        current = "";
+      } else {
+        current += char;
+      }
+    }
+    result.push(current.trim());
+    return result;
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    if (!file.name.endsWith(".csv")) {
+      toast({
+        title: "Invalid File",
+        description: "Please select a CSV file",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setSelectedFile(file);
+    
+    // Parse CSV for preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      const lines = text.split("\n").filter(line => line.trim());
+      if (lines.length < 2) {
+        toast({
+          title: "Invalid CSV",
+          description: "CSV file must have a header row and at least one data row",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().replace(/['"]/g, ""));
+      const patients = lines.slice(1).map(line => {
+        const values = parseCSVLine(line);
+        const patient: Record<string, string> = {};
+        headers.forEach((header, i) => {
+          patient[header] = values[i] || "";
+        });
+        return patient;
+      }).filter(p => p.firstname || p.first_name || p.lastname || p.last_name);
+      
+      setImportPreview(patients.slice(0, 5)); // Show first 5 for preview
+    };
+    reader.readAsText(file);
+  };
+
+  const handleImport = () => {
+    if (!selectedFile) return;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      const lines = text.split("\n").filter(line => line.trim());
+      const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().replace(/['"]/g, ""));
+      const patients = lines.slice(1).map(line => {
+        const values = parseCSVLine(line);
+        const patient: Record<string, string> = {};
+        headers.forEach((header, i) => {
+          patient[header] = values[i] || "";
+        });
+        return patient;
+      }).filter(p => p.firstname || p.first_name || p.lastname || p.last_name);
+      
+      importMutation.mutate({ patients });
+    };
+    reader.readAsText(selectedFile);
+  };
+
+  const downloadTemplate = () => {
+    const headers = "first_name,last_name,date_of_birth,email,phone,address,city,state,zip_code";
+    const example = "John,Doe,1985-03-15,john.doe@example.com,555-123-4567,123 Main St,Springfield,CA,90210";
+    const csv = `${headers}\n${example}`;
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "patient_import_template.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6 p-6">
       <PageHeader
         title="Patients"
         description="Manage patients, insurance verifications, and appointments"
         actions={
-          <Button asChild data-testid="button-add-patient">
-            <Link href="/patients/new">
-              <Plus className="mr-2 h-4 w-4" />
-              Add Patient
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowImportDialog(true)}
+              data-testid="button-import-csv"
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              Import CSV
+            </Button>
+            <Button asChild data-testid="button-add-patient">
+              <Link href="/patients/new">
+                <Plus className="mr-2 h-4 w-4" />
+                Add Patient
+              </Link>
+            </Button>
+          </div>
         }
       />
+
+      <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Import Patients from CSV</DialogTitle>
+            <DialogDescription>
+              Upload a CSV file with patient data. Required columns: first_name, last_name
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Button variant="outline" size="sm" onClick={downloadTemplate} data-testid="button-download-template">
+                <Download className="mr-2 h-4 w-4" />
+                Download Template
+              </Button>
+            </div>
+            
+            <div 
+              className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover-elevate"
+              onClick={() => fileInputRef.current?.click()}
+              data-testid="csv-drop-zone"
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv"
+                onChange={handleFileSelect}
+                className="hidden"
+                data-testid="input-csv-file"
+              />
+              {selectedFile ? (
+                <div className="flex items-center justify-center gap-2">
+                  <FileSpreadsheet className="h-8 w-8 text-primary" />
+                  <div className="text-left">
+                    <p className="font-medium">{selectedFile.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {importPreview.length > 0 && `${importPreview.length}+ patients found`}
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedFile(null);
+                      setImportPreview([]);
+                    }}
+                    data-testid="button-remove-file"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div>
+                  <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                  <p className="text-sm text-muted-foreground">
+                    Click to select a CSV file or drag and drop
+                  </p>
+                </div>
+              )}
+            </div>
+            
+            {importPreview.length > 0 && (
+              <div className="border rounded-lg p-3">
+                <p className="text-sm font-medium mb-2">Preview (first {importPreview.length} rows):</p>
+                <div className="text-xs space-y-1 max-h-32 overflow-y-auto">
+                  {importPreview.map((p, i) => (
+                    <div key={i} className="flex gap-2 text-muted-foreground">
+                      <span>{p.first_name || p.firstname}</span>
+                      <span>{p.last_name || p.lastname}</span>
+                      <span>{p.email}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowImportDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleImport} 
+              disabled={!selectedFile || importMutation.isPending}
+              data-testid="button-confirm-import"
+            >
+              {importMutation.isPending ? "Importing..." : "Import Patients"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
         <TabsList className="grid w-full max-w-md grid-cols-3">
