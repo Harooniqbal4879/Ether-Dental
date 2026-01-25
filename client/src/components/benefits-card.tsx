@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Stethoscope, ChevronRight } from "lucide-react";
+import { Calendar, Stethoscope } from "lucide-react";
 import { BenefitsProgress } from "./benefits-progress";
 import { CoverageBadge } from "./coverage-badge";
 import type { Benefit } from "@shared/schema";
@@ -44,9 +44,6 @@ export function BenefitsCard({ title, insuranceType, benefits, className, onClic
                 <Calendar className="h-3.5 w-3.5" />
                 Renews: {benefits.renewalDate}
               </div>
-            )}
-            {isClickable && (
-              <ChevronRight className="h-5 w-5 text-muted-foreground" />
             )}
           </div>
         </div>
@@ -180,6 +177,17 @@ export function BenefitsCard({ title, insuranceType, benefits, className, onClic
               </div>
             </div>
           </>
+        )}
+
+        {isClickable && (
+          <div className="pt-2 text-right">
+            <span 
+              className="text-sm text-primary hover:underline cursor-pointer"
+              data-testid={`link-${insuranceType}-details`}
+            >
+              Additional details click here
+            </span>
+          </div>
         )}
       </CardContent>
     </Card>
