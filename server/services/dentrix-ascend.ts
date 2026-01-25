@@ -65,9 +65,17 @@ export class DentrixAscendService {
         .where(eq(dentrixAscendConfig.practiceId, practiceId))
         .limit(1);
       this.config = configs[0] || null;
-    } else {
-      const configs = await db.select().from(dentrixAscendConfig).limit(1);
+    } else if (this.currentPracticeId) {
+      // Use cached practiceId if available
+      const configs = await db.select().from(dentrixAscendConfig)
+        .where(eq(dentrixAscendConfig.practiceId, this.currentPracticeId))
+        .limit(1);
       this.config = configs[0] || null;
+    } else {
+      // No practiceId available - return null for safety (practice isolation)
+      console.warn("DentrixAscendService: No practiceId provided - practice isolation requires explicit practiceId");
+      this.config = null;
+      return null;
     }
     if (this.config?.baseUrl) {
       this.baseUrl = this.config.baseUrl;
@@ -98,13 +106,21 @@ export class DentrixAscendService {
   }
 
   async testConnection(): Promise<{ success: boolean; message: string }> {
-    const config = await this.loadConfig();
+    // Use already-loaded config - loadConfig should be called first by the route handler
+    if (!this.config && !this.currentPracticeId) {
+      return { success: false, message: "Practice not configured - loadConfig must be called first with practiceId" };
+    }
     
-    if (!config?.clientId || !config?.clientSecret) {
+    // Reload if we have practiceId but no config
+    if (!this.config && this.currentPracticeId) {
+      await this.loadConfig(this.currentPracticeId);
+    }
+    
+    if (!this.config?.clientId || !this.config?.clientSecret) {
       return { success: false, message: "Missing OAuth credentials (Client ID and Client Secret)" };
     }
 
-    if (!config?.apiKey) {
+    if (!this.config?.apiKey) {
       return { success: false, message: "Missing API Key" };
     }
 
@@ -398,10 +414,19 @@ export class DentrixAscendService {
     return log || null;
   }
 
-  async getRecentSyncLogs(limit: number = 10): Promise<typeof dentrixSyncLog.$inferSelect[]> {
+  async getRecentSyncLogs(limit: number = 10, practiceId?: string): Promise<typeof dentrixSyncLog.$inferSelect[]> {
+    // Filter by practiceId if provided (sync logs are associated with configs)
+    const targetPracticeId = practiceId || this.currentPracticeId;
+    
+    if (!targetPracticeId) {
+      console.warn("DentrixAscendService: No practiceId for getRecentSyncLogs - returning empty array for safety");
+      return [];
+    }
+    
     return db
       .select()
       .from(dentrixSyncLog)
+      .where(eq(dentrixSyncLog.configId, this.config?.id || ""))
       .orderBy(dentrixSyncLog.startedAt)
       .limit(limit);
   }
@@ -435,4 +460,15 @@ export class DentrixAscendService {
   }
 }
 
+/**
+ * Creates a new per-request DentrixAscendService instance scoped to a specific practice.
+ * This ensures practice isolation for multi-tenant safety.
+ */
+export function createDentrixService(practiceId: string): DentrixAscendService {
+  const service = new DentrixAscendService();
+  service['currentPracticeId'] = practiceId;
+  return service;
+}
+
+// Legacy singleton export for backward compatibility - prefer createDentrixService for new code
 export const dentrixAscendService = new DentrixAscendService();

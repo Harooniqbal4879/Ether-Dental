@@ -3166,9 +3166,15 @@ export async function registerRoutes(
   // Get Dentrix Ascend configuration (practice-level)
   app.get("/api/dentrix/config", async (req, res) => {
     try {
-      const { dentrixAscendService } = await import("./services/dentrix-ascend");
+      const { createDentrixService } = await import("./services/dentrix-ascend");
       const practiceId = req.query.practiceId as string | undefined;
-      const config = await dentrixAscendService.loadConfig(practiceId);
+      
+      if (!practiceId) {
+        return res.status(400).json({ error: "practiceId is required for practice-level integration" });
+      }
+      
+      const service = createDentrixService(practiceId);
+      const config = await service.loadConfig(practiceId);
       
       if (!config) {
         return res.json({ configured: false });
@@ -3196,9 +3202,14 @@ export async function registerRoutes(
   // Save Dentrix Ascend configuration (practice-level)
   app.post("/api/dentrix/config", async (req, res) => {
     try {
-      const { dentrixAscendService } = await import("./services/dentrix-ascend");
+      const { createDentrixService } = await import("./services/dentrix-ascend");
       const { clientId, clientSecret, apiKey, baseUrl, isEnabled, autoSyncEnabled, syncIntervalMinutes, practiceId } = req.body;
       
+      if (!practiceId) {
+        return res.status(400).json({ error: "practiceId is required for practice-level integration" });
+      }
+      
+      const service = createDentrixService(practiceId);
       const updateData: Record<string, any> = {
         isEnabled,
         autoSyncEnabled,
@@ -3210,7 +3221,7 @@ export async function registerRoutes(
       if (apiKey && apiKey.trim()) updateData.apiKey = apiKey;
       if (baseUrl && baseUrl.trim()) updateData.baseUrl = baseUrl;
       
-      const config = await dentrixAscendService.saveConfig(updateData, practiceId);
+      const config = await service.saveConfig(updateData, practiceId);
       
       res.json({
         success: true,
@@ -3226,10 +3237,16 @@ export async function registerRoutes(
   // Test Dentrix Ascend connection (practice-level)
   app.post("/api/dentrix/test-connection", async (req, res) => {
     try {
-      const { dentrixAscendService } = await import("./services/dentrix-ascend");
+      const { createDentrixService } = await import("./services/dentrix-ascend");
       const { practiceId } = req.body;
-      await dentrixAscendService.loadConfig(practiceId);
-      const result = await dentrixAscendService.testConnection();
+      
+      if (!practiceId) {
+        return res.status(400).json({ success: false, message: "practiceId is required for practice-level integration" });
+      }
+      
+      const service = createDentrixService(practiceId);
+      await service.loadConfig(practiceId);
+      const result = await service.testConnection();
       res.json(result);
     } catch (error) {
       console.error("Error testing Dentrix connection:", error);
@@ -3240,11 +3257,16 @@ export async function registerRoutes(
   // Start bulk patient sync (practice-level)
   app.post("/api/dentrix/sync/patients", async (req, res) => {
     try {
-      const { dentrixAscendService } = await import("./services/dentrix-ascend");
+      const { createDentrixService } = await import("./services/dentrix-ascend");
       const { syncType = "full", practiceId } = req.body;
       
-      await dentrixAscendService.loadConfig(practiceId);
-      const syncLogId = await dentrixAscendService.syncAllPatients(syncType);
+      if (!practiceId) {
+        return res.status(400).json({ error: "practiceId is required for practice-level integration" });
+      }
+      
+      const service = createDentrixService(practiceId);
+      await service.loadConfig(practiceId);
+      const syncLogId = await service.syncAllPatients(syncType);
       
       res.json({
         success: true,
@@ -3261,12 +3283,17 @@ export async function registerRoutes(
   // Sync single patient (practice-level)
   app.post("/api/dentrix/sync/patient/:dentrixPatientId", async (req, res) => {
     try {
-      const { dentrixAscendService } = await import("./services/dentrix-ascend");
+      const { createDentrixService } = await import("./services/dentrix-ascend");
       const { dentrixPatientId } = req.params;
       const { practiceId } = req.body;
       
-      await dentrixAscendService.loadConfig(practiceId);
-      const result = await dentrixAscendService.syncSinglePatient(dentrixPatientId);
+      if (!practiceId) {
+        return res.status(400).json({ success: false, message: "practiceId is required for practice-level integration" });
+      }
+      
+      const service = createDentrixService(practiceId);
+      await service.loadConfig(practiceId);
+      const result = await service.syncSinglePatient(dentrixPatientId);
       res.json(result);
     } catch (error) {
       console.error("Error syncing single patient:", error);
@@ -3274,13 +3301,20 @@ export async function registerRoutes(
     }
   });
 
-  // Get sync status
+  // Get sync status (practice-level)
   app.get("/api/dentrix/sync/:syncLogId", async (req, res) => {
     try {
-      const { dentrixAscendService } = await import("./services/dentrix-ascend");
+      const { createDentrixService } = await import("./services/dentrix-ascend");
       const { syncLogId } = req.params;
+      const practiceId = req.query.practiceId as string | undefined;
       
-      const status = await dentrixAscendService.getSyncStatus(syncLogId);
+      if (!practiceId) {
+        return res.status(400).json({ error: "practiceId is required for practice-level integration" });
+      }
+      
+      const service = createDentrixService(practiceId);
+      await service.loadConfig(practiceId);
+      const status = await service.getSyncStatus(syncLogId);
       
       if (!status) {
         return res.status(404).json({ error: "Sync log not found" });
@@ -3293,13 +3327,20 @@ export async function registerRoutes(
     }
   });
 
-  // Get recent sync logs
+  // Get recent sync logs (practice-level)
   app.get("/api/dentrix/sync-history", async (req, res) => {
     try {
-      const { dentrixAscendService } = await import("./services/dentrix-ascend");
+      const { createDentrixService } = await import("./services/dentrix-ascend");
+      const practiceId = req.query.practiceId as string | undefined;
       const limit = parseInt(req.query.limit as string) || 10;
       
-      const logs = await dentrixAscendService.getRecentSyncLogs(limit);
+      if (!practiceId) {
+        return res.status(400).json({ error: "practiceId is required for practice-level integration" });
+      }
+      
+      const service = createDentrixService(practiceId);
+      await service.loadConfig(practiceId);
+      const logs = await service.getRecentSyncLogs(limit, practiceId);
       res.json(logs);
     } catch (error) {
       console.error("Error fetching sync history:", error);
@@ -3307,13 +3348,20 @@ export async function registerRoutes(
     }
   });
 
-  // Get patient mapping by Dentrix ID
+  // Get patient mapping by Dentrix ID (practice-level)
   app.get("/api/dentrix/mapping/:dentrixPatientId", async (req, res) => {
     try {
-      const { dentrixAscendService } = await import("./services/dentrix-ascend");
+      const { createDentrixService } = await import("./services/dentrix-ascend");
       const { dentrixPatientId } = req.params;
+      const practiceId = req.query.practiceId as string | undefined;
       
-      const mapping = await dentrixAscendService.getPatientMapping(dentrixPatientId);
+      if (!practiceId) {
+        return res.status(400).json({ error: "practiceId is required for practice-level integration" });
+      }
+      
+      const service = createDentrixService(practiceId);
+      await service.loadConfig(practiceId);
+      const mapping = await service.getPatientMapping(dentrixPatientId);
       
       if (!mapping) {
         return res.status(404).json({ error: "Mapping not found" });
@@ -3327,12 +3375,14 @@ export async function registerRoutes(
   });
 
   // Generate simulated patients (for testing without live Dentrix connection)
+  // Note: This just generates mock data, no practiceId needed - using static method
   app.get("/api/dentrix/simulated-patients", async (req, res) => {
     try {
-      const { dentrixAscendService } = await import("./services/dentrix-ascend");
+      const { DentrixAscendService } = await import("./services/dentrix-ascend");
       const count = parseInt(req.query.count as string) || 10;
       
-      const patients = dentrixAscendService.generateSimulatedPatients(count);
+      const service = new DentrixAscendService();
+      const patients = service.generateSimulatedPatients(count);
       res.json(patients);
     } catch (error) {
       console.error("Error generating simulated patients:", error);
@@ -3343,17 +3393,22 @@ export async function registerRoutes(
   // Import simulated patients (for testing) - practice-level
   app.post("/api/dentrix/import-simulated", async (req, res) => {
     try {
-      const { dentrixAscendService } = await import("./services/dentrix-ascend");
+      const { createDentrixService } = await import("./services/dentrix-ascend");
       const { count = 5, practiceId } = req.body;
       
-      await dentrixAscendService.loadConfig(practiceId);
-      const simulatedPatients = dentrixAscendService.generateSimulatedPatients(count);
+      if (!practiceId) {
+        return res.status(400).json({ error: "practiceId is required for practice-level integration" });
+      }
+      
+      const service = createDentrixService(practiceId);
+      await service.loadConfig(practiceId);
+      const simulatedPatients = service.generateSimulatedPatients(count);
       
       let created = 0;
       let updated = 0;
       
       for (const patient of simulatedPatients) {
-        const result = await dentrixAscendService.syncSinglePatient(patient.id);
+        const result = await service.syncSinglePatient(patient.id);
         if (result.action === "created") created++;
         if (result.action === "updated") updated++;
       }

@@ -2970,7 +2970,11 @@ function IntegrationsTab() {
   });
 
   const { data: syncHistory } = useQuery<DentrixSyncLog[]>({
-    queryKey: ["/api/dentrix/sync-history"],
+    queryKey: ["/api/dentrix/sync-history", practiceId],
+    queryFn: async () => {
+      const response = await fetch(`/api/dentrix/sync-history?practiceId=${practiceId}`);
+      return response.json();
+    },
   });
 
   useEffect(() => {
@@ -3018,7 +3022,7 @@ function IntegrationsTab() {
       return response.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/dentrix/sync-history"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dentrix/sync-history", practiceId] });
       toast({ title: "Sync started", description: data.message });
     },
     onError: (error: any) => {
@@ -3033,7 +3037,7 @@ function IntegrationsTab() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dentrix/sync-history"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dentrix/sync-history", practiceId] });
       toast({ title: "Import complete", description: data.message });
     },
     onError: () => {
