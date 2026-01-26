@@ -821,7 +821,7 @@ export default function AddShiftPage() {
               
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-sm">Hygienist wages</span>
+                  <span className="text-sm">Professional wages</span>
                   <span className="text-sm font-medium" data-testid="text-base-wage">
                     ${pricing.baseWage.toFixed(2)}
                   </span>

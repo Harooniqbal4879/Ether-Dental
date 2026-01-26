@@ -244,7 +244,7 @@ export default function MessagingPage() {
                 (isProfessional ? practicesWithoutConversation.length === 0 : hygienistsWithoutConversation.length === 0) && (
                 <div className="p-4 text-center text-muted-foreground">
                   <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p>{isProfessional ? "No practices available" : "No hygienists available"}</p>
+                  <p>{isProfessional ? "No practices available" : "No professionals available"}</p>
                 </div>
               )}
 
@@ -493,7 +493,7 @@ export default function MessagingPage() {
               <p className="text-sm">
                 {isProfessional 
                   ? "Choose a practice from the list to start messaging" 
-                  : "Choose a hygienist from the list to start messaging"
+                  : "Choose a professional from the list to start messaging"
                 }
               </p>
             </div>

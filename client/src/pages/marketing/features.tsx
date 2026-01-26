@@ -46,7 +46,7 @@ const features = [
   {
     icon: MessageSquare,
     title: "Messaging Center",
-    description: "Real-time messaging system for practice admins to communicate with hygienists and send shift invitations.",
+    description: "Real-time messaging system for practice admins to communicate with professionals and send shift invitations.",
   },
   {
     icon: FileText,

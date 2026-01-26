@@ -120,7 +120,7 @@ export default function Landing() {
                 onKeyDown={(e) => e.key === 'Enter' && handleProfessionalLogin()}
                 tabIndex={0}
                 role="button"
-                aria-label="Sign in as a professional - for hygienists and dental professionals"
+                aria-label="Sign in as a professional - for dental professionals"
                 data-testid="card-professional-login"
               >
                 <CardHeader className="text-center pb-2">
@@ -129,7 +129,7 @@ export default function Landing() {
                   </div>
                   <CardTitle className="text-xl" data-testid="text-prof-title">Professional Login</CardTitle>
                   <CardDescription data-testid="text-prof-description">
-                    For hygienists and dental professionals
+                    For dental professionals
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="text-center">

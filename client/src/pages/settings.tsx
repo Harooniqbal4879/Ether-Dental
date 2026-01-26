@@ -927,7 +927,7 @@ function OfficeProfileTab() {
           </div>
           <Separator />
           <div className="flex items-center justify-between py-2">
-            <span className="font-medium">Number of hygienists</span>
+            <span className="font-medium">Number of professionals</span>
             <NumberInput
               value={officeData.numHygienists}
               onChange={(val) => setOfficeData({ ...officeData, numHygienists: val })}
@@ -1355,9 +1355,9 @@ function PracticeInformationTab() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Responsibilities of temporary hygienists</CardTitle>
+          <CardTitle className="text-base">Responsibilities of temporary professionals</CardTitle>
           <CardDescription>
-            Select the clinical duties temporary hygienists may perform at your office
+            Select the clinical duties temporary professionals may perform at your office
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -1680,14 +1680,14 @@ function StaffingSettingsTab() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Main contact for hygienist</CardTitle>
+          <CardTitle className="text-base">Main contact for professionals</CardTitle>
           <CardDescription>
-            This will be shared with hygienists in case they have questions about your office
+            This will be shared with professionals in case they have questions about your office
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
-            <Label>Who should hygienists reach out to?</Label>
+            <Label>Who should professionals reach out to?</Label>
             <Select
               value={settings.mainContact}
               onValueChange={(value) => setSettings({ ...settings, mainContact: value })}
@@ -1934,7 +1934,7 @@ function StaffingSettingsTab() {
           </div>
           <Separator />
           <div className="flex items-center justify-between py-2">
-            <span className="font-medium">Are you able to accommodate left-handed hygienists?</span>
+            <span className="font-medium">Are you able to accommodate left-handed professionals?</span>
             <YesNoToggle
               value={settings.accommodateLeftHanded}
               onChange={(val) => setSettings({ ...settings, accommodateLeftHanded: val })}
@@ -1943,7 +1943,7 @@ function StaffingSettingsTab() {
           </div>
           <Separator />
           <div className="space-y-2 py-2">
-            <Label>Communicate any additional expectations for temporary hygienists (optional)</Label>
+            <Label>Communicate any additional expectations for temporary professionals (optional)</Label>
             <Textarea
               placeholder="Description"
               value={settings.additionalExpectations}
