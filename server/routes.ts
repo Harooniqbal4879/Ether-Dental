@@ -3131,6 +3131,46 @@ export async function registerRoutes(
     }
   });
 
+  // Get all practice contacts for professionals to message
+  app.get("/api/messaging/practices", async (req, res) => {
+    try {
+      const practices = await storage.getPracticeContacts();
+      res.json(practices);
+    } catch (error) {
+      console.error("Error fetching practice contacts:", error);
+      res.status(500).json({ error: "Failed to fetch practice contacts" });
+    }
+  });
+
+  // Get conversations for a professional
+  app.get("/api/messaging/professional/conversations", async (req, res) => {
+    try {
+      // For now, use a fixed professional ID (in production, get from session)
+      const professionalId = req.query.professionalId as string || "professional-1";
+      const conversations = await storage.getConversationsForProfessional(professionalId);
+      res.json(conversations);
+    } catch (error) {
+      console.error("Error fetching professional conversations:", error);
+      res.status(500).json({ error: "Failed to fetch conversations" });
+    }
+  });
+
+  // Create a conversation from professional to practice
+  app.post("/api/messaging/professional/conversations", async (req, res) => {
+    try {
+      const { practiceAdminId, professionalId } = req.body;
+      if (!practiceAdminId) {
+        return res.status(400).json({ error: "Practice admin ID is required" });
+      }
+      const profId = professionalId || "professional-1";
+      const conversation = await storage.getOrCreateConversationFromProfessional(profId, practiceAdminId);
+      res.json(conversation);
+    } catch (error) {
+      console.error("Error creating conversation:", error);
+      res.status(500).json({ error: "Failed to create conversation" });
+    }
+  });
+
   // Update user online status (heartbeat)
   app.post("/api/messaging/status", async (req, res) => {
     try {
