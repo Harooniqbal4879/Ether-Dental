@@ -10,24 +10,36 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Send, MessageSquare, Circle } from "lucide-react";
+import { Search, Send, MessageSquare, Circle, Building2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { usePersona } from "@/lib/persona-context";
 import type { ConversationWithDetails, Message } from "@shared/schema";
+
+type PracticeContact = {
+  id: string;
+  name: string;
+  practiceName: string;
+  isOnline: boolean;
+};
 
 export default function MessagingPage() {
   const queryClient = useQueryClient();
   const searchParams = useSearch();
+  const { currentPersona } = usePersona();
+  const isProfessional = currentPersona === "professional";
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedConversation, setSelectedConversation] = useState<ConversationWithDetails | null>(null);
   const [messageInput, setMessageInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [autoSelectHandled, setAutoSelectHandled] = useState(false);
 
+  // Conversations query - different endpoint based on persona
   const { data: conversations = [], isLoading: isLoadingConversations } = useQuery<ConversationWithDetails[]>({
-    queryKey: ["/api/messaging/conversations"],
+    queryKey: isProfessional ? ["/api/messaging/professional/conversations"] : ["/api/messaging/conversations"],
     refetchInterval: 5000,
   });
 
+  // Hygienists query (for admin view)
   const { data: hygienists = [], isLoading: isLoadingHygienists } = useQuery<{
     id: string;
     firstName: string;
@@ -38,6 +50,14 @@ export default function MessagingPage() {
   }[]>({
     queryKey: ["/api/messaging/hygienists"],
     refetchInterval: 5000,
+    enabled: !isProfessional,
+  });
+
+  // Practice contacts query (for professional view)
+  const { data: practices = [], isLoading: isLoadingPractices } = useQuery<PracticeContact[]>({
+    queryKey: ["/api/messaging/practices"],
+    refetchInterval: 5000,
+    enabled: isProfessional,
   });
 
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery<Message[]>({
@@ -49,20 +69,24 @@ export default function MessagingPage() {
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
       if (!selectedConversation) return;
+      const senderType = isProfessional ? "professional" : "practice_admin";
       const res = await apiRequest(
         "POST",
         `/api/messaging/conversations/${selectedConversation.id}/messages`,
-        { content, senderType: "practice_admin" }
+        { content, senderType }
       );
       return res.json();
     },
     onSuccess: () => {
       setMessageInput("");
       queryClient.invalidateQueries({ queryKey: ["/api/messaging/conversations", selectedConversation?.id, "messages"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/messaging/conversations"] });
+      queryClient.invalidateQueries({ 
+        queryKey: isProfessional ? ["/api/messaging/professional/conversations"] : ["/api/messaging/conversations"] 
+      });
     },
   });
 
+  // Start conversation mutation for admins (with hygienists)
   const startConversationMutation = useMutation({
     mutationFn: async (professionalId: string) => {
       const res = await apiRequest("POST", "/api/messaging/conversations", { professionalId });
@@ -84,9 +108,37 @@ export default function MessagingPage() {
     },
   });
 
-  // Handle ?professional= query parameter to auto-select or create conversation
+  // Start conversation mutation for professionals (with practices)
+  const startPracticeConversationMutation = useMutation({
+    mutationFn: async (practiceAdminId: string) => {
+      const res = await apiRequest("POST", "/api/messaging/professional/conversations", { practiceAdminId });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/messaging/professional/conversations"] });
+      if (data) {
+        const practice = practices.find(p => p.id === data.practiceAdminId);
+        if (practice) {
+          setSelectedConversation({
+            ...data,
+            professional: {
+              id: practice.id,
+              firstName: practice.name,
+              lastName: "",
+              photoUrl: null,
+              role: "admin",
+            },
+            unreadCount: 0,
+            isOnline: practice.isOnline,
+          });
+        }
+      }
+    },
+  });
+
+  // Handle ?professional= query parameter to auto-select or create conversation (admin view)
   useEffect(() => {
-    if (autoSelectHandled || isLoadingConversations || isLoadingHygienists) return;
+    if (isProfessional || autoSelectHandled || isLoadingConversations || isLoadingHygienists) return;
     
     const params = new URLSearchParams(searchParams);
     const professionalId = params.get("professional");
@@ -112,7 +164,7 @@ export default function MessagingPage() {
         }
       }
     }
-  }, [searchParams, conversations, hygienists, isLoadingConversations, isLoadingHygienists, autoSelectHandled]);
+  }, [isProfessional, searchParams, conversations, hygienists, isLoadingConversations, isLoadingHygienists, autoSelectHandled]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -139,13 +191,22 @@ export default function MessagingPage() {
     return fullName.includes(searchQuery.toLowerCase());
   });
 
+  // For admin view: hygienists without existing conversation
   const hygienistsWithoutConversation = hygienists.filter(
     h => !conversations.some(c => c.professional.id === h.id)
+  );
+
+  // For professional view: practices without existing conversation
+  const practicesWithoutConversation = practices.filter(
+    p => !conversations.some(c => c.practiceAdminId === p.id)
   );
 
   const sortedMessages = [...messages].sort((a, b) => 
     new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime()
   );
+
+  // For message display: determine which sender type represents "self"
+  const selfSenderType = isProfessional ? "professional" : "practice_admin";
 
   return (
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden" data-testid="messaging-page">
@@ -179,10 +240,11 @@ export default function MessagingPage() {
             </div>
           ) : (
             <div className="p-2">
-              {filteredConversations.length === 0 && hygienistsWithoutConversation.length === 0 && (
+              {filteredConversations.length === 0 && 
+                (isProfessional ? practicesWithoutConversation.length === 0 : hygienistsWithoutConversation.length === 0) && (
                 <div className="p-4 text-center text-muted-foreground">
                   <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p>No hygienists available</p>
+                  <p>{isProfessional ? "No practices available" : "No hygienists available"}</p>
                 </div>
               )}
 
@@ -236,7 +298,8 @@ export default function MessagingPage() {
                 </button>
               ))}
 
-              {hygienistsWithoutConversation.length > 0 && (
+              {/* Admin view: Show hygienists to start conversation with */}
+              {!isProfessional && hygienistsWithoutConversation.length > 0 && (
                 <>
                   <Separator className="my-2" />
                   <p className="text-xs text-muted-foreground px-3 py-2">Start a new conversation</p>
@@ -267,6 +330,42 @@ export default function MessagingPage() {
                         </span>
                         <p className="text-sm text-muted-foreground">
                           {hyg.isOnline ? "Online" : "Offline"}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </>
+              )}
+
+              {/* Professional view: Show practices to start conversation with */}
+              {isProfessional && practicesWithoutConversation.length > 0 && (
+                <>
+                  <Separator className="my-2" />
+                  <p className="text-xs text-muted-foreground px-3 py-2">Start a new conversation</p>
+                  {practicesWithoutConversation.map((practice) => (
+                    <button
+                      key={practice.id}
+                      onClick={() => startPracticeConversationMutation.mutate(practice.id)}
+                      className="w-full flex items-center gap-3 p-3 rounded-lg text-left hover-elevate transition-colors"
+                      data-testid={`new-conversation-practice-${practice.id}`}
+                    >
+                      <div className="relative">
+                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Building2 className="h-5 w-5 text-primary" />
+                        </div>
+                        <Circle
+                          className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 fill-current ${
+                            practice.isOnline ? "text-green-500" : "text-gray-400"
+                          }`}
+                          data-testid={`practice-status-${practice.id}`}
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="font-medium">
+                          {practice.name}
+                        </span>
+                        <p className="text-sm text-muted-foreground">
+                          {practice.isOnline ? "Online" : "Offline"}
                         </p>
                       </div>
                     </button>
@@ -335,16 +434,16 @@ export default function MessagingPage() {
               ) : (
                 <div className="space-y-4">
                   {sortedMessages.map((message) => {
-                    const isAdmin = message.senderType === "practice_admin";
+                    const isSelf = message.senderType === selfSenderType;
                     return (
                       <div
                         key={message.id}
-                        className={`flex ${isAdmin ? "justify-end" : "justify-start"}`}
+                        className={`flex ${isSelf ? "justify-end" : "justify-start"}`}
                         data-testid={`message-${message.id}`}
                       >
                         <div
                           className={`max-w-[70%] rounded-lg px-4 py-2 ${
-                            isAdmin
+                            isSelf
                               ? "bg-primary text-primary-foreground"
                               : "bg-muted"
                           }`}
@@ -352,7 +451,7 @@ export default function MessagingPage() {
                           <p className="text-sm">{message.content}</p>
                           <p
                             className={`text-xs mt-1 ${
-                              isAdmin ? "text-primary-foreground/70" : "text-muted-foreground"
+                              isSelf ? "text-primary-foreground/70" : "text-muted-foreground"
                             }`}
                           >
                             {format(new Date(message.createdAt!), "h:mm a")}
@@ -391,7 +490,12 @@ export default function MessagingPage() {
             <div className="text-center">
               <MessageSquare className="h-16 w-16 mx-auto mb-4 opacity-50" />
               <h3 className="text-lg font-medium mb-1">Select a conversation</h3>
-              <p className="text-sm">Choose a hygienist from the list to start messaging</p>
+              <p className="text-sm">
+                {isProfessional 
+                  ? "Choose a practice from the list to start messaging" 
+                  : "Choose a hygienist from the list to start messaging"
+                }
+              </p>
             </div>
           </div>
         )}
