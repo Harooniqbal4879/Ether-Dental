@@ -13,6 +13,8 @@ import {
   platformSettings,
   platformStateTaxRates,
   practices,
+  conversations,
+  messages,
   StaffRoles,
   DentalSpecialties,
 } from "@shared/schema";
@@ -640,6 +642,82 @@ async function seed() {
   if (transactionsData.length > 0) {
     await db.insert(shiftTransactions).values(transactionsData);
     console.log(`Created ${transactionsData.length} shift transactions`);
+  }
+
+  // Seed Messaging Test Data
+  // Find Jessica Chen (hygienist) for messaging
+  const jessicaChen = createdProfessionals.find(p => p.email === "j.chen@sunnypines.dental");
+  const sarahMiller = createdProfessionals.find(p => p.email === "s.miller@sunnypines.dental");
+  
+  if (jessicaChen) {
+    const practiceAdminId = "admin-sunny-pines"; // Mock admin ID for Sunny Pines Dental
+    
+    // Create conversation between Jessica Chen and practice admin
+    const [jessicaConversation] = await db.insert(conversations).values({
+      practiceAdminId: practiceAdminId,
+      professionalId: jessicaChen.id,
+    }).returning();
+    
+    // Add test messages in the conversation
+    await db.insert(messages).values([
+      {
+        conversationId: jessicaConversation.id,
+        senderId: practiceAdminId,
+        senderType: "practice_admin",
+        content: "Hi Jessica! We have an open shift this Friday from 8 AM to 4 PM. Would you be interested?",
+      },
+      {
+        conversationId: jessicaConversation.id,
+        senderId: jessicaChen.id,
+        senderType: "professional",
+        content: "Hi! Yes, I'm available on Friday. What's the hourly rate for this shift?",
+      },
+      {
+        conversationId: jessicaConversation.id,
+        senderId: practiceAdminId,
+        senderType: "practice_admin",
+        content: "Great! The rate is $55/hour. We'll also provide lunch. Does that work for you?",
+      },
+      {
+        conversationId: jessicaConversation.id,
+        senderId: jessicaChen.id,
+        senderType: "professional",
+        content: "That sounds perfect! I'll take it. Should I arrive 15 minutes early?",
+      },
+      {
+        conversationId: jessicaConversation.id,
+        senderId: practiceAdminId,
+        senderType: "practice_admin",
+        content: "Yes, please arrive at 7:45 AM. Looking forward to having you on the team!",
+      },
+    ]);
+    
+    console.log("Created messaging test data for Jessica Chen");
+    
+    // Create another conversation with Sarah Miller
+    if (sarahMiller) {
+      const [sarahConversation] = await db.insert(conversations).values({
+        practiceAdminId: practiceAdminId,
+        professionalId: sarahMiller.id,
+      }).returning();
+      
+      await db.insert(messages).values([
+        {
+          conversationId: sarahConversation.id,
+          senderId: practiceAdminId,
+          senderType: "practice_admin",
+          content: "Dr. Miller, we'd love to have you cover some complex restorative cases next week.",
+        },
+        {
+          conversationId: sarahConversation.id,
+          senderId: sarahMiller.id,
+          senderType: "professional",
+          content: "I'd be happy to help! What days are you looking at?",
+        },
+      ]);
+      
+      console.log("Created messaging test data for Sarah Miller");
+    }
   }
 
   console.log("Database seeding complete!");
