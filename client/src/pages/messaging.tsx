@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSearch } from "wouter";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,10 +16,12 @@ import type { ConversationWithDetails, Message } from "@shared/schema";
 
 export default function MessagingPage() {
   const queryClient = useQueryClient();
+  const searchParams = useSearch();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedConversation, setSelectedConversation] = useState<ConversationWithDetails | null>(null);
   const [messageInput, setMessageInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [autoSelectHandled, setAutoSelectHandled] = useState(false);
 
   const { data: conversations = [], isLoading: isLoadingConversations } = useQuery<ConversationWithDetails[]>({
     queryKey: ["/api/messaging/conversations"],
@@ -80,6 +83,36 @@ export default function MessagingPage() {
       }
     },
   });
+
+  // Handle ?professional= query parameter to auto-select or create conversation
+  useEffect(() => {
+    if (autoSelectHandled || isLoadingConversations || isLoadingHygienists) return;
+    
+    const params = new URLSearchParams(searchParams);
+    const professionalId = params.get("professional");
+    
+    if (professionalId) {
+      // Check if conversation already exists with this professional
+      const existingConv = conversations.find(c => c.professional.id === professionalId);
+      
+      if (existingConv) {
+        setSelectedConversation(existingConv);
+        setAutoSelectHandled(true);
+      } else {
+        // Check if the professional exists in hygienists list
+        const professional = hygienists.find(h => h.id === professionalId);
+        if (professional) {
+          // Start a new conversation
+          startConversationMutation.mutate(professionalId);
+          setAutoSelectHandled(true);
+        } else {
+          // Professional not found in hygienists, but might exist - try to create anyway
+          startConversationMutation.mutate(professionalId);
+          setAutoSelectHandled(true);
+        }
+      }
+    }
+  }, [searchParams, conversations, hygienists, isLoadingConversations, isLoadingHygienists, autoSelectHandled]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

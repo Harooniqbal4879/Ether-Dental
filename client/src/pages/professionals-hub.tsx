@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useRoute } from "wouter";
+import { useRoute, useLocation } from "wouter";
 import { Link } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -41,6 +41,7 @@ import {
   AlertCircle,
   Upload,
   ExternalLink,
+  MessageCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1813,8 +1814,15 @@ function CredentialSection<T extends { id: string }>({
 }
 
 function ProfessionalCard({ professional, isOnline }: { professional: ProfessionalWithBadges; isOnline?: boolean }) {
+  const [, navigate] = useLocation();
   const initials = `${professional.firstName[0]}${professional.lastName[0]}`;
   const rating = parseFloat(professional.rating || "0");
+
+  const handleMessageClick = (e: { preventDefault: () => void; stopPropagation: () => void }) => {
+    e.preventDefault();
+    e.stopPropagation();
+    navigate(`/messaging?professional=${professional.id}`);
+  };
 
   return (
     <Link href={`/professionals/${professional.id}`}>
@@ -1837,13 +1845,25 @@ function ProfessionalCard({ professional, isOnline }: { professional: Profession
               />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <h3 className="font-semibold text-base truncate">
-                  {professional.firstName} {professional.lastName}
-                </h3>
-                {professional.credentialsVerified && (
-                  <BadgeCheck className="h-4 w-4 text-primary shrink-0" />
-                )}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <h3 className="font-semibold text-base truncate">
+                    {professional.firstName} {professional.lastName}
+                  </h3>
+                  {professional.credentialsVerified && (
+                    <BadgeCheck className="h-4 w-4 text-primary shrink-0" />
+                  )}
+                </div>
+                <Button 
+                  size="icon" 
+                  variant="ghost" 
+                  className="shrink-0"
+                  onClick={handleMessageClick}
+                  title="Send message"
+                  data-testid={`button-message-${professional.id}`}
+                >
+                  <MessageCircle className="h-4 w-4" />
+                </Button>
               </div>
               <div className="flex items-center gap-2">
                 <p className="text-sm text-muted-foreground">{professional.role}</p>
