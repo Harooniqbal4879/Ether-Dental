@@ -132,7 +132,7 @@ export default function Appointments() {
                       return (
                         <Link
                           key={apt.id}
-                          href={`/patients/${apt.patientId}`}
+                          href={`/app/patients/${apt.patientId}`}
                           className="flex items-center gap-4 p-4 hover-elevate cursor-pointer"
                           data-testid={`appointment-${apt.id}`}
                         >

@@ -108,7 +108,7 @@ function PatientsTab() {
           {filteredPatients.map((patient) => (
             <Link
               key={patient.id}
-              href={`/patients/${patient.id}`}
+              href={`/app/patients/${patient.id}`}
               className="block"
             >
               <Card
@@ -325,7 +325,7 @@ function AppointmentsTab() {
                       return (
                         <Link
                           key={apt.id}
-                          href={`/patients/${apt.patientId}`}
+                          href={`/app/patients/${apt.patientId}`}
                           className="flex items-center gap-4 p-4 hover-elevate cursor-pointer"
                           data-testid={`appointment-${apt.id}`}
                         >
@@ -400,9 +400,9 @@ export default function Patients() {
 
   const handleTabChange = (value: string) => {
     if (value === "patients") {
-      setLocation("/patients");
+      setLocation("/app/patients");
     } else {
-      setLocation(`/patients?tab=${value}`);
+      setLocation(`/app/patients?tab=${value}`);
     }
   };
 

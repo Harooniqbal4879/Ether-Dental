@@ -73,32 +73,22 @@ function MainLayout() {
   };
 
   return (
-    <PersonaProvider>
-      <LocationProvider>
-        <SidebarProvider style={sidebarStyle as React.CSSProperties}>
-          <div className="flex h-screen w-full">
-            <AppSidebar />
-            <SidebarInset className="flex flex-1 flex-col overflow-hidden">
-              <header className="sticky top-0 z-50 flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background px-4">
-                <SidebarTrigger data-testid="button-sidebar-toggle" />
-                <ThemeToggle />
-              </header>
-              <main className="flex-1 overflow-auto">
-                <MainRouter />
-              </main>
-            </SidebarInset>
-          </div>
-        </SidebarProvider>
-      </LocationProvider>
-    </PersonaProvider>
-  );
-}
-
-function LandingWrapper() {
-  return (
-    <PersonaProvider>
-      <Landing />
-    </PersonaProvider>
+    <LocationProvider>
+      <SidebarProvider style={sidebarStyle as React.CSSProperties}>
+        <div className="flex h-screen w-full">
+          <AppSidebar />
+          <SidebarInset className="flex flex-1 flex-col overflow-hidden">
+            <header className="sticky top-0 z-50 flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background px-4">
+              <SidebarTrigger data-testid="button-sidebar-toggle" />
+              <ThemeToggle />
+            </header>
+            <main className="flex-1 overflow-auto">
+              <MainRouter />
+            </main>
+          </SidebarInset>
+        </div>
+      </SidebarProvider>
+    </LocationProvider>
   );
 }
 
@@ -107,23 +97,25 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="light" storageKey="etherai-theme">
         <TooltipProvider>
-          <Switch>
-            <Route path="/" component={LandingWrapper} />
-            <Route path="/register" component={RegisterPractice} />
-            <Route path="/features" component={Features} />
-            <Route path="/how-it-works" component={HowItWorks} />
-            <Route path="/benefits" component={Benefits} />
-            <Route path="/pricing" component={Pricing} />
-            <Route path="/faq" component={FAQ} />
-            <Route path="/demo" component={Demo} />
-            <Route path="/app/:rest*">
-              <MainLayout />
-            </Route>
-            <Route>
-              <MainLayout />
-            </Route>
-          </Switch>
-          <Toaster />
+          <PersonaProvider>
+            <Switch>
+              <Route path="/" component={Landing} />
+              <Route path="/register" component={RegisterPractice} />
+              <Route path="/features" component={Features} />
+              <Route path="/how-it-works" component={HowItWorks} />
+              <Route path="/benefits" component={Benefits} />
+              <Route path="/pricing" component={Pricing} />
+              <Route path="/faq" component={FAQ} />
+              <Route path="/demo" component={Demo} />
+              <Route path="/app/:rest*">
+                <MainLayout />
+              </Route>
+              <Route>
+                <MainLayout />
+              </Route>
+            </Switch>
+            <Toaster />
+          </PersonaProvider>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>

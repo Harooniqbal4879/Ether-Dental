@@ -82,7 +82,15 @@ export default function Landing() {
             </div>
 
             <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto mb-16" data-testid="login-options">
-              <Card className="hover-elevate cursor-pointer" onClick={handleOrganizationLogin} data-testid="card-organization-login">
+              <Card 
+                className="hover-elevate cursor-pointer" 
+                onClick={handleOrganizationLogin}
+                onKeyDown={(e) => e.key === 'Enter' && handleOrganizationLogin()}
+                tabIndex={0}
+                role="button"
+                aria-label="Sign in as an organization - for dental practices and clinics"
+                data-testid="card-organization-login"
+              >
                 <CardHeader className="text-center pb-2">
                   <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-primary/10 mx-auto mb-4">
                     <Building2 className="h-8 w-8 text-primary" />
@@ -99,14 +107,22 @@ export default function Landing() {
                     <li>Track verifications & billing</li>
                     <li>Multi-location support</li>
                   </ul>
-                  <Button className="w-full" data-testid="button-org-login">
+                  <Button className="w-full" tabIndex={-1} data-testid="button-org-login">
                     Sign In as Organization
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </CardContent>
               </Card>
 
-              <Card className="hover-elevate cursor-pointer" onClick={handleProfessionalLogin} data-testid="card-professional-login">
+              <Card 
+                className="hover-elevate cursor-pointer" 
+                onClick={handleProfessionalLogin}
+                onKeyDown={(e) => e.key === 'Enter' && handleProfessionalLogin()}
+                tabIndex={0}
+                role="button"
+                aria-label="Sign in as a professional - for hygienists and dental professionals"
+                data-testid="card-professional-login"
+              >
                 <CardHeader className="text-center pb-2">
                   <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-primary/10 mx-auto mb-4">
                     <UserCircle className="h-8 w-8 text-primary" />
@@ -123,7 +139,7 @@ export default function Landing() {
                     <li>Track earnings & credentials</li>
                     <li>Connect with practices</li>
                   </ul>
-                  <Button className="w-full" variant="outline" data-testid="button-prof-login">
+                  <Button className="w-full" variant="outline" tabIndex={-1} data-testid="button-prof-login">
                     Sign In as Professional
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>

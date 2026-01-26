@@ -174,7 +174,7 @@ export default function Verifications() {
                   >
                     <TableCell>
                       <Link
-                        href={`/patients/${v.patientId}`}
+                        href={`/app/patients/${v.patientId}`}
                         className="font-medium hover:underline"
                       >
                         {v.patient.firstName} {v.patient.lastName}
@@ -206,7 +206,7 @@ export default function Verifications() {
                     </TableCell>
                     <TableCell>
                       <Button variant="ghost" size="icon" asChild>
-                        <Link href={`/patients/${v.patientId}`}>
+                        <Link href={`/app/patients/${v.patientId}`}>
                           <ChevronRight className="h-4 w-4" />
                         </Link>
                       </Button>
