@@ -19,6 +19,30 @@ export const insertInsuranceCarrierSchema = createInsertSchema(insuranceCarriers
 export type InsertInsuranceCarrier = z.infer<typeof insertInsuranceCarrierSchema>;
 export type InsuranceCarrier = typeof insuranceCarriers.$inferSelect;
 
+// Practice Insurance Carriers - Links carriers to practices
+export const practiceInsuranceCarriers = pgTable("practice_insurance_carriers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  practiceId: varchar("practice_id").notNull(),
+  carrierId: varchar("carrier_id").notNull().references(() => insuranceCarriers.id, { onDelete: "cascade" }),
+  isActive: boolean("is_active").default(true),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const practiceInsuranceCarriersRelations = relations(practiceInsuranceCarriers, ({ one }) => ({
+  carrier: one(insuranceCarriers, {
+    fields: [practiceInsuranceCarriers.carrierId],
+    references: [insuranceCarriers.id],
+  }),
+}));
+
+export const insertPracticeInsuranceCarrierSchema = createInsertSchema(practiceInsuranceCarriers).omit({ 
+  id: true, 
+  createdAt: true 
+});
+export type InsertPracticeInsuranceCarrier = z.infer<typeof insertPracticeInsuranceCarrierSchema>;
+export type PracticeInsuranceCarrier = typeof practiceInsuranceCarriers.$inferSelect;
+
 // Patients
 export const patients = pgTable("patients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

@@ -1,6 +1,7 @@
 import {
   patients,
   insuranceCarriers,
+  practiceInsuranceCarriers,
   insurancePolicies,
   verifications,
   benefits,
@@ -38,6 +39,8 @@ import {
   type InsertPatient,
   type InsuranceCarrier,
   type InsertInsuranceCarrier,
+  type PracticeInsuranceCarrier,
+  type InsertPracticeInsuranceCarrier,
   type InsurancePolicy,
   type InsertInsurancePolicy,
   type Verification,
@@ -125,6 +128,12 @@ export interface IStorage {
   getCarriersByType(type: "dental" | "medical"): Promise<InsuranceCarrier[]>;
   getCarrier(id: string): Promise<InsuranceCarrier | undefined>;
   createCarrier(carrier: InsertInsuranceCarrier): Promise<InsuranceCarrier>;
+  searchCarriers(query: string): Promise<InsuranceCarrier[]>;
+
+  // Practice Insurance Carriers
+  getPracticeInsuranceCarriers(practiceId: string): Promise<(PracticeInsuranceCarrier & { carrier: InsuranceCarrier })[]>;
+  addPracticeInsuranceCarrier(data: InsertPracticeInsuranceCarrier): Promise<PracticeInsuranceCarrier>;
+  removePracticeInsuranceCarrier(id: string): Promise<void>;
 
   // Patients
   getPatients(): Promise<PatientWithInsurance[]>;
@@ -364,6 +373,36 @@ export class DatabaseStorage implements IStorage {
   async createCarrier(carrier: InsertInsuranceCarrier): Promise<InsuranceCarrier> {
     const [created] = await db.insert(insuranceCarriers).values(carrier).returning();
     return created;
+  }
+
+  async searchCarriers(query: string): Promise<InsuranceCarrier[]> {
+    const searchTerm = `%${query.toLowerCase()}%`;
+    return db.select().from(insuranceCarriers)
+      .where(sql`LOWER(${insuranceCarriers.name}) LIKE ${searchTerm}`)
+      .orderBy(insuranceCarriers.name)
+      .limit(20);
+  }
+
+  // Practice Insurance Carriers
+  async getPracticeInsuranceCarriers(practiceId: string): Promise<(PracticeInsuranceCarrier & { carrier: InsuranceCarrier })[]> {
+    const results = await db.select()
+      .from(practiceInsuranceCarriers)
+      .innerJoin(insuranceCarriers, eq(practiceInsuranceCarriers.carrierId, insuranceCarriers.id))
+      .where(eq(practiceInsuranceCarriers.practiceId, practiceId));
+    
+    return results.map(r => ({
+      ...r.practice_insurance_carriers,
+      carrier: r.insurance_carriers,
+    }));
+  }
+
+  async addPracticeInsuranceCarrier(data: InsertPracticeInsuranceCarrier): Promise<PracticeInsuranceCarrier> {
+    const [created] = await db.insert(practiceInsuranceCarriers).values(data).returning();
+    return created;
+  }
+
+  async removePracticeInsuranceCarrier(id: string): Promise<void> {
+    await db.delete(practiceInsuranceCarriers).where(eq(practiceInsuranceCarriers.id, id));
   }
 
   // Patients
