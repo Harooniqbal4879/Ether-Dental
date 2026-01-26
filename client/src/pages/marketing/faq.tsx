@@ -103,10 +103,10 @@ export default function FAQ() {
       <section className="py-16 lg:py-24" data-testid="section-faq">
         <div className="container mx-auto px-4">
           <div className="text-center max-w-3xl mx-auto mb-16">
-            <h1 className="text-4xl lg:text-5xl font-bold mb-6">
+            <h1 className="text-4xl lg:text-5xl font-bold mb-6" data-testid="text-faq-title">
               Frequently Asked Questions
             </h1>
-            <p className="text-xl text-muted-foreground">
+            <p className="text-xl text-muted-foreground" data-testid="text-faq-description">
               Find answers to common questions about EtherAI. Can't find what you're 
               looking for? Contact our support team.
             </p>
@@ -124,10 +124,10 @@ export default function FAQ() {
                         value={`${catIndex}-${qIndex}`}
                         data-testid={`faq-item-${catIndex}-${qIndex}`}
                       >
-                        <AccordionTrigger className="text-left">
+                        <AccordionTrigger className="text-left" data-testid={`button-faq-trigger-${catIndex}-${qIndex}`}>
                           {item.question}
                         </AccordionTrigger>
-                        <AccordionContent className="text-muted-foreground">
+                        <AccordionContent className="text-muted-foreground" data-testid={`text-faq-answer-${catIndex}-${qIndex}`}>
                           {item.answer}
                         </AccordionContent>
                       </AccordionItem>

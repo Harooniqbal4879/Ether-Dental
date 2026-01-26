@@ -86,10 +86,10 @@ export default function Features() {
       <section className="py-16 lg:py-24" data-testid="section-features-hero">
         <div className="container mx-auto px-4">
           <div className="text-center max-w-3xl mx-auto mb-16">
-            <h1 className="text-4xl lg:text-5xl font-bold mb-6">
+            <h1 className="text-4xl lg:text-5xl font-bold mb-6" data-testid="text-features-title">
               Powerful Features for Modern Dental Practices
             </h1>
-            <p className="text-xl text-muted-foreground">
+            <p className="text-xl text-muted-foreground" data-testid="text-features-description">
               Everything you need to streamline insurance verification, manage patients, 
               and optimize your practice operations in one comprehensive platform.
             </p>

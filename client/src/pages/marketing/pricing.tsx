@@ -76,10 +76,10 @@ export default function Pricing() {
       <section className="py-16 lg:py-24" data-testid="section-pricing">
         <div className="container mx-auto px-4">
           <div className="text-center max-w-3xl mx-auto mb-16">
-            <h1 className="text-4xl lg:text-5xl font-bold mb-6">
+            <h1 className="text-4xl lg:text-5xl font-bold mb-6" data-testid="text-pricing-title">
               Simple, Transparent Pricing
             </h1>
-            <p className="text-xl text-muted-foreground">
+            <p className="text-xl text-muted-foreground" data-testid="text-pricing-description">
               Choose the plan that fits your practice. All plans include a 14-day free trial 
               with no credit card required.
             </p>

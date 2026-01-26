@@ -3,7 +3,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -11,21 +10,33 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Calendar, Users, Clock, CheckCircle } from "lucide-react";
 import { useState } from "react";
 
-interface DemoFormData {
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  practiceName: string;
-  practiceSize: string;
-  currentSoftware: string;
-  message: string;
-}
+const demoFormSchema = z.object({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  email: z.string().email("Please enter a valid email address"),
+  phone: z.string().optional(),
+  practiceName: z.string().min(1, "Practice name is required"),
+  practiceSize: z.string().optional(),
+  currentSoftware: z.string().optional(),
+  message: z.string().optional(),
+});
+
+type DemoFormData = z.infer<typeof demoFormSchema>;
 
 const benefits = [
   {
@@ -53,7 +64,20 @@ const benefits = [
 export default function Demo() {
   const { toast } = useToast();
   const [submitted, setSubmitted] = useState(false);
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<DemoFormData>();
+
+  const form = useForm<DemoFormData>({
+    resolver: zodResolver(demoFormSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      email: "",
+      phone: "",
+      practiceName: "",
+      practiceSize: "",
+      currentSoftware: "",
+      message: "",
+    },
+  });
 
   const onSubmit = async (data: DemoFormData) => {
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -75,16 +99,16 @@ export default function Demo() {
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 mx-auto mb-6">
                   <CheckCircle className="h-8 w-8 text-primary" />
                 </div>
-                <h1 className="text-2xl font-bold mb-4">Thank You!</h1>
-                <p className="text-muted-foreground mb-6">
+                <h1 className="text-2xl font-bold mb-4" data-testid="text-thank-you">Thank You!</h1>
+                <p className="text-muted-foreground mb-6" data-testid="text-success-message">
                   Your demo request has been received. A member of our team will 
                   reach out within 24 hours to schedule your personalized demonstration.
                 </p>
                 <p className="text-sm text-muted-foreground">
                   In the meantime, feel free to explore our{" "}
-                  <a href="/features" className="text-primary hover:underline">features</a>{" "}
+                  <a href="/features" className="text-primary hover:underline" data-testid="link-features">features</a>{" "}
                   or{" "}
-                  <a href="/faq" className="text-primary hover:underline">FAQ</a>.
+                  <a href="/faq" className="text-primary hover:underline" data-testid="link-faq">FAQ</a>.
                 </p>
               </CardContent>
             </Card>
@@ -100,10 +124,10 @@ export default function Demo() {
         <div className="container mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-12 max-w-6xl mx-auto">
             <div>
-              <h1 className="text-4xl lg:text-5xl font-bold mb-6">
+              <h1 className="text-4xl lg:text-5xl font-bold mb-6" data-testid="text-demo-title">
                 See EtherAI in Action
               </h1>
-              <p className="text-xl text-muted-foreground mb-8">
+              <p className="text-xl text-muted-foreground mb-8" data-testid="text-demo-description">
                 Schedule a personalized demo with our team. We'll show you how 
                 EtherAI can transform your practice's insurance verification 
                 and patient management workflows.
@@ -116,14 +140,14 @@ export default function Demo() {
                       <benefit.icon className="h-5 w-5 text-primary" />
                     </div>
                     <div>
-                      <h3 className="font-semibold">{benefit.title}</h3>
+                      <h3 className="font-semibold" data-testid={`text-benefit-title-${index}`}>{benefit.title}</h3>
                       <p className="text-sm text-muted-foreground">{benefit.description}</p>
                     </div>
                   </div>
                 ))}
               </div>
 
-              <div className="mt-12 p-6 bg-muted/30 rounded-lg">
+              <div className="mt-12 p-6 bg-muted/30 rounded-lg" data-testid="box-trial-info">
                 <p className="text-sm text-muted-foreground">
                   <strong className="text-foreground">Prefer to explore on your own?</strong>
                   {" "}You can also sign up for a 14-day free trial and test EtherAI 
@@ -134,113 +158,159 @@ export default function Demo() {
 
             <Card data-testid="card-demo-form">
               <CardHeader>
-                <CardTitle>Request Your Demo</CardTitle>
+                <CardTitle data-testid="text-form-title">Request Your Demo</CardTitle>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="firstName">First Name *</Label>
-                      <Input
-                        id="firstName"
-                        {...register("firstName", { required: true })}
-                        className={errors.firstName ? "border-destructive" : ""}
-                        data-testid="input-first-name"
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="firstName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>First Name *</FormLabel>
+                            <FormControl>
+                              <Input {...field} data-testid="input-first-name" />
+                            </FormControl>
+                            <FormMessage data-testid="error-first-name" />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="lastName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Last Name *</FormLabel>
+                            <FormControl>
+                              <Input {...field} data-testid="input-last-name" />
+                            </FormControl>
+                            <FormMessage data-testid="error-last-name" />
+                          </FormItem>
+                        )}
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="lastName">Last Name *</Label>
-                      <Input
-                        id="lastName"
-                        {...register("lastName", { required: true })}
-                        className={errors.lastName ? "border-destructive" : ""}
-                        data-testid="input-last-name"
-                      />
-                    </div>
-                  </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Work Email *</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      {...register("email", { required: true, pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/ })}
-                      className={errors.email ? "border-destructive" : ""}
-                      data-testid="input-email"
+                    <FormField
+                      control={form.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Work Email *</FormLabel>
+                          <FormControl>
+                            <Input type="email" {...field} data-testid="input-email" />
+                          </FormControl>
+                          <FormMessage data-testid="error-email" />
+                        </FormItem>
+                      )}
                     />
-                  </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Phone Number</Label>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      {...register("phone")}
-                      data-testid="input-phone"
+                    <FormField
+                      control={form.control}
+                      name="phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Phone Number</FormLabel>
+                          <FormControl>
+                            <Input type="tel" {...field} data-testid="input-phone" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                  </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="practiceName">Practice Name *</Label>
-                    <Input
-                      id="practiceName"
-                      {...register("practiceName", { required: true })}
-                      className={errors.practiceName ? "border-destructive" : ""}
-                      data-testid="input-practice-name"
+                    <FormField
+                      control={form.control}
+                      name="practiceName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Practice Name *</FormLabel>
+                          <FormControl>
+                            <Input {...field} data-testid="input-practice-name" />
+                          </FormControl>
+                          <FormMessage data-testid="error-practice-name" />
+                        </FormItem>
+                      )}
                     />
-                  </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="practiceSize">Practice Size</Label>
-                    <Select onValueChange={(value) => register("practiceSize").onChange({ target: { value } })}>
-                      <SelectTrigger data-testid="select-practice-size">
-                        <SelectValue placeholder="Select practice size" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="solo">Solo Practice</SelectItem>
-                        <SelectItem value="small">2-5 Providers</SelectItem>
-                        <SelectItem value="medium">6-15 Providers</SelectItem>
-                        <SelectItem value="large">16-50 Providers</SelectItem>
-                        <SelectItem value="dso">DSO / 50+ Providers</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="currentSoftware">Current Practice Management Software</Label>
-                    <Input
-                      id="currentSoftware"
-                      placeholder="e.g., Dentrix, Eaglesoft, Open Dental"
-                      {...register("currentSoftware")}
-                      data-testid="input-current-software"
+                    <FormField
+                      control={form.control}
+                      name="practiceSize"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Practice Size</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-practice-size">
+                                <SelectValue placeholder="Select practice size" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="solo" data-testid="option-solo">Solo Practice</SelectItem>
+                              <SelectItem value="small" data-testid="option-small">2-5 Providers</SelectItem>
+                              <SelectItem value="medium" data-testid="option-medium">6-15 Providers</SelectItem>
+                              <SelectItem value="large" data-testid="option-large">16-50 Providers</SelectItem>
+                              <SelectItem value="dso" data-testid="option-dso">DSO / 50+ Providers</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                  </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="message">What are you hoping to accomplish?</Label>
-                    <Textarea
-                      id="message"
-                      placeholder="Tell us about your verification challenges..."
-                      rows={3}
-                      {...register("message")}
-                      data-testid="textarea-message"
+                    <FormField
+                      control={form.control}
+                      name="currentSoftware"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Current Practice Management Software</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="e.g., Dentrix, Eaglesoft, Open Dental"
+                              {...field}
+                              data-testid="input-current-software"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                  </div>
 
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    disabled={isSubmitting}
-                    data-testid="button-submit-demo"
-                  >
-                    {isSubmitting ? "Submitting..." : "Request Demo"}
-                  </Button>
+                    <FormField
+                      control={form.control}
+                      name="message"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>What are you hoping to accomplish?</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Tell us about your verification challenges..."
+                              rows={3}
+                              {...field}
+                              data-testid="textarea-message"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                  <p className="text-xs text-muted-foreground text-center">
-                    By submitting this form, you agree to receive communications from EtherAI. 
-                    We respect your privacy and will never share your information.
-                  </p>
-                </form>
+                    <Button
+                      type="submit"
+                      className="w-full"
+                      disabled={form.formState.isSubmitting}
+                      data-testid="button-submit-demo"
+                    >
+                      {form.formState.isSubmitting ? "Submitting..." : "Request Demo"}
+                    </Button>
+
+                    <p className="text-xs text-muted-foreground text-center" data-testid="text-privacy-notice">
+                      By submitting this form, you agree to receive communications from EtherAI. 
+                      We respect your privacy and will never share your information.
+                    </p>
+                  </form>
+                </Form>
               </CardContent>
             </Card>
           </div>

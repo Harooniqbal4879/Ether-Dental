@@ -26,6 +26,12 @@ import RegisterPractice from "@/pages/register-practice";
 import Eligibility from "@/pages/eligibility";
 import Messaging from "@/pages/messaging";
 import NotFound from "@/pages/not-found";
+import Features from "@/pages/marketing/features";
+import HowItWorks from "@/pages/marketing/how-it-works";
+import Benefits from "@/pages/marketing/benefits";
+import Pricing from "@/pages/marketing/pricing";
+import FAQ from "@/pages/marketing/faq";
+import Demo from "@/pages/marketing/demo";
 
 function MainRouter() {
   return (
@@ -94,6 +100,12 @@ function App() {
         <TooltipProvider>
           <Switch>
             <Route path="/register" component={RegisterPractice} />
+            <Route path="/features" component={Features} />
+            <Route path="/how-it-works" component={HowItWorks} />
+            <Route path="/benefits" component={Benefits} />
+            <Route path="/pricing" component={Pricing} />
+            <Route path="/faq" component={FAQ} />
+            <Route path="/demo" component={Demo} />
             <Route>
               <MainLayout />
             </Route>
