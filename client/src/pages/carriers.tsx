@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Building2, Phone, Globe, CheckCircle, Search, X, Loader2, Trash2 } from "lucide-react";
+import { Plus, Building2, Phone, Globe, CheckCircle, Search, X, Loader2, Trash2, LayoutGrid, List } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +29,7 @@ export default function Carriers() {
   const [carrierSearch, setCarrierSearch] = useState("");
   const [selectedCarrier, setSelectedCarrier] = useState<InsuranceCarrier | null>(null);
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -300,16 +301,38 @@ export default function Carriers() {
         }
       />
 
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          type="search"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search carriers..."
-          className="pl-9"
-          data-testid="input-search-carriers"
-        />
+      <div className="flex items-center gap-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search carriers..."
+            className="pl-9"
+            data-testid="input-search-carriers"
+          />
+        </div>
+        <div className="flex items-center rounded-md border">
+          <Button
+            variant={viewMode === "grid" ? "secondary" : "ghost"}
+            size="icon"
+            onClick={() => setViewMode("grid")}
+            className="rounded-r-none"
+            data-testid="button-view-grid"
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={viewMode === "list" ? "secondary" : "ghost"}
+            size="icon"
+            onClick={() => setViewMode("list")}
+            className="rounded-l-none"
+            data-testid="button-view-list"
+          >
+            <List className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -329,17 +352,76 @@ export default function Carriers() {
           ))}
         </div>
       ) : filteredPracticeCarriers && filteredPracticeCarriers.length > 0 ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredPracticeCarriers.map((pc) => (
-            <Card key={pc.id} className="hover-elevate group" data-testid={`card-carrier-${pc.carrier.id}`}>
-              <CardContent className="p-4">
-                <div className="flex items-start gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-md bg-muted text-lg font-semibold">
+        viewMode === "grid" ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {filteredPracticeCarriers.map((pc) => (
+              <Card key={pc.id} className="hover-elevate group" data-testid={`card-carrier-${pc.carrier.id}`}>
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-md bg-muted text-lg font-semibold">
+                      {pc.carrier.name.slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="truncate font-semibold">{pc.carrier.name}</h3>
+                        {pc.carrier.clearinghouseCompatible && (
+                          <Badge
+                            variant="outline"
+                            className="shrink-0 gap-1 border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-900/20 dark:text-emerald-400"
+                          >
+                            <CheckCircle className="h-3 w-3" />
+                            EDI
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="mt-2 space-y-1 text-sm text-muted-foreground">
+                        {pc.carrier.phone && (
+                          <div className="flex items-center gap-2">
+                            <Phone className="h-3.5 w-3.5" />
+                            <span>{pc.carrier.phone}</span>
+                          </div>
+                        )}
+                        {pc.carrier.website && (
+                          <div className="flex items-center gap-2">
+                            <Globe className="h-3.5 w-3.5" />
+                            <a
+                              href={pc.carrier.website}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="truncate hover:underline"
+                            >
+                              {pc.carrier.website.replace(/^https?:\/\//, "")}
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="invisible shrink-0 group-hover:visible"
+                      onClick={() => removeCarrierMutation.mutate(pc.id)}
+                      disabled={removeCarrierMutation.isPending}
+                      data-testid={`button-remove-carrier-${pc.id}`}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {filteredPracticeCarriers.map((pc) => (
+              <Card key={pc.id} className="hover-elevate group" data-testid={`row-carrier-${pc.carrier.id}`}>
+                <CardContent className="flex items-center gap-4 p-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-muted text-sm font-semibold">
                     {pc.carrier.name.slice(0, 2).toUpperCase()}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <h3 className="truncate font-semibold">{pc.carrier.name}</h3>
+                      <h3 className="font-semibold">{pc.carrier.name}</h3>
                       {pc.carrier.clearinghouseCompatible && (
                         <Badge
                           variant="outline"
@@ -350,27 +432,29 @@ export default function Carriers() {
                         </Badge>
                       )}
                     </div>
-                    <div className="mt-2 space-y-1 text-sm text-muted-foreground">
-                      {pc.carrier.phone && (
-                        <div className="flex items-center gap-2">
-                          <Phone className="h-3.5 w-3.5" />
-                          <span>{pc.carrier.phone}</span>
-                        </div>
-                      )}
-                      {pc.carrier.website && (
-                        <div className="flex items-center gap-2">
-                          <Globe className="h-3.5 w-3.5" />
-                          <a
-                            href={pc.carrier.website}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="truncate hover:underline"
-                          >
-                            {pc.carrier.website.replace(/^https?:\/\//, "")}
-                          </a>
-                        </div>
-                      )}
-                    </div>
+                  </div>
+                  <div className="hidden items-center gap-2 text-sm text-muted-foreground sm:flex">
+                    {pc.carrier.phone && (
+                      <div className="flex items-center gap-1">
+                        <Phone className="h-3.5 w-3.5" />
+                        <span>{pc.carrier.phone}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="hidden items-center gap-2 text-sm text-muted-foreground md:flex">
+                    {pc.carrier.website && (
+                      <div className="flex items-center gap-1">
+                        <Globe className="h-3.5 w-3.5" />
+                        <a
+                          href={pc.carrier.website}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="hover:underline"
+                        >
+                          {pc.carrier.website.replace(/^https?:\/\//, "")}
+                        </a>
+                      </div>
+                    )}
                   </div>
                   <Button
                     variant="ghost"
@@ -378,15 +462,15 @@ export default function Carriers() {
                     className="invisible shrink-0 group-hover:visible"
                     onClick={() => removeCarrierMutation.mutate(pc.id)}
                     disabled={removeCarrierMutation.isPending}
-                    data-testid={`button-remove-carrier-${pc.id}`}
+                    data-testid={`button-remove-carrier-list-${pc.id}`}
                   >
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )
       ) : (
         <EmptyState
           icon={Building2}
