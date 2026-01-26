@@ -176,7 +176,7 @@ export function EligibilityTabContent() {
 
   useEffect(() => {
     if (!ALLOWED_PERSONAS.includes(currentPersona)) {
-      navigate("/patients");
+      navigate("/app/patients");
     }
   }, [currentPersona, navigate]);
 
@@ -1034,7 +1034,7 @@ export default function EligibilityPage() {
 
   useEffect(() => {
     if (!ALLOWED_PERSONAS.includes(currentPersona)) {
-      navigate("/patients");
+      navigate("/app/patients");
     }
   }, [currentPersona, navigate]);
 

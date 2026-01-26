@@ -41,43 +41,43 @@ import { useLocation as useLocationContext } from "@/lib/location-context";
 const allNavItems = [
   {
     title: "Dashboard",
-    url: "/",
+    url: "/app",
     icon: LayoutDashboard,
     personas: ["system_admin", "admin", "front_desk", "treatment_coordinator", "billing_manager"],
   },
   {
     title: "Patients",
-    url: "/patients",
+    url: "/app/patients",
     icon: Users,
     personas: ["system_admin", "admin", "front_desk", "treatment_coordinator", "billing_manager"],
   },
   {
     title: "Staffing Requests",
-    url: "/staffing",
+    url: "/app/staffing",
     icon: UserCheck,
     personas: ["system_admin", "admin", "front_desk"],
   },
   {
     title: "Services",
-    url: "/services",
+    url: "/app/services",
     icon: Sparkles,
     personas: ["system_admin", "admin", "billing_manager"],
   },
   {
     title: "Patient Portal",
-    url: "/portal",
+    url: "/app/portal",
     icon: CreditCard,
     personas: ["patient"],
   },
   {
     title: "Professionals Hub",
-    url: "/professionals",
+    url: "/app/professionals",
     icon: Contact,
     personas: ["system_admin", "admin", "front_desk", "professional"],
   },
   {
     title: "Messaging",
-    url: "/messaging",
+    url: "/app/messaging",
     icon: MessageSquare,
     personas: ["admin"],
   },
@@ -86,19 +86,19 @@ const allNavItems = [
 const configNavItems = [
   {
     title: "Settings",
-    url: "/settings",
+    url: "/app/settings",
     icon: Settings,
     personas: ["admin"],
   },
   {
     title: "Practices",
-    url: "/practices",
+    url: "/app/practices",
     icon: Building2,
     personas: ["system_admin"],
   },
   {
     title: "Platform Settings",
-    url: "/platform-settings",
+    url: "/app/platform-settings",
     icon: Sliders,
     personas: ["system_admin"],
   },
@@ -121,7 +121,7 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border px-6 py-4">
-        <Link href="/" className="flex items-center gap-3">
+        <Link href="/app" className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary">
             <Shield className="h-5 w-5 text-primary-foreground" />
           </div>

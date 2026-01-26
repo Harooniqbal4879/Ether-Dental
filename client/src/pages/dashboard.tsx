@@ -58,7 +58,7 @@ export default function Dashboard() {
         description="Your dental practice management hub - track verifications, manage patients, and streamline operations"
         actions={
           <Button asChild data-testid="button-view-all-verifications">
-            <Link href="/patients?tab=verifications">
+            <Link href="/app/patients?tab=verifications">
               View All Verifications
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
@@ -76,7 +76,7 @@ export default function Dashboard() {
           </>
         ) : (
           <>
-            <Link href="/patients">
+            <Link href="/app/patients">
               <StatCard
                 title="Total Patients"
                 value={stats?.totalPatients ?? 0}
@@ -85,7 +85,7 @@ export default function Dashboard() {
                 className="cursor-pointer hover-elevate"
               />
             </Link>
-            <Link href="/patients?tab=verifications">
+            <Link href="/app/patients?tab=verifications">
               <StatCard
                 title="Pending Verifications"
                 value={stats?.pendingVerifications ?? 0}
@@ -98,7 +98,7 @@ export default function Dashboard() {
                 }`}
               />
             </Link>
-            <Link href="/patients?tab=verifications">
+            <Link href="/app/patients?tab=verifications">
               <StatCard
                 title="Completed Today"
                 value={stats?.completedToday ?? 0}
@@ -107,7 +107,7 @@ export default function Dashboard() {
                 className="cursor-pointer hover-elevate"
               />
             </Link>
-            <Link href="/patients?tab=appointments">
+            <Link href="/app/patients?tab=appointments">
               <StatCard
                 title="Upcoming Appointments"
                 value={stats?.upcomingAppointments ?? 0}
@@ -122,7 +122,7 @@ export default function Dashboard() {
 
       {/* Quick Actions */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Link href="/patients/new">
+        <Link href="/app/patients/new">
           <Card className="hover-elevate cursor-pointer transition-all" data-testid="card-quick-add-patient">
             <CardContent className="flex items-center gap-4 p-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
@@ -135,7 +135,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </Link>
-        <Link href="/staffing">
+        <Link href="/app/staffing">
           <Card className="hover-elevate cursor-pointer transition-all" data-testid="card-quick-staffing">
             <CardContent className="flex items-center gap-4 p-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-md bg-blue-100 dark:bg-blue-900/30">
@@ -148,7 +148,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </Link>
-        <Link href="/services">
+        <Link href="/app/services">
           <Card className="hover-elevate cursor-pointer transition-all" data-testid="card-quick-services">
             <CardContent className="flex items-center gap-4 p-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-md bg-purple-100 dark:bg-purple-900/30">
@@ -161,7 +161,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </Link>
-        <Link href="/settings">
+        <Link href="/app/settings">
           <Card className="hover-elevate cursor-pointer transition-all" data-testid="card-quick-settings">
             <CardContent className="flex items-center gap-4 p-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted">
@@ -183,7 +183,7 @@ export default function Dashboard() {
               Recent Verifications
             </CardTitle>
             <Button variant="ghost" size="sm" asChild>
-              <Link href="/patients?tab=verifications" data-testid="link-see-all-verifications">
+              <Link href="/app/patients?tab=verifications" data-testid="link-see-all-verifications">
                 See all
                 <ArrowRight className="ml-1 h-3.5 w-3.5" />
               </Link>

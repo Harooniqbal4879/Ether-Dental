@@ -26,6 +26,7 @@ import RegisterPractice from "@/pages/register-practice";
 import Eligibility from "@/pages/eligibility";
 import Messaging from "@/pages/messaging";
 import NotFound from "@/pages/not-found";
+import Landing from "@/pages/landing";
 import Features from "@/pages/marketing/features";
 import HowItWorks from "@/pages/marketing/how-it-works";
 import Benefits from "@/pages/marketing/benefits";
@@ -36,30 +37,30 @@ import Demo from "@/pages/marketing/demo";
 function MainRouter() {
   return (
     <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route path="/patients" component={Patients} />
-      <Route path="/patients/new" component={PatientForm} />
-      <Route path="/patients/:id" component={PatientDetail} />
-      <Route path="/verifications">
-        <Redirect to="/patients?tab=insurance" />
+      <Route path="/app" component={Dashboard} />
+      <Route path="/app/patients" component={Patients} />
+      <Route path="/app/patients/new" component={PatientForm} />
+      <Route path="/app/patients/:id" component={PatientDetail} />
+      <Route path="/app/verifications">
+        <Redirect to="/app/patients?tab=insurance" />
       </Route>
-      <Route path="/appointments">
-        <Redirect to="/patients?tab=appointments" />
+      <Route path="/app/appointments">
+        <Redirect to="/app/patients?tab=appointments" />
       </Route>
-      <Route path="/carriers" component={Carriers} />
-      <Route path="/settings" component={Settings} />
-      <Route path="/staffing" component={Staffing} />
-      <Route path="/staffing/add-shift" component={AddShift} />
-      <Route path="/services" component={Services} />
-      <Route path="/portal" component={PatientPortal} />
-      <Route path="/professionals" component={ProfessionalsHub} />
-      <Route path="/professionals/:id" component={ProfessionalsHub} />
-      <Route path="/platform-settings" component={PlatformSettings} />
-      <Route path="/practices" component={PracticeManagement} />
-      <Route path="/eligibility">
-        <Redirect to="/patients?tab=insurance" />
+      <Route path="/app/carriers" component={Carriers} />
+      <Route path="/app/settings" component={Settings} />
+      <Route path="/app/staffing" component={Staffing} />
+      <Route path="/app/staffing/add-shift" component={AddShift} />
+      <Route path="/app/services" component={Services} />
+      <Route path="/app/portal" component={PatientPortal} />
+      <Route path="/app/professionals" component={ProfessionalsHub} />
+      <Route path="/app/professionals/:id" component={ProfessionalsHub} />
+      <Route path="/app/platform-settings" component={PlatformSettings} />
+      <Route path="/app/practices" component={PracticeManagement} />
+      <Route path="/app/eligibility">
+        <Redirect to="/app/patients?tab=insurance" />
       </Route>
-      <Route path="/messaging" component={Messaging} />
+      <Route path="/app/messaging" component={Messaging} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -93,12 +94,21 @@ function MainLayout() {
   );
 }
 
+function LandingWrapper() {
+  return (
+    <PersonaProvider>
+      <Landing />
+    </PersonaProvider>
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="light" storageKey="etherai-theme">
         <TooltipProvider>
           <Switch>
+            <Route path="/" component={LandingWrapper} />
             <Route path="/register" component={RegisterPractice} />
             <Route path="/features" component={Features} />
             <Route path="/how-it-works" component={HowItWorks} />
@@ -106,6 +116,9 @@ function App() {
             <Route path="/pricing" component={Pricing} />
             <Route path="/faq" component={FAQ} />
             <Route path="/demo" component={Demo} />
+            <Route path="/app/:rest*">
+              <MainLayout />
+            </Route>
             <Route>
               <MainLayout />
             </Route>

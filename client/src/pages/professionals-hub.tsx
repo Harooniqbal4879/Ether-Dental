@@ -625,7 +625,7 @@ function ProfessionalProfileDisplay({
       {showBackButton && (
         <div className="flex items-center gap-4 mb-6">
           <Button variant="ghost" size="sm" asChild>
-            <Link href="/professionals" data-testid="button-back-to-professionals">
+            <Link href="/app/professionals" data-testid="button-back-to-professionals">
               <ChevronLeft className="h-4 w-4 mr-1" />
               Back to Professionals
             </Link>
@@ -1821,7 +1821,7 @@ function ProfessionalCard({ professional, isOnline }: { professional: Profession
   const handleMessageClick = (e: { preventDefault: () => void; stopPropagation: () => void }) => {
     e.preventDefault();
     e.stopPropagation();
-    navigate(`/messaging?professional=${professional.id}`);
+    navigate(`/app/messaging?professional=${professional.id}`);
   };
 
   return (
@@ -1914,7 +1914,7 @@ function ProfessionalDetail({ professional }: { professional: ProfessionalWithBa
     <div className="space-y-6">
       <div className="flex items-center gap-4 mb-6">
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/professionals" data-testid="button-back-to-professionals">
+          <Link href="/app/professionals" data-testid="button-back-to-professionals">
             <ChevronLeft className="h-4 w-4 mr-1" />
             Back to Professionals
           </Link>

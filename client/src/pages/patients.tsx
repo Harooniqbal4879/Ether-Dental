@@ -205,7 +205,7 @@ function PatientsTab() {
           action={
             !searchQuery && (
               <Button asChild>
-                <Link href="/patients/new">
+                <Link href="/app/patients/new">
                   <Plus className="mr-2 h-4 w-4" />
                   Add Patient
                 </Link>
@@ -551,7 +551,7 @@ export default function Patients() {
               Import CSV
             </Button>
             <Button asChild data-testid="button-add-patient">
-              <Link href="/patients/new">
+              <Link href="/app/patients/new">
                 <Plus className="mr-2 h-4 w-4" />
                 Add Patient
               </Link>

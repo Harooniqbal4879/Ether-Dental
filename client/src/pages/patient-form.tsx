@@ -97,7 +97,7 @@ export default function PatientForm() {
         title: "Patient created",
         description: "The patient has been added successfully.",
       });
-      navigate("/patients");
+      navigate("/app/patients");
     },
     onError: () => {
       toast({
@@ -116,7 +116,7 @@ export default function PatientForm() {
     <div className="space-y-6 p-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" asChild>
-          <Link href="/patients" data-testid="button-back">
+          <Link href="/app/patients" data-testid="button-back">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
@@ -522,7 +522,7 @@ export default function PatientForm() {
 
           <div className="flex justify-end gap-4">
             <Button type="button" variant="outline" asChild>
-              <Link href="/patients" data-testid="button-cancel">
+              <Link href="/app/patients" data-testid="button-cancel">
                 Cancel
               </Link>
             </Button>

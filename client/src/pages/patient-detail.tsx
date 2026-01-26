@@ -105,7 +105,7 @@ export default function PatientDetail() {
           The patient you're looking for doesn't exist.
         </p>
         <Button asChild className="mt-4">
-          <Link href="/patients">Back to Patients</Link>
+          <Link href="/app/patients">Back to Patients</Link>
         </Button>
       </div>
     );
@@ -154,7 +154,7 @@ export default function PatientDetail() {
     <div className="space-y-6 p-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" asChild>
-          <Link href="/patients" data-testid="button-back-to-patients">
+          <Link href="/app/patients" data-testid="button-back-to-patients">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
