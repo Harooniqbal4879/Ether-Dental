@@ -25,6 +25,7 @@ import {
   platformSettings,
   platformStateTaxRates,
   practices,
+  practiceAdmins,
   practiceSettings,
   practiceLocations,
   eligibilityVerifications,
@@ -94,6 +95,8 @@ import {
   type InsertPlatformStateTaxRate,
   type Practice,
   type InsertPractice,
+  type PracticeAdmin,
+  type InsertPracticeAdmin,
   type PracticeSettings,
   type InsertPracticeSettings,
   type PracticeLocation,
@@ -298,6 +301,13 @@ export interface IStorage {
   getPractice(id: string): Promise<Practice | undefined>;
   createPractice(practice: InsertPractice): Promise<Practice>;
   updatePractice(id: string, data: Partial<Practice>): Promise<Practice | undefined>;
+
+  // Practice Admins
+  getPracticeAdmins(practiceId: string): Promise<PracticeAdmin[]>;
+  getPracticeAdmin(id: string): Promise<PracticeAdmin | undefined>;
+  getPracticeAdminByEmail(email: string): Promise<PracticeAdmin | undefined>;
+  createPracticeAdmin(admin: InsertPracticeAdmin): Promise<PracticeAdmin>;
+  updatePracticeAdmin(id: string, data: Partial<PracticeAdmin>): Promise<PracticeAdmin | undefined>;
 
   // Practice Settings
   getPracticeSettings(practiceId: string): Promise<PracticeSettings | undefined>;
@@ -1858,6 +1868,35 @@ export class DatabaseStorage implements IStorage {
       .update(practices)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(practices.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Practice Admins
+  async getPracticeAdmins(practiceId: string): Promise<PracticeAdmin[]> {
+    return await db.select().from(practiceAdmins).where(eq(practiceAdmins.practiceId, practiceId));
+  }
+
+  async getPracticeAdmin(id: string): Promise<PracticeAdmin | undefined> {
+    const [admin] = await db.select().from(practiceAdmins).where(eq(practiceAdmins.id, id));
+    return admin;
+  }
+
+  async getPracticeAdminByEmail(email: string): Promise<PracticeAdmin | undefined> {
+    const [admin] = await db.select().from(practiceAdmins).where(eq(practiceAdmins.email, email));
+    return admin;
+  }
+
+  async createPracticeAdmin(admin: InsertPracticeAdmin): Promise<PracticeAdmin> {
+    const [created] = await db.insert(practiceAdmins).values(admin).returning();
+    return created;
+  }
+
+  async updatePracticeAdmin(id: string, data: Partial<PracticeAdmin>): Promise<PracticeAdmin | undefined> {
+    const [updated] = await db
+      .update(practiceAdmins)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(practiceAdmins.id, id))
       .returning();
     return updated;
   }

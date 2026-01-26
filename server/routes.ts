@@ -2000,11 +2000,52 @@ export async function registerRoutes(
 
   app.post("/api/practices", async (req, res) => {
     try {
-      const practice = await storage.createPractice(req.body);
+      const { adminFirstName, adminLastName, adminEmail, adminPhone, ...practiceData } = req.body;
+      
+      // Create the practice
+      const practice = await storage.createPractice(practiceData);
+      
+      // If admin info is provided, create the practice admin
+      if (adminEmail && adminFirstName && adminLastName) {
+        await storage.createPracticeAdmin({
+          practiceId: practice.id,
+          firstName: adminFirstName,
+          lastName: adminLastName,
+          email: adminEmail,
+          phone: adminPhone || null,
+          role: "admin",
+        });
+      }
+      
       res.status(201).json(practice);
     } catch (error) {
       console.error("Error creating practice:", error);
       res.status(500).json({ error: "Failed to create practice" });
+    }
+  });
+
+  // Get practice admins for a practice
+  app.get("/api/practices/:id/admins", async (req, res) => {
+    try {
+      const admins = await storage.getPracticeAdmins(req.params.id);
+      res.json(admins);
+    } catch (error) {
+      console.error("Error fetching practice admins:", error);
+      res.status(500).json({ error: "Failed to fetch practice admins" });
+    }
+  });
+
+  // Create a practice admin
+  app.post("/api/practices/:id/admins", async (req, res) => {
+    try {
+      const admin = await storage.createPracticeAdmin({
+        ...req.body,
+        practiceId: req.params.id,
+      });
+      res.status(201).json(admin);
+    } catch (error) {
+      console.error("Error creating practice admin:", error);
+      res.status(500).json({ error: "Failed to create practice admin" });
     }
   });
 
