@@ -50,6 +50,10 @@ interface PracticeFormData {
   ownerLastName: string;
   ownerEmail: string;
   ownerPhone: string;
+  adminFirstName: string;
+  adminLastName: string;
+  adminEmail: string;
+  adminPhone: string;
 }
 
 function PracticeForm({ 
@@ -79,176 +83,317 @@ function PracticeForm({
     ownerLastName: initialData?.ownerLastName || "",
     ownerEmail: initialData?.ownerEmail || "",
     ownerPhone: initialData?.ownerPhone || "",
+    adminFirstName: "",
+    adminLastName: "",
+    adminEmail: "",
+    adminPhone: "",
   });
+  const [currentStep, setCurrentStep] = useState(1);
+  const totalSteps = mode === "add" ? 3 : 2; // Admin step only for new practices
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit(formData);
   };
 
+  const handleNext = () => {
+    if (currentStep < totalSteps) {
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const isStepValid = () => {
+    if (currentStep === 1) {
+      return formData.name.trim() !== "";
+    }
+    if (currentStep === 2) {
+      return true; // Owner info is optional
+    }
+    if (currentStep === 3) {
+      return formData.adminEmail.trim() !== "" && formData.adminFirstName.trim() !== "" && formData.adminLastName.trim() !== "";
+    }
+    return true;
+  };
+
+  const stepLabels = mode === "add" 
+    ? ["Practice Info", "Owner Info", "Practice Admin"] 
+    : ["Practice Info", "Owner Info"];
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="space-y-4">
-        <h4 className="font-medium text-sm text-muted-foreground">Practice Information</h4>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="col-span-2">
-            <Label htmlFor="name">Practice Name *</Label>
-            <Input
-              id="name"
-              data-testid="input-practice-name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="Sunny Pines Dental"
-              required
-            />
+      {/* Step Indicator */}
+      <div className="flex items-center justify-center gap-2 mb-4">
+        {stepLabels.map((label, index) => (
+          <div key={label} className="flex items-center gap-2">
+            <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${
+              currentStep === index + 1 
+                ? "bg-primary text-primary-foreground" 
+                : currentStep > index + 1 
+                  ? "bg-primary/20 text-primary" 
+                  : "bg-muted text-muted-foreground"
+            }`}>
+              {currentStep > index + 1 ? <Check className="h-4 w-4" /> : index + 1}
+            </div>
+            <span className={`text-sm ${currentStep === index + 1 ? "font-medium" : "text-muted-foreground"}`}>
+              {label}
+            </span>
+            {index < stepLabels.length - 1 && (
+              <div className={`w-8 h-0.5 ${currentStep > index + 1 ? "bg-primary" : "bg-muted"}`} />
+            )}
           </div>
-          <div className="col-span-2">
-            <Label htmlFor="address">Address</Label>
-            <Input
-              id="address"
-              data-testid="input-practice-address"
-              value={formData.address}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-              placeholder="123 Main Street"
-            />
-          </div>
-          <div>
-            <Label htmlFor="city">City</Label>
-            <Input
-              id="city"
-              data-testid="input-practice-city"
-              value={formData.city}
-              onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-              placeholder="Los Angeles"
-            />
-          </div>
-          <div>
-            <Label htmlFor="stateCode">State</Label>
-            <Select 
-              value={formData.stateCode} 
-              onValueChange={(value) => setFormData({ ...formData, stateCode: value })}
-            >
-              <SelectTrigger data-testid="select-practice-state">
-                <SelectValue placeholder="Select state" />
-              </SelectTrigger>
-              <SelectContent>
-                {US_STATES.map((state) => (
-                  <SelectItem key={state.code} value={state.code}>
-                    {state.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="zipCode">Zip Code</Label>
-            <Input
-              id="zipCode"
-              data-testid="input-practice-zip"
-              value={formData.zipCode}
-              onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
-              placeholder="90210"
-            />
-          </div>
-          <div>
-            <Label htmlFor="phone">Phone</Label>
-            <Input
-              id="phone"
-              data-testid="input-practice-phone"
-              value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              placeholder="(555) 123-4567"
-            />
-          </div>
-          <div className="col-span-2">
-            <Label htmlFor="email">Practice Email</Label>
-            <Input
-              id="email"
-              type="email"
-              data-testid="input-practice-email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              placeholder="info@sunnypinesdental.com"
-            />
-          </div>
-          <div>
-            <Label htmlFor="npiNumber">NPI Number</Label>
-            <Input
-              id="npiNumber"
-              data-testid="input-practice-npi"
-              value={formData.npiNumber}
-              onChange={(e) => setFormData({ ...formData, npiNumber: e.target.value })}
-              placeholder="1234567890"
-            />
-          </div>
-          <div>
-            <Label htmlFor="taxId">Tax ID</Label>
-            <Input
-              id="taxId"
-              data-testid="input-practice-tax-id"
-              value={formData.taxId}
-              onChange={(e) => setFormData({ ...formData, taxId: e.target.value })}
-              placeholder="12-3456789"
-            />
-          </div>
-        </div>
+        ))}
       </div>
 
-      <div className="space-y-4">
-        <h4 className="font-medium text-sm text-muted-foreground">Owner Information</h4>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="ownerFirstName">First Name</Label>
-            <Input
-              id="ownerFirstName"
-              data-testid="input-owner-first-name"
-              value={formData.ownerFirstName}
-              onChange={(e) => setFormData({ ...formData, ownerFirstName: e.target.value })}
-              placeholder="John"
-            />
-          </div>
-          <div>
-            <Label htmlFor="ownerLastName">Last Name</Label>
-            <Input
-              id="ownerLastName"
-              data-testid="input-owner-last-name"
-              value={formData.ownerLastName}
-              onChange={(e) => setFormData({ ...formData, ownerLastName: e.target.value })}
-              placeholder="Doe"
-            />
-          </div>
-          <div>
-            <Label htmlFor="ownerEmail">Owner Email</Label>
-            <Input
-              id="ownerEmail"
-              type="email"
-              data-testid="input-owner-email"
-              value={formData.ownerEmail}
-              onChange={(e) => setFormData({ ...formData, ownerEmail: e.target.value })}
-              placeholder="john.doe@example.com"
-            />
-          </div>
-          <div>
-            <Label htmlFor="ownerPhone">Owner Phone</Label>
-            <Input
-              id="ownerPhone"
-              data-testid="input-owner-phone"
-              value={formData.ownerPhone}
-              onChange={(e) => setFormData({ ...formData, ownerPhone: e.target.value })}
-              placeholder="(555) 987-6543"
-            />
+      {/* Step 1: Practice Information */}
+      {currentStep === 1 && (
+        <div className="space-y-4">
+          <h4 className="font-medium text-sm text-muted-foreground">Practice Information</h4>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
+              <Label htmlFor="name">Practice Name *</Label>
+              <Input
+                id="name"
+                data-testid="input-practice-name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Sunny Pines Dental"
+                required
+              />
+            </div>
+            <div className="col-span-2">
+              <Label htmlFor="address">Address</Label>
+              <Input
+                id="address"
+                data-testid="input-practice-address"
+                value={formData.address}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                placeholder="123 Main Street"
+              />
+            </div>
+            <div>
+              <Label htmlFor="city">City</Label>
+              <Input
+                id="city"
+                data-testid="input-practice-city"
+                value={formData.city}
+                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                placeholder="Los Angeles"
+              />
+            </div>
+            <div>
+              <Label htmlFor="stateCode">State</Label>
+              <Select 
+                value={formData.stateCode} 
+                onValueChange={(value) => setFormData({ ...formData, stateCode: value })}
+              >
+                <SelectTrigger data-testid="select-practice-state">
+                  <SelectValue placeholder="Select state" />
+                </SelectTrigger>
+                <SelectContent>
+                  {US_STATES.map((state) => (
+                    <SelectItem key={state.code} value={state.code}>
+                      {state.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="zipCode">Zip Code</Label>
+              <Input
+                id="zipCode"
+                data-testid="input-practice-zip"
+                value={formData.zipCode}
+                onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
+                placeholder="90210"
+              />
+            </div>
+            <div>
+              <Label htmlFor="phone">Phone</Label>
+              <Input
+                id="phone"
+                data-testid="input-practice-phone"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                placeholder="(555) 123-4567"
+              />
+            </div>
+            <div className="col-span-2">
+              <Label htmlFor="email">Practice Email</Label>
+              <Input
+                id="email"
+                type="email"
+                data-testid="input-practice-email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                placeholder="info@sunnypinesdental.com"
+              />
+            </div>
+            <div>
+              <Label htmlFor="npiNumber">NPI Number</Label>
+              <Input
+                id="npiNumber"
+                data-testid="input-practice-npi"
+                value={formData.npiNumber}
+                onChange={(e) => setFormData({ ...formData, npiNumber: e.target.value })}
+                placeholder="1234567890"
+              />
+            </div>
+            <div>
+              <Label htmlFor="taxId">Tax ID</Label>
+              <Input
+                id="taxId"
+                data-testid="input-practice-tax-id"
+                value={formData.taxId}
+                onChange={(e) => setFormData({ ...formData, taxId: e.target.value })}
+                placeholder="12-3456789"
+              />
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      <DialogFooter>
+      {/* Step 2: Owner Information */}
+      {currentStep === 2 && (
+        <div className="space-y-4">
+          <h4 className="font-medium text-sm text-muted-foreground">Owner Information</h4>
+          <p className="text-sm text-muted-foreground">The practice owner details (optional)</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="ownerFirstName">First Name</Label>
+              <Input
+                id="ownerFirstName"
+                data-testid="input-owner-first-name"
+                value={formData.ownerFirstName}
+                onChange={(e) => setFormData({ ...formData, ownerFirstName: e.target.value })}
+                placeholder="John"
+              />
+            </div>
+            <div>
+              <Label htmlFor="ownerLastName">Last Name</Label>
+              <Input
+                id="ownerLastName"
+                data-testid="input-owner-last-name"
+                value={formData.ownerLastName}
+                onChange={(e) => setFormData({ ...formData, ownerLastName: e.target.value })}
+                placeholder="Doe"
+              />
+            </div>
+            <div>
+              <Label htmlFor="ownerEmail">Owner Email</Label>
+              <Input
+                id="ownerEmail"
+                type="email"
+                data-testid="input-owner-email"
+                value={formData.ownerEmail}
+                onChange={(e) => setFormData({ ...formData, ownerEmail: e.target.value })}
+                placeholder="john.doe@example.com"
+              />
+            </div>
+            <div>
+              <Label htmlFor="ownerPhone">Owner Phone</Label>
+              <Input
+                id="ownerPhone"
+                data-testid="input-owner-phone"
+                value={formData.ownerPhone}
+                onChange={(e) => setFormData({ ...formData, ownerPhone: e.target.value })}
+                placeholder="(555) 987-6543"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Step 3: Practice Admin (only for add mode) */}
+      {currentStep === 3 && mode === "add" && (
+        <div className="space-y-4">
+          <h4 className="font-medium text-sm text-muted-foreground">Practice Administrator</h4>
+          <p className="text-sm text-muted-foreground">Create an administrator account who will manage this practice</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="adminFirstName">First Name *</Label>
+              <Input
+                id="adminFirstName"
+                data-testid="input-admin-first-name"
+                value={formData.adminFirstName}
+                onChange={(e) => setFormData({ ...formData, adminFirstName: e.target.value })}
+                placeholder="Jane"
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="adminLastName">Last Name *</Label>
+              <Input
+                id="adminLastName"
+                data-testid="input-admin-last-name"
+                value={formData.adminLastName}
+                onChange={(e) => setFormData({ ...formData, adminLastName: e.target.value })}
+                placeholder="Smith"
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="adminEmail">Admin Email *</Label>
+              <Input
+                id="adminEmail"
+                type="email"
+                data-testid="input-admin-email"
+                value={formData.adminEmail}
+                onChange={(e) => setFormData({ ...formData, adminEmail: e.target.value })}
+                placeholder="admin@sunnypinesdental.com"
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="adminPhone">Admin Phone</Label>
+              <Input
+                id="adminPhone"
+                data-testid="input-admin-phone"
+                value={formData.adminPhone}
+                onChange={(e) => setFormData({ ...formData, adminPhone: e.target.value })}
+                placeholder="(555) 123-4567"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <DialogFooter className="gap-2">
+        {currentStep > 1 && (
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={handleBack} 
+            disabled={isSubmitting}
+            data-testid="button-step-back"
+          >
+            Back
+          </Button>
+        )}
         <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
           Cancel
         </Button>
-        <Button type="submit" disabled={isSubmitting} data-testid="button-save-practice">
-          {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {mode === "add" ? "Add Practice" : "Save Changes"}
-        </Button>
+        {currentStep < totalSteps ? (
+          <Button 
+            type="button" 
+            onClick={handleNext} 
+            disabled={!isStepValid()}
+            data-testid="button-step-next"
+          >
+            Next
+          </Button>
+        ) : (
+          <Button type="submit" disabled={isSubmitting || !isStepValid()} data-testid="button-save-practice">
+            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {mode === "add" ? "Create Practice" : "Save Changes"}
+          </Button>
+        )}
       </DialogFooter>
     </form>
   );
