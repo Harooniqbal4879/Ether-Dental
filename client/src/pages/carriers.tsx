@@ -19,8 +19,7 @@ import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { usePersona } from "@/lib/persona-context";
-import type { InsuranceCarrier, PracticeInsuranceCarrier } from "@shared/schema";
+import type { InsuranceCarrier, PracticeInsuranceCarrier, Practice } from "@shared/schema";
 
 type PracticeInsuranceCarrierWithCarrier = PracticeInsuranceCarrier & { carrier: InsuranceCarrier };
 
@@ -32,9 +31,12 @@ export default function Carriers() {
   const [showSearchResults, setShowSearchResults] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
-  const { currentPersona } = usePersona();
 
-  const practiceId = currentPersona?.practiceId;
+  const { data: practices } = useQuery<Practice[]>({
+    queryKey: ["/api/practices"],
+  });
+
+  const practiceId = practices?.[0]?.id;
 
   const { data: practiceCarriers, isLoading } = useQuery<PracticeInsuranceCarrierWithCarrier[]>({
     queryKey: ["/api/practices", practiceId, "insurance-carriers"],
