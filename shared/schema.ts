@@ -1058,6 +1058,35 @@ export const practiceRegistrationSchema = z.object({
 });
 export type PracticeRegistration = z.infer<typeof practiceRegistrationSchema>;
 
+// Practice Admins - Users who can manage a practice
+export const practiceAdmins = pgTable("practice_admins", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  practiceId: varchar("practice_id").notNull().references(() => practices.id, { onDelete: "cascade" }),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone"),
+  role: text("role").default("admin"), // admin, manager, staff
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const practiceAdminsRelations = relations(practiceAdmins, ({ one }) => ({
+  practice: one(practices, {
+    fields: [practiceAdmins.practiceId],
+    references: [practices.id],
+  }),
+}));
+
+export const insertPracticeAdminSchema = createInsertSchema(practiceAdmins).omit({ 
+  id: true, 
+  createdAt: true,
+  updatedAt: true 
+});
+export type InsertPracticeAdmin = z.infer<typeof insertPracticeAdminSchema>;
+export type PracticeAdmin = typeof practiceAdmins.$inferSelect;
+
 // Practice Locations - Multiple office locations for a practice
 export const practiceLocations = pgTable("practice_locations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
