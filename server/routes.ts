@@ -66,6 +66,63 @@ export async function registerRoutes(
     }
   });
 
+  // Search carriers (for autocomplete)
+  app.get("/api/carriers/search", async (req, res) => {
+    try {
+      const query = req.query.q as string || "";
+      if (query.length < 2) {
+        return res.json([]);
+      }
+      const carriers = await storage.searchCarriers(query);
+      res.json(carriers);
+    } catch (error) {
+      console.error("Error searching carriers:", error);
+      res.status(500).json({ error: "Failed to search carriers" });
+    }
+  });
+
+  // Practice Insurance Carriers - Get all carriers for a practice
+  app.get("/api/practices/:practiceId/insurance-carriers", async (req, res) => {
+    try {
+      const carriers = await storage.getPracticeInsuranceCarriers(req.params.practiceId);
+      res.json(carriers);
+    } catch (error) {
+      console.error("Error fetching practice insurance carriers:", error);
+      res.status(500).json({ error: "Failed to fetch practice insurance carriers" });
+    }
+  });
+
+  // Practice Insurance Carriers - Add a carrier to a practice
+  app.post("/api/practices/:practiceId/insurance-carriers", async (req, res) => {
+    try {
+      const { carrierId, notes } = req.body;
+      if (!carrierId) {
+        return res.status(400).json({ error: "carrierId is required" });
+      }
+      const practiceCarrier = await storage.addPracticeInsuranceCarrier({
+        practiceId: req.params.practiceId,
+        carrierId,
+        notes: notes || null,
+        isActive: true,
+      });
+      res.status(201).json(practiceCarrier);
+    } catch (error) {
+      console.error("Error adding practice insurance carrier:", error);
+      res.status(500).json({ error: "Failed to add insurance carrier to practice" });
+    }
+  });
+
+  // Practice Insurance Carriers - Remove a carrier from a practice
+  app.delete("/api/practices/:practiceId/insurance-carriers/:id", async (req, res) => {
+    try {
+      await storage.removePracticeInsuranceCarrier(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error removing practice insurance carrier:", error);
+      res.status(500).json({ error: "Failed to remove insurance carrier from practice" });
+    }
+  });
+
   // Patients
   app.get("/api/patients", async (req, res) => {
     try {
