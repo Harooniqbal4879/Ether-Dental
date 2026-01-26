@@ -316,8 +316,10 @@ export interface IStorage {
 
   // Messaging - Conversations
   getConversations(practiceAdminId: string): Promise<ConversationWithDetails[]>;
+  getConversationsForProfessional(professionalId: string): Promise<ConversationWithDetails[]>;
   getConversation(id: string): Promise<Conversation | undefined>;
   getOrCreateConversation(practiceAdminId: string, professionalId: string): Promise<Conversation>;
+  getOrCreateConversationFromProfessional(professionalId: string, practiceAdminId: string): Promise<Conversation>;
   
   // Messaging - Messages
   getMessages(conversationId: string, limit?: number): Promise<Message[]>;
@@ -329,6 +331,7 @@ export interface IStorage {
   getUserOnlineStatus(userId: string): Promise<UserOnlineStatus | undefined>;
   getOnlineHygienists(): Promise<{ id: string; firstName: string; lastName: string; photoUrl: string | null; isOnline: boolean }[]>;
   getProfessionalsOnlineStatus(): Promise<Map<string, boolean>>;
+  getPracticeContacts(): Promise<{ id: string; name: string; practiceName: string; isOnline: boolean }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2195,6 +2198,64 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
+  async getConversationsForProfessional(professionalId: string): Promise<ConversationWithDetails[]> {
+    const allConversations = await db
+      .select()
+      .from(conversations)
+      .where(eq(conversations.professionalId, professionalId))
+      .orderBy(desc(conversations.lastMessageAt));
+
+    const result: ConversationWithDetails[] = [];
+    
+    for (const conv of allConversations) {
+      // For professional view, we get the practice admin info
+      const [lastMessage] = await db
+        .select()
+        .from(messages)
+        .where(eq(messages.conversationId, conv.id))
+        .orderBy(desc(messages.createdAt))
+        .limit(1);
+
+      const unreadMessages = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(messages)
+        .where(
+          and(
+            eq(messages.conversationId, conv.id),
+            eq(messages.senderType, "practice_admin"),
+            sql`${messages.readAt} IS NULL`
+          )
+        );
+
+      const [onlineStatus] = await db
+        .select()
+        .from(userOnlineStatus)
+        .where(eq(userOnlineStatus.userId, conv.practiceAdminId));
+
+      // Create a pseudo-professional object for the practice admin
+      result.push({
+        ...conv,
+        professional: {
+          id: conv.practiceAdminId,
+          firstName: "Practice",
+          lastName: "Admin",
+          photoUrl: null,
+          role: "admin",
+        },
+        lastMessage,
+        unreadCount: Number(unreadMessages[0]?.count || 0),
+        isOnline: onlineStatus?.isOnline || false,
+      });
+    }
+
+    return result;
+  }
+
+  async getOrCreateConversationFromProfessional(professionalId: string, practiceAdminId: string): Promise<Conversation> {
+    // Same logic as getOrCreateConversation, just different perspective
+    return this.getOrCreateConversation(practiceAdminId, professionalId);
+  }
+
   // Messaging - Messages
   async getMessages(conversationId: string, limit: number = 50): Promise<Message[]> {
     return db
@@ -2298,6 +2359,51 @@ export class DatabaseStorage implements IStorage {
       statusMap.set(status.userId, status.isOnline);
     }
     return statusMap;
+  }
+
+  async getPracticeContacts(): Promise<{ id: string; name: string; practiceName: string; isOnline: boolean }[]> {
+    // Get all practices and their admins for professionals to message
+    const allPractices = await db
+      .select({
+        id: practices.id,
+        name: practices.name,
+        contactEmail: practices.email,
+      })
+      .from(practices);
+
+    const result = [];
+    for (const practice of allPractices) {
+      // Use practice ID as the admin ID for now (simplified)
+      const adminId = `practice-admin-${practice.id}`;
+      const [status] = await db
+        .select()
+        .from(userOnlineStatus)
+        .where(eq(userOnlineStatus.userId, adminId));
+      
+      result.push({
+        id: adminId,
+        name: practice.name,
+        practiceName: practice.name,
+        isOnline: status?.isOnline || false,
+      });
+    }
+
+    // Also add a default practice admin for testing
+    const [defaultStatus] = await db
+      .select()
+      .from(userOnlineStatus)
+      .where(eq(userOnlineStatus.userId, "practice-admin-1"));
+    
+    if (!result.some(r => r.id === "practice-admin-1")) {
+      result.push({
+        id: "practice-admin-1",
+        name: "Sunshine Dental Clinic",
+        practiceName: "Sunshine Dental Clinic",
+        isOnline: defaultStatus?.isOnline || false,
+      });
+    }
+
+    return result;
   }
 }
 

@@ -79,7 +79,7 @@ const allNavItems = [
     title: "Messaging",
     url: "/app/messaging",
     icon: MessageSquare,
-    personas: ["admin"],
+    personas: ["admin", "professional"],
   },
 ];
 
