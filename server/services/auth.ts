@@ -100,3 +100,60 @@ export async function getPracticeAdminByEmail(email: string) {
 
   return admins[0] || null;
 }
+
+export async function getPracticeAdmins(practiceId: string) {
+  const admins = await db
+    .select({
+      id: practiceAdmins.id,
+      email: practiceAdmins.email,
+      firstName: practiceAdmins.firstName,
+      lastName: practiceAdmins.lastName,
+      phone: practiceAdmins.phone,
+      role: practiceAdmins.role,
+      isActive: practiceAdmins.isActive,
+      createdAt: practiceAdmins.createdAt,
+      updatedAt: practiceAdmins.updatedAt,
+    })
+    .from(practiceAdmins)
+    .where(eq(practiceAdmins.practiceId, practiceId))
+    .orderBy(practiceAdmins.createdAt);
+
+  return admins;
+}
+
+export async function updatePracticeAdmin(
+  adminId: string,
+  data: {
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    role?: string;
+    isActive?: boolean;
+  }
+) {
+  const result = await db
+    .update(practiceAdmins)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(practiceAdmins.id, adminId))
+    .returning({
+      id: practiceAdmins.id,
+      email: practiceAdmins.email,
+      firstName: practiceAdmins.firstName,
+      lastName: practiceAdmins.lastName,
+      phone: practiceAdmins.phone,
+      role: practiceAdmins.role,
+      isActive: practiceAdmins.isActive,
+    });
+
+  return result[0];
+}
+
+export async function getPracticeAdminById(adminId: string) {
+  const admins = await db
+    .select()
+    .from(practiceAdmins)
+    .where(eq(practiceAdmins.id, adminId))
+    .limit(1);
+
+  return admins[0] || null;
+}

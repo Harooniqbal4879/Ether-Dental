@@ -270,6 +270,162 @@ export async function registerRoutes(
     }
   });
 
+  // Practice Admin Management - List users for a practice
+  app.get("/api/practice-admins", async (req, res) => {
+    const session = req.session as any;
+    
+    if (!session?.adminId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    try {
+      const { getPracticeAdmins, getPracticeAdminById } = await import("./services/auth");
+      
+      const currentAdmin = await getPracticeAdminById(session.adminId);
+      if (!currentAdmin) {
+        return res.status(401).json({ error: "Admin not found" });
+      }
+
+      const admins = await getPracticeAdmins(currentAdmin.practiceId);
+      res.json(admins);
+    } catch (error) {
+      console.error("Error fetching practice admins:", error);
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  // Create new practice admin user
+  app.post("/api/practice-admins", async (req, res) => {
+    const session = req.session as any;
+    
+    if (!session?.adminId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    try {
+      const { firstName, lastName, email, password, phone, role } = req.body;
+
+      if (!firstName || !lastName || !email || !password) {
+        return res.status(400).json({ error: "First name, last name, email, and password are required" });
+      }
+
+      if (password.length < 6) {
+        return res.status(400).json({ error: "Password must be at least 6 characters" });
+      }
+
+      const { getPracticeAdminByEmail, createPracticeAdminWithPassword, getPracticeAdminById } = await import("./services/auth");
+      
+      const currentAdmin = await getPracticeAdminById(session.adminId);
+      if (!currentAdmin) {
+        return res.status(401).json({ error: "Admin not found" });
+      }
+
+      const existing = await getPracticeAdminByEmail(email);
+      if (existing) {
+        return res.status(400).json({ error: "A user with this email already exists" });
+      }
+
+      const newAdmin = await createPracticeAdminWithPassword(
+        currentAdmin.practiceId,
+        firstName,
+        lastName,
+        email,
+        password,
+        phone,
+        role || "staff"
+      );
+
+      res.status(201).json({
+        id: newAdmin.id,
+        email: newAdmin.email,
+        firstName: newAdmin.firstName,
+        lastName: newAdmin.lastName,
+        phone: newAdmin.phone,
+        role: newAdmin.role,
+        isActive: newAdmin.isActive,
+      });
+    } catch (error) {
+      console.error("Error creating practice admin:", error);
+      res.status(500).json({ error: "Failed to create user" });
+    }
+  });
+
+  // Update practice admin user
+  app.patch("/api/practice-admins/:id", async (req, res) => {
+    const session = req.session as any;
+    
+    if (!session?.adminId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    try {
+      const { id } = req.params;
+      const { firstName, lastName, phone, role, isActive } = req.body;
+
+      const { updatePracticeAdmin, getPracticeAdminById } = await import("./services/auth");
+      
+      const currentAdmin = await getPracticeAdminById(session.adminId);
+      if (!currentAdmin) {
+        return res.status(401).json({ error: "Admin not found" });
+      }
+
+      const targetAdmin = await getPracticeAdminById(id);
+      if (!targetAdmin || targetAdmin.practiceId !== currentAdmin.practiceId) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const updated = await updatePracticeAdmin(id, {
+        firstName,
+        lastName,
+        phone,
+        role,
+        isActive,
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating practice admin:", error);
+      res.status(500).json({ error: "Failed to update user" });
+    }
+  });
+
+  // Reset password for practice admin
+  app.post("/api/practice-admins/:id/reset-password", async (req, res) => {
+    const session = req.session as any;
+    
+    if (!session?.adminId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    try {
+      const { id } = req.params;
+      const { password } = req.body;
+
+      if (!password || password.length < 6) {
+        return res.status(400).json({ error: "Password must be at least 6 characters" });
+      }
+
+      const { updateAdminPassword, getPracticeAdminById } = await import("./services/auth");
+      
+      const currentAdmin = await getPracticeAdminById(session.adminId);
+      if (!currentAdmin) {
+        return res.status(401).json({ error: "Admin not found" });
+      }
+
+      const targetAdmin = await getPracticeAdminById(id);
+      if (!targetAdmin || targetAdmin.practiceId !== currentAdmin.practiceId) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      await updateAdminPassword(id, password);
+
+      res.json({ success: true, message: "Password reset successfully" });
+    } catch (error) {
+      console.error("Error resetting password:", error);
+      res.status(500).json({ error: "Failed to reset password" });
+    }
+  });
+
   // Dashboard Stats
   app.get("/api/dashboard/stats", async (req, res) => {
     try {
