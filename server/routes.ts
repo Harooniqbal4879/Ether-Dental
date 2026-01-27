@@ -4282,5 +4282,105 @@ export async function registerRoutes(
     }
   });
 
+  // ============================================================
+  // Production Seed Endpoint (One-time setup)
+  // ============================================================
+  
+  app.post("/api/seed/production", async (req, res) => {
+    try {
+      const { seedSecret } = req.body;
+      const expectedSecret = process.env.SEED_SECRET;
+      
+      // Require a secret to prevent unauthorized seeding
+      if (!expectedSecret) {
+        return res.status(403).json({ 
+          error: "SEED_SECRET environment variable not configured. Set it in your secrets to enable seeding." 
+        });
+      }
+      
+      if (seedSecret !== expectedSecret) {
+        return res.status(401).json({ error: "Invalid seed secret" });
+      }
+      
+      const results: string[] = [];
+      
+      // Check if admin already exists
+      const existingAdmin = await storage.getPracticeAdminByEmail("admin@test.com");
+      if (existingAdmin) {
+        results.push("Test admin already exists (admin@test.com)");
+      } else {
+        // Create a test practice
+        const existingPractices = await storage.getPractices();
+        let practiceId: string;
+        
+        if (existingPractices.length > 0) {
+          practiceId = existingPractices[0].id;
+          results.push(`Using existing practice: ${existingPractices[0].name}`);
+        } else {
+          const newPractice = await storage.createPractice({
+            name: "Demo Dental Practice",
+            email: "demo@demopractice.com",
+            phone: "(555) 123-4567",
+            address: "123 Main Street",
+            city: "San Francisco",
+            state: "CA",
+            zipCode: "94102",
+            status: "approved",
+          });
+          practiceId = newPractice.id;
+          results.push(`Created practice: Demo Dental Practice`);
+        }
+        
+        // Create test admin with password
+        const { hashPassword } = await import("./services/auth");
+        const passwordHash = await hashPassword("admin123");
+        
+        await storage.createPracticeAdmin({
+          practiceId,
+          firstName: "Test",
+          lastName: "Admin",
+          email: "admin@test.com",
+          phone: "(555) 987-6543",
+          role: "admin",
+          passwordHash,
+        });
+        results.push("Created test admin: admin@test.com / admin123");
+      }
+      
+      // Create a sample patient if none exist
+      const existingPatients = await storage.getPatients();
+      if (existingPatients.length === 0) {
+        await storage.createPatient({
+          firstName: "John",
+          lastName: "Doe",
+          email: "john.doe@example.com",
+          phone: "(555) 111-2222",
+          dateOfBirth: "1985-03-15",
+          address: "456 Oak Avenue",
+          city: "San Francisco",
+          state: "CA",
+          zipCode: "94103",
+        });
+        results.push("Created sample patient: John Doe");
+      } else {
+        results.push(`${existingPatients.length} patients already exist`);
+      }
+      
+      res.json({
+        success: true,
+        message: "Production seed completed",
+        results,
+        credentials: {
+          email: "admin@test.com",
+          password: "admin123",
+          note: "Please change this password after first login!"
+        }
+      });
+    } catch (error) {
+      console.error("Error seeding production:", error);
+      res.status(500).json({ error: "Failed to seed production data" });
+    }
+  });
+
   return httpServer;
 }
