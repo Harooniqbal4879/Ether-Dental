@@ -2666,13 +2666,27 @@ export async function registerRoutes(
 
   app.post("/api/practices", async (req, res) => {
     try {
-      const { adminFirstName, adminLastName, adminEmail, adminPhone, ...practiceData } = req.body;
+      const { adminFirstName, adminLastName, adminEmail, adminPhone, adminPassword, adminConfirmPassword, ...practiceData } = req.body;
       
       // Create the practice
       const practice = await storage.createPractice(practiceData);
       
       // If admin info is provided, create the practice admin
       if (adminEmail && adminFirstName && adminLastName) {
+        let passwordHash = null;
+        
+        // Hash the password if provided
+        if (adminPassword) {
+          if (adminPassword.length < 6) {
+            return res.status(400).json({ error: "Password must be at least 6 characters" });
+          }
+          if (adminPassword !== adminConfirmPassword) {
+            return res.status(400).json({ error: "Passwords do not match" });
+          }
+          const { hashPassword } = await import("./services/auth");
+          passwordHash = await hashPassword(adminPassword);
+        }
+        
         await storage.createPracticeAdmin({
           practiceId: practice.id,
           firstName: adminFirstName,
@@ -2680,6 +2694,7 @@ export async function registerRoutes(
           email: adminEmail,
           phone: adminPhone || null,
           role: "admin",
+          passwordHash,
         });
       }
       

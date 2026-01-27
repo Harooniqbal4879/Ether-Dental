@@ -54,6 +54,8 @@ interface PracticeFormData {
   adminLastName: string;
   adminEmail: string;
   adminPhone: string;
+  adminPassword: string;
+  adminConfirmPassword: string;
 }
 
 function PracticeForm({ 
@@ -87,8 +89,11 @@ function PracticeForm({
     adminLastName: "",
     adminEmail: "",
     adminPhone: "",
+    adminPassword: "",
+    adminConfirmPassword: "",
   });
   const [currentStep, setCurrentStep] = useState(1);
+  const [passwordError, setPasswordError] = useState("");
   const totalSteps = mode === "add" ? 3 : 2; // Admin step only for new practices
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -116,7 +121,12 @@ function PracticeForm({
       return true; // Owner info is optional
     }
     if (currentStep === 3) {
-      return formData.adminEmail.trim() !== "" && formData.adminFirstName.trim() !== "" && formData.adminLastName.trim() !== "";
+      const hasRequiredFields = formData.adminEmail.trim() !== "" && 
+        formData.adminFirstName.trim() !== "" && 
+        formData.adminLastName.trim() !== "" &&
+        formData.adminPassword.length >= 6 &&
+        formData.adminPassword === formData.adminConfirmPassword;
+      return hasRequiredFields;
     }
     return true;
   };
@@ -359,6 +369,39 @@ function PracticeForm({
                 onChange={(e) => setFormData({ ...formData, adminPhone: e.target.value })}
                 placeholder="(555) 123-4567"
               />
+            </div>
+            <div>
+              <Label htmlFor="adminPassword">Password *</Label>
+              <Input
+                id="adminPassword"
+                type="password"
+                data-testid="input-admin-password"
+                value={formData.adminPassword}
+                onChange={(e) => {
+                  setFormData({ ...formData, adminPassword: e.target.value });
+                  setPasswordError("");
+                }}
+                placeholder="Min 6 characters"
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="adminConfirmPassword">Confirm Password *</Label>
+              <Input
+                id="adminConfirmPassword"
+                type="password"
+                data-testid="input-admin-confirm-password"
+                value={formData.adminConfirmPassword}
+                onChange={(e) => {
+                  setFormData({ ...formData, adminConfirmPassword: e.target.value });
+                  setPasswordError("");
+                }}
+                placeholder="Re-enter password"
+                required
+              />
+              {passwordError && (
+                <p className="text-sm text-destructive mt-1">{passwordError}</p>
+              )}
             </div>
           </div>
         </div>
