@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Stethoscope, ArrowLeft, Loader2, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { usePersona } from "@/lib/persona-context";
 
 interface LoginResponse {
@@ -38,13 +38,12 @@ export default function AdminLogin() {
 
   const loginMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest<LoginResponse>("/api/auth/login", {
-        method: "POST",
-        body: JSON.stringify({ email, password }),
-      });
-      return response;
+      const response = await apiRequest("POST", "/api/auth/login", { email, password });
+      const data: LoginResponse = await response.json();
+      return data;
     },
     onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/session"] });
       toast({
         title: "Login successful",
         description: `Welcome back, ${data.admin.firstName}!`,

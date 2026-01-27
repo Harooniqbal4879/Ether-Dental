@@ -9,6 +9,7 @@ import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/s
 import { AppSidebar } from "@/components/app-sidebar";
 import { PersonaProvider } from "@/lib/persona-context";
 import { LocationProvider } from "@/lib/location-context";
+import { AuthProvider } from "@/lib/auth-context";
 import Dashboard from "@/pages/dashboard";
 import Patients from "@/pages/patients";
 import PatientDetail from "@/pages/patient-detail";
@@ -98,8 +99,9 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="light" storageKey="etherai-theme">
         <TooltipProvider>
-          <PersonaProvider>
-            <Switch>
+          <AuthProvider>
+            <PersonaProvider>
+              <Switch>
               <Route path="/" component={Landing} />
               <Route path="/login/admin" component={AdminLogin} />
               <Route path="/register" component={RegisterPractice} />
@@ -115,9 +117,10 @@ function App() {
               <Route>
                 <MainLayout />
               </Route>
-            </Switch>
-            <Toaster />
-          </PersonaProvider>
+              </Switch>
+              <Toaster />
+            </PersonaProvider>
+          </AuthProvider>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>

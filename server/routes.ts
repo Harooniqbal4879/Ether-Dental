@@ -82,7 +82,7 @@ export async function registerRoutes(
   app.get("/api/auth/session", async (req, res) => {
     const session = req.session as any;
     
-    if (!session.isAuthenticated || !session.adminId) {
+    if (!session || !session.isAuthenticated || !session.adminId) {
       return res.json({ authenticated: false });
     }
 
@@ -178,7 +178,7 @@ export async function registerRoutes(
   app.post("/api/auth/update-password", async (req, res) => {
     const session = req.session as any;
     
-    if (!session.isAuthenticated || !session.adminId) {
+    if (!session || !session.isAuthenticated || !session.adminId) {
       return res.status(401).json({ error: "Not authenticated" });
     }
 
@@ -220,6 +220,53 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Update password error:", error);
       res.status(500).json({ error: "Failed to update password" });
+    }
+  });
+
+  // Set initial password for an admin (for setup - requires email verification in production)
+  app.post("/api/auth/set-password", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ error: "Email and password are required" });
+      }
+
+      if (password.length < 6) {
+        return res.status(400).json({ error: "Password must be at least 6 characters" });
+      }
+
+      const { db } = await import("./db");
+      const { practiceAdmins } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      const { hashPassword } = await import("./services/auth");
+
+      // Find admin by email
+      const admins = await db
+        .select()
+        .from(practiceAdmins)
+        .where(eq(practiceAdmins.email, email.toLowerCase()))
+        .limit(1);
+
+      const admin = admins[0];
+      if (!admin) {
+        return res.status(404).json({ error: "Admin not found with this email" });
+      }
+
+      // Set password
+      const passwordHash = await hashPassword(password);
+      await db
+        .update(practiceAdmins)
+        .set({ passwordHash, updatedAt: new Date() })
+        .where(eq(practiceAdmins.id, admin.id));
+
+      res.json({ 
+        success: true, 
+        message: "Password set successfully. You can now login."
+      });
+    } catch (error) {
+      console.error("Set password error:", error);
+      res.status(500).json({ error: "Failed to set password" });
     }
   });
 
