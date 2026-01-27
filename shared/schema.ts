@@ -1088,7 +1088,8 @@ export const practiceAdmins = pgTable("practice_admins", {
   practiceId: varchar("practice_id").notNull().references(() => practices.id, { onDelete: "cascade" }),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
-  email: text("email").notNull(),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash"), // Bcrypt hashed password
   phone: text("phone"),
   role: text("role").default("admin"), // admin, manager, staff
   isActive: boolean("is_active").default(true),
