@@ -30,6 +30,199 @@ export async function registerRoutes(
   // Register Object Storage routes for file uploads
   registerObjectStorageRoutes(app);
 
+  // ============================================================
+  // Practice Admin Authentication API
+  // ============================================================
+
+  // Login endpoint
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ error: "Email and password are required" });
+      }
+
+      const { authenticatePracticeAdmin } = await import("./services/auth");
+      const result = await authenticatePracticeAdmin(email, password);
+
+      if (!result) {
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+
+      // Store admin info in session
+      (req.session as any).adminId = result.admin.id;
+      (req.session as any).practiceId = result.admin.practiceId;
+      (req.session as any).adminEmail = result.admin.email;
+      (req.session as any).isAuthenticated = true;
+
+      res.json({
+        success: true,
+        admin: result.admin,
+        practice: result.practice,
+      });
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(500).json({ error: "Login failed" });
+    }
+  });
+
+  // Logout endpoint
+  app.post("/api/auth/logout", (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        console.error("Logout error:", err);
+        return res.status(500).json({ error: "Logout failed" });
+      }
+      res.json({ success: true });
+    });
+  });
+
+  // Check session endpoint
+  app.get("/api/auth/session", async (req, res) => {
+    const session = req.session as any;
+    
+    if (!session.isAuthenticated || !session.adminId) {
+      return res.json({ authenticated: false });
+    }
+
+    try {
+      const { db } = await import("./db");
+      const { practiceAdmins, practices } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+
+      const admins = await db
+        .select()
+        .from(practiceAdmins)
+        .where(eq(practiceAdmins.id, session.adminId))
+        .limit(1);
+
+      const admin = admins[0];
+      if (!admin || !admin.isActive) {
+        return res.json({ authenticated: false });
+      }
+
+      const practiceList = await db
+        .select()
+        .from(practices)
+        .where(eq(practices.id, admin.practiceId))
+        .limit(1);
+
+      res.json({
+        authenticated: true,
+        admin: {
+          id: admin.id,
+          email: admin.email,
+          firstName: admin.firstName,
+          lastName: admin.lastName,
+          role: admin.role,
+          practiceId: admin.practiceId,
+        },
+        practice: practiceList[0] || null,
+      });
+    } catch (error) {
+      console.error("Session check error:", error);
+      res.json({ authenticated: false });
+    }
+  });
+
+  // Register practice admin with password (for setup/testing)
+  app.post("/api/auth/register-admin", async (req, res) => {
+    try {
+      const { practiceId, firstName, lastName, email, password, phone } = req.body;
+
+      if (!practiceId || !firstName || !lastName || !email || !password) {
+        return res.status(400).json({ 
+          error: "Practice ID, first name, last name, email, and password are required" 
+        });
+      }
+
+      if (password.length < 6) {
+        return res.status(400).json({ error: "Password must be at least 6 characters" });
+      }
+
+      const { getPracticeAdminByEmail, createPracticeAdminWithPassword } = await import("./services/auth");
+      
+      // Check if email already exists
+      const existing = await getPracticeAdminByEmail(email);
+      if (existing) {
+        return res.status(409).json({ error: "An admin with this email already exists" });
+      }
+
+      const admin = await createPracticeAdminWithPassword(
+        practiceId,
+        firstName,
+        lastName,
+        email,
+        password,
+        phone
+      );
+
+      res.json({
+        success: true,
+        admin: {
+          id: admin.id,
+          email: admin.email,
+          firstName: admin.firstName,
+          lastName: admin.lastName,
+          practiceId: admin.practiceId,
+        },
+      });
+    } catch (error) {
+      console.error("Register admin error:", error);
+      res.status(500).json({ error: "Failed to register admin" });
+    }
+  });
+
+  // Update password endpoint
+  app.post("/api/auth/update-password", async (req, res) => {
+    const session = req.session as any;
+    
+    if (!session.isAuthenticated || !session.adminId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    try {
+      const { currentPassword, newPassword } = req.body;
+
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ error: "Current and new password are required" });
+      }
+
+      if (newPassword.length < 6) {
+        return res.status(400).json({ error: "New password must be at least 6 characters" });
+      }
+
+      const { db } = await import("./db");
+      const { practiceAdmins } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      const { verifyPassword, updateAdminPassword } = await import("./services/auth");
+
+      const admins = await db
+        .select()
+        .from(practiceAdmins)
+        .where(eq(practiceAdmins.id, session.adminId))
+        .limit(1);
+
+      const admin = admins[0];
+      if (!admin || !admin.passwordHash) {
+        return res.status(401).json({ error: "Admin not found" });
+      }
+
+      const isValid = await verifyPassword(currentPassword, admin.passwordHash);
+      if (!isValid) {
+        return res.status(401).json({ error: "Current password is incorrect" });
+      }
+
+      await updateAdminPassword(session.adminId, newPassword);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Update password error:", error);
+      res.status(500).json({ error: "Failed to update password" });
+    }
+  });
+
   // Dashboard Stats
   app.get("/api/dashboard/stats", async (req, res) => {
     try {
