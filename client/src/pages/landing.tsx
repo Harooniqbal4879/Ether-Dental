@@ -28,8 +28,7 @@ export default function Landing() {
   const { setCurrentPersona } = usePersona();
 
   const handleOrganizationLogin = () => {
-    setCurrentPersona("admin");
-    navigate("/app");
+    navigate("/login/admin");
   };
 
   const handleProfessionalLogin = () => {

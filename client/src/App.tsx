@@ -27,6 +27,7 @@ import Eligibility from "@/pages/eligibility";
 import Messaging from "@/pages/messaging";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/landing";
+import AdminLogin from "@/pages/admin-login";
 import Features from "@/pages/marketing/features";
 import HowItWorks from "@/pages/marketing/how-it-works";
 import Benefits from "@/pages/marketing/benefits";
@@ -100,6 +101,7 @@ function App() {
           <PersonaProvider>
             <Switch>
               <Route path="/" component={Landing} />
+              <Route path="/login/admin" component={AdminLogin} />
               <Route path="/register" component={RegisterPractice} />
               <Route path="/features" component={Features} />
               <Route path="/how-it-works" component={HowItWorks} />
