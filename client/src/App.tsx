@@ -6,6 +6,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { User, LogOut } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+import { useLocation } from "wouter";
 import { AppSidebar } from "@/components/app-sidebar";
 import { PersonaProvider } from "@/lib/persona-context";
 import { LocationProvider } from "@/lib/location-context";
@@ -29,6 +34,7 @@ import Messaging from "@/pages/messaging";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/landing";
 import AdminLogin from "@/pages/admin-login";
+import Profile from "@/pages/profile";
 import Features from "@/pages/marketing/features";
 import HowItWorks from "@/pages/marketing/how-it-works";
 import Benefits from "@/pages/marketing/benefits";
@@ -63,6 +69,7 @@ function MainRouter() {
         <Redirect to="/app/patients?tab=insurance" />
       </Route>
       <Route path="/app/messaging" component={Messaging} />
+      <Route path="/app/profile" component={Profile} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -73,6 +80,13 @@ function MainLayout() {
     "--sidebar-width": "18rem",
     "--sidebar-width-icon": "4rem",
   };
+  const { admin, authenticated, logout } = useAuth();
+  const [, setLocation] = useLocation();
+
+  const handleLogout = async () => {
+    await logout();
+    setLocation("/login/admin");
+  };
 
   return (
     <LocationProvider>
@@ -82,7 +96,36 @@ function MainLayout() {
           <SidebarInset className="flex flex-1 flex-col overflow-hidden">
             <header className="sticky top-0 z-50 flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background px-4">
               <SidebarTrigger data-testid="button-sidebar-toggle" />
-              <ThemeToggle />
+              <div className="flex items-center gap-2">
+                {authenticated && admin && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="gap-2" data-testid="button-user-menu">
+                        <User className="h-4 w-4" />
+                        <span className="hidden sm:inline">{admin.firstName} {admin.lastName}</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem 
+                        onClick={() => setLocation("/app/profile")}
+                        data-testid="menu-item-profile"
+                      >
+                        <User className="mr-2 h-4 w-4" />
+                        My Profile
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem 
+                        onClick={handleLogout}
+                        data-testid="menu-item-logout"
+                      >
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Logout
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+                <ThemeToggle />
+              </div>
             </header>
             <main className="flex-1 overflow-auto">
               <MainRouter />

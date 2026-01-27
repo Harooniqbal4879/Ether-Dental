@@ -223,6 +223,147 @@ export async function registerRoutes(
     }
   });
 
+  // Alias for update-password to support profile page
+  app.post("/api/auth/change-password", async (req, res) => {
+    const session = req.session as any;
+    
+    if (!session || !session.isAuthenticated || !session.adminId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    try {
+      const { currentPassword, newPassword } = req.body;
+
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ error: "Current and new password are required" });
+      }
+
+      if (newPassword.length < 6) {
+        return res.status(400).json({ error: "New password must be at least 6 characters" });
+      }
+
+      const { db } = await import("./db");
+      const { practiceAdmins } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      const { verifyPassword, updateAdminPassword } = await import("./services/auth");
+
+      const admins = await db
+        .select()
+        .from(practiceAdmins)
+        .where(eq(practiceAdmins.id, session.adminId))
+        .limit(1);
+
+      const admin = admins[0];
+      if (!admin || !admin.passwordHash) {
+        return res.status(401).json({ error: "Admin not found" });
+      }
+
+      const isValid = await verifyPassword(currentPassword, admin.passwordHash);
+      if (!isValid) {
+        return res.status(401).json({ error: "Current password is incorrect" });
+      }
+
+      await updateAdminPassword(session.adminId, newPassword);
+
+      res.json({ success: true, message: "Password changed successfully" });
+    } catch (error) {
+      console.error("Change password error:", error);
+      res.status(500).json({ error: "Failed to change password" });
+    }
+  });
+
+  // Get own profile
+  app.get("/api/auth/profile", async (req, res) => {
+    const session = req.session as any;
+    
+    if (!session || !session.isAuthenticated || !session.adminId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    try {
+      const { db } = await import("./db");
+      const { practiceAdmins } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+
+      const admins = await db
+        .select()
+        .from(practiceAdmins)
+        .where(eq(practiceAdmins.id, session.adminId))
+        .limit(1);
+
+      const admin = admins[0];
+      if (!admin) {
+        return res.status(404).json({ error: "Admin not found" });
+      }
+
+      res.json({
+        admin: {
+          id: admin.id,
+          email: admin.email,
+          firstName: admin.firstName,
+          lastName: admin.lastName,
+          phone: admin.phone,
+          role: admin.role,
+        }
+      });
+    } catch (error) {
+      console.error("Get profile error:", error);
+      res.status(500).json({ error: "Failed to get profile" });
+    }
+  });
+
+  // Update own profile
+  app.patch("/api/auth/profile", async (req, res) => {
+    const session = req.session as any;
+    
+    if (!session || !session.isAuthenticated || !session.adminId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    try {
+      const { firstName, lastName, phone } = req.body;
+
+      if (!firstName || !lastName) {
+        return res.status(400).json({ error: "First name and last name are required" });
+      }
+
+      const { db } = await import("./db");
+      const { practiceAdmins } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+
+      const [updated] = await db
+        .update(practiceAdmins)
+        .set({ 
+          firstName, 
+          lastName, 
+          phone: phone || null,
+          updatedAt: new Date() 
+        })
+        .where(eq(practiceAdmins.id, session.adminId))
+        .returning();
+
+      if (!updated) {
+        return res.status(404).json({ error: "Admin not found" });
+      }
+
+      res.json({ 
+        success: true, 
+        message: "Profile updated successfully",
+        admin: {
+          id: updated.id,
+          email: updated.email,
+          firstName: updated.firstName,
+          lastName: updated.lastName,
+          phone: updated.phone,
+          role: updated.role,
+        }
+      });
+    } catch (error) {
+      console.error("Update profile error:", error);
+      res.status(500).json({ error: "Failed to update profile" });
+    }
+  });
+
   // Set initial password for an admin (RESTRICTED: development only, or admin with no password)
   // In production, this endpoint is disabled - use authenticated password reset instead
   app.post("/api/auth/set-password", async (req, res) => {
