@@ -223,8 +223,16 @@ export async function registerRoutes(
     }
   });
 
-  // Set initial password for an admin (for setup - requires email verification in production)
+  // Set initial password for an admin (RESTRICTED: development only, or admin with no password)
+  // In production, this endpoint is disabled - use authenticated password reset instead
   app.post("/api/auth/set-password", async (req, res) => {
+    // SECURITY: Only allow this endpoint in development environment
+    if (process.env.NODE_ENV === "production") {
+      return res.status(403).json({ 
+        error: "This endpoint is disabled in production. Contact an admin to reset your password." 
+      });
+    }
+
     try {
       const { email, password } = req.body;
 
@@ -251,6 +259,14 @@ export async function registerRoutes(
       const admin = admins[0];
       if (!admin) {
         return res.status(404).json({ error: "Admin not found with this email" });
+      }
+
+      // SECURITY: Only allow setting password if no password is currently set
+      // This prevents unauthorized password changes even in development
+      if (admin.passwordHash) {
+        return res.status(403).json({ 
+          error: "Password already set. Use the password reset feature or contact an admin." 
+        });
       }
 
       // Set password
@@ -286,6 +302,16 @@ export async function registerRoutes(
         return res.status(401).json({ error: "Admin not found" });
       }
 
+      // Verify current admin is active
+      if (!currentAdmin.isActive) {
+        return res.status(403).json({ error: "Your account is inactive" });
+      }
+
+      // Only admins can view user list
+      if (currentAdmin.role !== "admin") {
+        return res.status(403).json({ error: "Only admins can view the user list" });
+      }
+
       const admins = await getPracticeAdmins(currentAdmin.practiceId);
       res.json(admins);
     } catch (error) {
@@ -305,6 +331,7 @@ export async function registerRoutes(
     try {
       const { firstName, lastName, email, password, phone, role } = req.body;
 
+      // Validate required fields
       if (!firstName || !lastName || !email || !password) {
         return res.status(400).json({ error: "First name, last name, email, and password are required" });
       }
@@ -313,11 +340,28 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Password must be at least 6 characters" });
       }
 
+      // Validate role if provided
+      const validRoles = ["admin", "staff", "billing"];
+      const userRole = role || "staff";
+      if (!validRoles.includes(userRole)) {
+        return res.status(400).json({ error: "Invalid role. Must be admin, staff, or billing" });
+      }
+
       const { getPracticeAdminByEmail, createPracticeAdminWithPassword, getPracticeAdminById } = await import("./services/auth");
       
       const currentAdmin = await getPracticeAdminById(session.adminId);
       if (!currentAdmin) {
         return res.status(401).json({ error: "Admin not found" });
+      }
+
+      // Verify current admin is active
+      if (!currentAdmin.isActive) {
+        return res.status(403).json({ error: "Your account is inactive" });
+      }
+
+      // Only admins can create new users
+      if (currentAdmin.role !== "admin") {
+        return res.status(403).json({ error: "Only admins can create new users" });
       }
 
       const existing = await getPracticeAdminByEmail(email);
@@ -332,7 +376,7 @@ export async function registerRoutes(
         email,
         password,
         phone,
-        role || "staff"
+        userRole
       );
 
       res.status(201).json({
@@ -369,9 +413,27 @@ export async function registerRoutes(
         return res.status(401).json({ error: "Admin not found" });
       }
 
+      // Verify current admin is active
+      if (!currentAdmin.isActive) {
+        return res.status(403).json({ error: "Your account is inactive" });
+      }
+
+      // Only admins can update users
+      if (currentAdmin.role !== "admin") {
+        return res.status(403).json({ error: "Only admins can update users" });
+      }
+
       const targetAdmin = await getPracticeAdminById(id);
       if (!targetAdmin || targetAdmin.practiceId !== currentAdmin.practiceId) {
         return res.status(404).json({ error: "User not found" });
+      }
+
+      // Validate role if provided
+      if (role) {
+        const validRoles = ["admin", "staff", "billing"];
+        if (!validRoles.includes(role)) {
+          return res.status(400).json({ error: "Invalid role. Must be admin, staff, or billing" });
+        }
       }
 
       const updated = await updatePracticeAdmin(id, {
@@ -410,6 +472,16 @@ export async function registerRoutes(
       const currentAdmin = await getPracticeAdminById(session.adminId);
       if (!currentAdmin) {
         return res.status(401).json({ error: "Admin not found" });
+      }
+
+      // Verify current admin is active
+      if (!currentAdmin.isActive) {
+        return res.status(403).json({ error: "Your account is inactive" });
+      }
+
+      // Only admins can reset passwords
+      if (currentAdmin.role !== "admin") {
+        return res.status(403).json({ error: "Only admins can reset passwords" });
       }
 
       const targetAdmin = await getPracticeAdminById(id);
