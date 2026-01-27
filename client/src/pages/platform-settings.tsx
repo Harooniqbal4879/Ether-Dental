@@ -664,11 +664,14 @@ function StateTaxRateForm({
 }
 
 const CLEARINGHOUSE_OPTIONS = [
+  { value: "dentalxchange", label: "DentalXchange" },
   { value: "change_healthcare", label: "Change Healthcare" },
   { value: "availity", label: "Availity" },
   { value: "trizetto", label: "Trizetto" },
   { value: "office_ally", label: "Office Ally" },
   { value: "waystar", label: "Waystar" },
+  { value: "nea_fast", label: "NEA FastAttach" },
+  { value: "emdeon", label: "Emdeon" },
 ];
 
 function ClearinghouseIntegrationsTab() {
