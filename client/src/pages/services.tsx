@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, createContext, useContext } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,23 +17,32 @@ import {
   Zap,
   ArrowRight,
   Check,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/auth-context";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import type { ServiceSubscription } from "@shared/schema";
 
 type ServiceStatus = "active" | "inactive" | "pending";
 
-interface ServiceSubscription {
-  service: string;
-  status: ServiceStatus;
-  tier?: string;
-  monthlyProduction?: number;
+interface SubscriptionsContextType {
+  subscriptions: ServiceSubscription[];
+  isLoading: boolean;
+  getSubscription: (service: string) => ServiceSubscription | undefined;
+  subscribe: (service: string, tier?: string) => Promise<void>;
 }
 
-const mockSubscriptions: ServiceSubscription[] = [
-  { service: "verification", status: "active", tier: "per_patient" },
-  { service: "insurance_billing", status: "inactive" },
-  { service: "patient_billing", status: "inactive" },
-];
+const SubscriptionsContext = createContext<SubscriptionsContextType | null>(null);
+
+function useSubscriptions() {
+  const ctx = useContext(SubscriptionsContext);
+  if (!ctx) {
+    throw new Error("useSubscriptions must be used within SubscriptionsProvider");
+  }
+  return ctx;
+}
 
 function StatusBadge({ status }: { status: ServiceStatus }) {
   const styles = {
@@ -55,8 +65,19 @@ function StatusBadge({ status }: { status: ServiceStatus }) {
 }
 
 function InsuranceVerificationCard() {
-  const subscription = mockSubscriptions.find(s => s.service === "verification");
+  const { getSubscription, subscribe, isLoading } = useSubscriptions();
+  const [isSubscribing, setIsSubscribing] = useState(false);
+  const subscription = getSubscription("verification");
   const isActive = subscription?.status === "active";
+  
+  const handleSubscribe = async () => {
+    setIsSubscribing(true);
+    try {
+      await subscribe("verification", "per_patient");
+    } finally {
+      setIsSubscribing(false);
+    }
+  };
   
   return (
     <Card className="flex flex-col" data-testid="card-insurance-verification">
@@ -71,7 +92,7 @@ function InsuranceVerificationCard() {
               <CardDescription>Self-service eligibility & benefits</CardDescription>
             </div>
           </div>
-          <StatusBadge status={subscription?.status || "inactive"} />
+          <StatusBadge status={(subscription?.status as ServiceStatus) || "inactive"} />
         </div>
       </CardHeader>
       <CardContent className="flex-1">
@@ -122,7 +143,8 @@ function InsuranceVerificationCard() {
             Manage Subscription
           </Button>
         ) : (
-          <Button className="w-full" data-testid="button-subscribe-verification">
+          <Button className="w-full" onClick={handleSubscribe} disabled={isSubscribing} data-testid="button-subscribe-verification">
+            {isSubscribing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
             Subscribe Now
             <ArrowRight className="h-4 w-4 ml-2" />
           </Button>
@@ -133,8 +155,19 @@ function InsuranceVerificationCard() {
 }
 
 function InsuranceBillingCard() {
-  const subscription = mockSubscriptions.find(s => s.service === "insurance_billing");
+  const { getSubscription, subscribe } = useSubscriptions();
+  const [isSubscribing, setIsSubscribing] = useState(false);
+  const subscription = getSubscription("insurance_billing");
   const isActive = subscription?.status === "active";
+  
+  const handleSubscribe = async () => {
+    setIsSubscribing(true);
+    try {
+      await subscribe("insurance_billing", "percentage");
+    } finally {
+      setIsSubscribing(false);
+    }
+  };
   
   return (
     <Card className="flex flex-col" data-testid="card-insurance-billing">
@@ -154,7 +187,7 @@ function InsuranceBillingCard() {
           </Badge>
         </div>
         <div className="mt-2">
-          <StatusBadge status={subscription?.status || "inactive"} />
+          <StatusBadge status={(subscription?.status as ServiceStatus) || "inactive"} />
         </div>
       </CardHeader>
       <CardContent className="flex-1">
@@ -209,7 +242,8 @@ function InsuranceBillingCard() {
             Manage Subscription
           </Button>
         ) : (
-          <Button className="w-full" data-testid="button-subscribe-insurance-billing">
+          <Button className="w-full" onClick={handleSubscribe} disabled={isSubscribing} data-testid="button-subscribe-insurance-billing">
+            {isSubscribing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
             Get Started
             <ArrowRight className="h-4 w-4 ml-2" />
           </Button>
@@ -220,8 +254,19 @@ function InsuranceBillingCard() {
 }
 
 function PatientBillingCard() {
-  const subscription = mockSubscriptions.find(s => s.service === "patient_billing");
+  const { getSubscription, subscribe } = useSubscriptions();
+  const [isSubscribing, setIsSubscribing] = useState(false);
+  const subscription = getSubscription("patient_billing");
   const isActive = subscription?.status === "active";
+  
+  const handleSubscribe = async () => {
+    setIsSubscribing(true);
+    try {
+      await subscribe("patient_billing", "percentage");
+    } finally {
+      setIsSubscribing(false);
+    }
+  };
   
   return (
     <Card className="flex flex-col" data-testid="card-patient-billing">
@@ -241,7 +286,7 @@ function PatientBillingCard() {
           </Badge>
         </div>
         <div className="mt-2">
-          <StatusBadge status={subscription?.status || "inactive"} />
+          <StatusBadge status={(subscription?.status as ServiceStatus) || "inactive"} />
         </div>
       </CardHeader>
       <CardContent className="flex-1">
@@ -296,7 +341,8 @@ function PatientBillingCard() {
             Manage Subscription
           </Button>
         ) : (
-          <Button className="w-full" data-testid="button-subscribe-patient-billing">
+          <Button className="w-full" onClick={handleSubscribe} disabled={isSubscribing} data-testid="button-subscribe-patient-billing">
+            {isSubscribing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
             Get Started
             <ArrowRight className="h-4 w-4 ml-2" />
           </Button>
@@ -378,7 +424,81 @@ function HowItWorksSection() {
   );
 }
 
-export default function ServicesPage() {
+function MySubscriptionsTab() {
+  const { subscriptions, isLoading, subscribe } = useSubscriptions();
+  
+  const allServices = ["verification", "insurance_billing", "patient_billing"];
+  
+  const getServiceSubscription = (service: string) => {
+    return subscriptions.find(s => s.service === service);
+  };
+  
+  const handleActivate = async (service: string, tier?: string) => {
+    await subscribe(service, tier || "default");
+  };
+  
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
+  
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Your Active Subscriptions</CardTitle>
+        <CardDescription>Manage your service subscriptions and billing</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {allServices.map((serviceName) => {
+            const sub = getServiceSubscription(serviceName);
+            const status = sub?.status || "inactive";
+            const tier = sub?.tier;
+            
+            return (
+              <div key={serviceName} className="flex items-center justify-between p-4 rounded-lg border">
+                <div className="flex items-center gap-3">
+                  {serviceName === "verification" && <Shield className="h-5 w-5 text-primary" />}
+                  {serviceName === "insurance_billing" && <FileText className="h-5 w-5 text-blue-600" />}
+                  {serviceName === "patient_billing" && <TrendingUp className="h-5 w-5 text-green-600" />}
+                  <div>
+                    <p className="font-medium capitalize">
+                      {serviceName.replace(/_/g, " ")}
+                    </p>
+                    {status === "active" && (
+                      <p className="text-xs text-muted-foreground">
+                        {tier === "per_patient" ? "$99/mo + per patient" : "Contact for pricing"}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <StatusBadge status={status as ServiceStatus} />
+                  {status === "active" ? (
+                    <Button variant="outline" size="sm" data-testid={`button-manage-${serviceName}`}>
+                      Manage
+                    </Button>
+                  ) : (
+                    <Button size="sm" onClick={() => handleActivate(serviceName)} data-testid={`button-activate-${serviceName}`}>
+                      Activate
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ServicesPageContent() {
   const [activeTab, setActiveTab] = useState("services");
   
   return (
@@ -412,49 +532,78 @@ export default function ServicesPage() {
         </TabsContent>
         
         <TabsContent value="my-subscriptions">
-          <Card>
-            <CardHeader>
-              <CardTitle>Your Active Subscriptions</CardTitle>
-              <CardDescription>Manage your service subscriptions and billing</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {mockSubscriptions.map((sub) => (
-                  <div key={sub.service} className="flex items-center justify-between p-4 rounded-lg border">
-                    <div className="flex items-center gap-3">
-                      {sub.service === "verification" && <Shield className="h-5 w-5 text-primary" />}
-                      {sub.service === "insurance_billing" && <FileText className="h-5 w-5 text-blue-600" />}
-                      {sub.service === "patient_billing" && <TrendingUp className="h-5 w-5 text-green-600" />}
-                      <div>
-                        <p className="font-medium capitalize">
-                          {sub.service.replace(/_/g, " ")}
-                        </p>
-                        {sub.status === "active" && (
-                          <p className="text-xs text-muted-foreground">
-                            {sub.tier === "per_patient" ? "$99/mo + per patient" : "Contact for pricing"}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <StatusBadge status={sub.status} />
-                      {sub.status === "active" ? (
-                        <Button variant="outline" size="sm" data-testid={`button-manage-${sub.service}`}>
-                          Manage
-                        </Button>
-                      ) : (
-                        <Button size="sm" data-testid={`button-activate-${sub.service}`}>
-                          Activate
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <MySubscriptionsTab />
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+export default function ServicesPage() {
+  const { practice } = useAuth();
+  const { toast } = useToast();
+  const practiceId = practice?.id;
+  
+  const { data: subscriptions = [], isLoading } = useQuery<ServiceSubscription[]>({
+    queryKey: ["/api/practices", practiceId, "service-subscriptions"],
+    enabled: !!practiceId,
+  });
+  
+  const subscribeMutation = useMutation({
+    mutationFn: async ({ service, tier }: { service: string; tier?: string }) => {
+      const res = await apiRequest("POST", `/api/practices/${practiceId}/service-subscriptions`, {
+        service,
+        tier,
+        status: "active",
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/practices", practiceId, "service-subscriptions"] });
+      toast({
+        title: "Subscribed",
+        description: "You have successfully subscribed to this service.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to subscribe",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  const getSubscription = (service: string) => {
+    return subscriptions.find(s => s.service === service);
+  };
+  
+  const subscribe = async (service: string, tier?: string) => {
+    await subscribeMutation.mutateAsync({ service, tier });
+  };
+  
+  const contextValue: SubscriptionsContextType = {
+    subscriptions,
+    isLoading,
+    getSubscription,
+    subscribe,
+  };
+  
+  if (!practiceId) {
+    return (
+      <div className="flex-1 p-6">
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+            <p className="text-muted-foreground">Please log in to view services.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  
+  return (
+    <SubscriptionsContext.Provider value={contextValue}>
+      <ServicesPageContent />
+    </SubscriptionsContext.Provider>
   );
 }

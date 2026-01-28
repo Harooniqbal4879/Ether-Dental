@@ -2933,6 +2933,110 @@ export async function registerRoutes(
     }
   });
 
+  // Service Subscriptions
+  app.get("/api/practices/:practiceId/service-subscriptions", async (req, res) => {
+    try {
+      const { serviceSubscriptions } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      const subscriptions = await db
+        .select()
+        .from(serviceSubscriptions)
+        .where(eq(serviceSubscriptions.practiceId, req.params.practiceId));
+      res.json(subscriptions);
+    } catch (error) {
+      console.error("Error fetching service subscriptions:", error);
+      res.status(500).json({ error: "Failed to fetch service subscriptions" });
+    }
+  });
+
+  app.post("/api/practices/:practiceId/service-subscriptions", async (req, res) => {
+    try {
+      const { serviceSubscriptions, insertServiceSubscriptionSchema } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      
+      const parseResult = insertServiceSubscriptionSchema.safeParse({
+        ...req.body,
+        practiceId: req.params.practiceId,
+      });
+      
+      if (!parseResult.success) {
+        return res.status(400).json({ error: parseResult.error.issues });
+      }
+      
+      // Check if subscription already exists for this service
+      const existing = await db
+        .select()
+        .from(serviceSubscriptions)
+        .where(and(
+          eq(serviceSubscriptions.practiceId, req.params.practiceId),
+          eq(serviceSubscriptions.service, parseResult.data.service)
+        ))
+        .limit(1);
+      
+      if (existing.length > 0) {
+        // Update existing subscription
+        const updated = await db
+          .update(serviceSubscriptions)
+          .set({
+            ...parseResult.data,
+            updatedAt: new Date(),
+          })
+          .where(eq(serviceSubscriptions.id, existing[0].id))
+          .returning();
+        return res.json(updated[0]);
+      }
+      
+      // Create new subscription
+      const inserted = await db
+        .insert(serviceSubscriptions)
+        .values({
+          ...parseResult.data,
+          subscribedAt: parseResult.data.status === "active" ? new Date() : null,
+        })
+        .returning();
+      
+      res.status(201).json(inserted[0]);
+    } catch (error) {
+      console.error("Error creating service subscription:", error);
+      res.status(500).json({ error: "Failed to create service subscription" });
+    }
+  });
+
+  app.patch("/api/practices/:practiceId/service-subscriptions/:id", async (req, res) => {
+    try {
+      const { serviceSubscriptions } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      
+      const updates: any = {
+        ...req.body,
+        updatedAt: new Date(),
+      };
+      
+      // Track subscription date changes
+      if (req.body.status === "active" && !req.body.subscribedAt) {
+        updates.subscribedAt = new Date();
+        updates.cancelledAt = null;
+      } else if (req.body.status === "inactive" && !req.body.cancelledAt) {
+        updates.cancelledAt = new Date();
+      }
+      
+      const updated = await db
+        .update(serviceSubscriptions)
+        .set(updates)
+        .where(eq(serviceSubscriptions.id, req.params.id))
+        .returning();
+      
+      if (updated.length === 0) {
+        return res.status(404).json({ error: "Subscription not found" });
+      }
+      
+      res.json(updated[0]);
+    } catch (error) {
+      console.error("Error updating service subscription:", error);
+      res.status(500).json({ error: "Failed to update service subscription" });
+    }
+  });
+
   // Practice Locations
   app.get("/api/practices/:practiceId/locations", async (req, res) => {
     try {
