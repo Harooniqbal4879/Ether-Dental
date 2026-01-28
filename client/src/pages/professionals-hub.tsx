@@ -1825,7 +1825,7 @@ function ProfessionalCard({ professional, isOnline }: { professional: Profession
   };
 
   return (
-    <Link href={`/professionals/${professional.id}`}>
+    <Link href={`/app/professionals/${professional.id}`}>
       <Card className="hover-elevate cursor-pointer" data-testid={`card-professional-${professional.id}`}>
         <CardContent className="p-4">
           <div className="flex items-start gap-4">
@@ -1953,7 +1953,7 @@ function ProfessionalDetail({ professional }: { professional: ProfessionalWithBa
 }
 
 export default function ProfessionalsHub() {
-  const [, params] = useRoute("/professionals/:id");
+  const [, params] = useRoute("/app/professionals/:id");
   const professionalId = params?.id;
   const { currentPersona } = usePersona();
 
