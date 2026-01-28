@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { PracticeLocation } from "@shared/schema";
+import { useAuth } from "./auth-context";
 
 interface LocationContextType {
   currentLocationId: string | null;
@@ -14,7 +15,6 @@ interface LocationContextType {
 const LocationContext = createContext<LocationContextType | undefined>(undefined);
 
 const LOCATION_STORAGE_KEY = "etherAI_location";
-const PRACTICE_ID = "practice-1";
 
 function getStoredLocationId(): string | null {
   try {
@@ -26,14 +26,18 @@ function getStoredLocationId(): string | null {
 
 export function LocationProvider({ children }: { children: ReactNode }) {
   const [currentLocationId, setCurrentLocationIdState] = useState<string | null>(getStoredLocationId);
+  const { admin } = useAuth();
+  const practiceId = admin?.practiceId;
 
   const { data: locations = [], isLoading } = useQuery<PracticeLocation[]>({
-    queryKey: ["/api/practices", PRACTICE_ID, "locations"],
+    queryKey: ["/api/practices", practiceId, "locations"],
     queryFn: async () => {
-      const response = await fetch(`/api/practices/${PRACTICE_ID}/locations`);
+      if (!practiceId) return [];
+      const response = await fetch(`/api/practices/${practiceId}/locations`);
       if (!response.ok) throw new Error("Failed to fetch locations");
       return response.json();
     },
+    enabled: !!practiceId,
   });
 
   useEffect(() => {
@@ -62,7 +66,8 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   };
 
   const currentLocation = locations.find(loc => loc.id === currentLocationId) || null;
-  const currentPracticeId = currentLocation?.practiceId || null;
+  // Use the admin's practiceId as the source of truth
+  const currentPracticeId = practiceId || currentLocation?.practiceId || null;
 
   return (
     <LocationContext.Provider value={{ 

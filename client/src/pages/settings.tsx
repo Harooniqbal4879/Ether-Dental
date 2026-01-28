@@ -2289,10 +2289,11 @@ function LocationsTab() {
   const [editingLocation, setEditingLocation] = useState<PracticeLocation | null>(null);
   const { toast } = useToast();
 
-  const practiceId = "practice-1";
+  const practiceId = useSettingsPracticeId();
 
   const { data: locations, isLoading } = useQuery<PracticeLocation[]>({
     queryKey: ["/api/practices", practiceId, "locations"],
+    enabled: !!practiceId,
   });
 
   const form = useForm<LocationFormValues>({
