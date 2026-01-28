@@ -308,6 +308,7 @@ export interface IStorage {
   // Practices
   getPractices(): Promise<Practice[]>;
   getPractice(id: string): Promise<Practice | undefined>;
+  getPracticeByName(name: string): Promise<Practice | undefined>;
   createPractice(practice: InsertPractice): Promise<Practice>;
   updatePractice(id: string, data: Partial<Practice>): Promise<Practice | undefined>;
 
@@ -1894,6 +1895,11 @@ export class DatabaseStorage implements IStorage {
 
   async getPractice(id: string): Promise<Practice | undefined> {
     const [practice] = await db.select().from(practices).where(eq(practices.id, id));
+    return practice;
+  }
+
+  async getPracticeByName(name: string): Promise<Practice | undefined> {
+    const [practice] = await db.select().from(practices).where(eq(practices.name, name));
     return practice;
   }
 

@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
+import { eq } from "drizzle-orm";
 import { 
   insertPatientSchema, 
   insertInsuranceCarrierSchema, 
@@ -19,6 +20,7 @@ import {
   insertProfessionalEducationSchema,
   insertProfessionalAwardSchema,
   insertProfessionalTrainingSchema,
+  practiceAdmins,
 } from "@shared/schema";
 import { z } from "zod";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
@@ -4431,7 +4433,57 @@ export async function registerRoutes(
       }
       
       const results: string[] = [];
+      const { hashPassword } = await import("./services/auth");
       
+      // ============== SUPER ADMIN SEEDING ==============
+      // Platform-level super admin with hardcoded credentials
+      const superAdminEmail = "superadmin@etherai.com";
+      const superAdminPassword = "EtherAI@2024!"; // Strong default password
+      
+      const existingSuperAdmin = await storage.getPracticeAdminByEmail(superAdminEmail);
+      if (existingSuperAdmin) {
+        // Update to ensure it's a super admin
+        if (!existingSuperAdmin.isSuperAdmin) {
+          await db.update(practiceAdmins)
+            .set({ isSuperAdmin: true })
+            .where(eq(practiceAdmins.id, existingSuperAdmin.id));
+          results.push(`Updated super admin: ${superAdminEmail} (now has super admin privileges)`);
+        } else {
+          results.push(`Super admin already exists: ${superAdminEmail}`);
+        }
+      } else {
+        // Need a practice for the super admin - create Platform practice if doesn't exist
+        let platformPractice = await storage.getPracticeByName("EtherAI Platform");
+        
+        if (!platformPractice) {
+          platformPractice = await storage.createPractice({
+            name: "EtherAI Platform",
+            email: "platform@etherai.com",
+            phone: "(555) 000-0000",
+            address: "Platform Administration",
+            city: "San Francisco",
+            stateCode: "CA",
+            zipCode: "94102",
+            registrationStatus: "approved",
+          });
+          results.push("Created EtherAI Platform practice for super admins");
+        }
+        
+        const superAdminPasswordHash = await hashPassword(superAdminPassword);
+        await storage.createPracticeAdmin({
+          practiceId: platformPractice.id,
+          firstName: "Super",
+          lastName: "Admin",
+          email: superAdminEmail,
+          phone: null,
+          role: "admin",
+          passwordHash: superAdminPasswordHash,
+          isSuperAdmin: true,
+        });
+        results.push(`Created super admin: ${superAdminEmail}`);
+      }
+      
+      // ============== TEST ADMIN SEEDING ==============
       // Check if admin already exists
       const existingAdmin = await storage.getPracticeAdminByEmail("admin@test.com");
       if (existingAdmin) {
@@ -4439,11 +4491,13 @@ export async function registerRoutes(
       } else {
         // Create a test practice
         const existingPractices = await storage.getPractices();
+        // Filter out the platform practice
+        const regularPractices = existingPractices.filter(p => p.name !== "EtherAI Platform");
         let practiceId: string;
         
-        if (existingPractices.length > 0) {
-          practiceId = existingPractices[0].id;
-          results.push(`Using existing practice: ${existingPractices[0].name}`);
+        if (regularPractices.length > 0) {
+          practiceId = regularPractices[0].id;
+          results.push(`Using existing practice: ${regularPractices[0].name}`);
         } else {
           const newPractice = await storage.createPractice({
             name: "Demo Dental Practice",
@@ -4451,16 +4505,15 @@ export async function registerRoutes(
             phone: "(555) 123-4567",
             address: "123 Main Street",
             city: "San Francisco",
-            state: "CA",
+            stateCode: "CA",
             zipCode: "94102",
-            status: "approved",
+            registrationStatus: "approved",
           });
           practiceId = newPractice.id;
           results.push(`Created practice: Demo Dental Practice`);
         }
         
         // Create test admin with password
-        const { hashPassword } = await import("./services/auth");
         const passwordHash = await hashPassword("admin123");
         
         await storage.createPracticeAdmin({
@@ -4499,9 +4552,16 @@ export async function registerRoutes(
         message: "Production seed completed",
         results,
         credentials: {
-          email: "admin@test.com",
-          password: "admin123",
-          note: "Please change this password after first login!"
+          superAdmin: {
+            email: superAdminEmail,
+            password: superAdminPassword,
+            note: "Platform-level super admin - has access to all practices"
+          },
+          testAdmin: {
+            email: "admin@test.com",
+            password: "admin123",
+            note: "Test admin for demo practice"
+          }
         }
       });
     } catch (error) {

@@ -1113,6 +1113,7 @@ export const practiceAdmins = pgTable("practice_admins", {
   passwordHash: text("password_hash"), // Bcrypt hashed password
   phone: text("phone"),
   role: text("role").default("admin"), // admin, manager, staff
+  isSuperAdmin: boolean("is_super_admin").default(false), // Platform-level super admin with access to all practices
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
