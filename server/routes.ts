@@ -74,6 +74,13 @@ export async function registerRoutes(
         console.error("Logout error:", err);
         return res.status(500).json({ error: "Logout failed" });
       }
+      // Clear the session cookie
+      res.clearCookie("connect.sid", {
+        path: "/",
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+      });
       res.json({ success: true });
     });
   });
