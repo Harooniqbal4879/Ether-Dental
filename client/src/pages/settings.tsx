@@ -2843,7 +2843,7 @@ function InsuranceCarriersTab() {
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [selectedDetailCarrier, setSelectedDetailCarrier] = useState<PracticeInsuranceCarrierWithDetails | null>(null);
   const [carrierSearchQuery, setCarrierSearchQuery] = useState("");
-  const [selectedCarrierId, setSelectedCarrierId] = useState<string | null>(null);
+  const [selectedCarrierIds, setSelectedCarrierIds] = useState<string[]>([]);
   const { toast } = useToast();
   const practiceId = useSettingsPracticeId();
 
@@ -2852,16 +2852,29 @@ function InsuranceCarriersTab() {
     setIsDetailDialogOpen(true);
   };
 
+  const toggleCarrierSelection = (carrierId: string) => {
+    setSelectedCarrierIds(prev => 
+      prev.includes(carrierId) 
+        ? prev.filter(id => id !== carrierId)
+        : [...prev, carrierId]
+    );
+  };
+
+  const selectAllFiltered = () => {
+    if (filteredAvailableCarriers) {
+      const allIds = filteredAvailableCarriers.map(c => c.id);
+      setSelectedCarrierIds(allIds);
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedCarrierIds([]);
+  };
+
   // Fetch practice-specific carriers
   const { data: practiceCarriers, isLoading } = useQuery<PracticeInsuranceCarrierWithDetails[]>({
     queryKey: ["/api/practices", practiceId, "insurance-carriers"],
     enabled: !!practiceId,
-  });
-
-  // Search for carriers to add
-  const { data: searchResults } = useQuery<InsuranceCarrier[]>({
-    queryKey: ["/api/carriers/search", carrierSearchQuery],
-    enabled: carrierSearchQuery.length >= 2,
   });
 
   // Get all carriers for the dropdown
@@ -2869,25 +2882,30 @@ function InsuranceCarriersTab() {
     queryKey: ["/api/carriers"],
   });
 
-  const addCarrierMutation = useMutation({
-    mutationFn: async (carrierId: string) => {
+  const addCarriersMutation = useMutation({
+    mutationFn: async (carrierIds: string[]) => {
       if (!practiceId) throw new Error("No practice selected");
-      return apiRequest("POST", `/api/practices/${practiceId}/insurance-carriers`, { carrierId });
+      const results = await Promise.all(
+        carrierIds.map(carrierId => 
+          apiRequest("POST", `/api/practices/${practiceId}/insurance-carriers`, { carrierId })
+        )
+      );
+      return results;
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/practices", practiceId, "insurance-carriers"] });
       toast({
-        title: "Carrier added",
-        description: "The insurance carrier has been added to your practice.",
+        title: variables.length === 1 ? "Carrier added" : "Carriers added",
+        description: `${variables.length} insurance carrier${variables.length === 1 ? " has" : "s have"} been added to your practice.`,
       });
       setIsDialogOpen(false);
-      setSelectedCarrierId(null);
+      setSelectedCarrierIds([]);
       setCarrierSearchQuery("");
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to add carrier. Please try again.",
+        description: "Failed to add carriers. Please try again.",
         variant: "destructive",
       });
     },
@@ -2940,7 +2958,7 @@ function InsuranceCarriersTab() {
           setIsDialogOpen(open);
           if (!open) {
             setCarrierSearchQuery("");
-            setSelectedCarrierId(null);
+            setSelectedCarrierIds([]);
           }
         }}>
           <DialogTrigger asChild>
@@ -2949,65 +2967,109 @@ function InsuranceCarriersTab() {
               Add Carrier
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogContent className="max-h-[85vh] sm:max-w-2xl overflow-hidden flex flex-col">
             <DialogHeader>
-              <DialogTitle>Add Insurance Carrier</DialogTitle>
+              <DialogTitle>Add Insurance Carriers</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 overflow-y-auto flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  type="search"
-                  value={carrierSearchQuery}
-                  onChange={(e) => setCarrierSearchQuery(e.target.value)}
-                  placeholder="Search for a carrier..."
-                  className="pl-9"
-                  data-testid="input-search-available-carriers"
-                />
+            <div className="space-y-4 overflow-hidden flex flex-col flex-1">
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    type="search"
+                    value={carrierSearchQuery}
+                    onChange={(e) => setCarrierSearchQuery(e.target.value)}
+                    placeholder="Search carriers..."
+                    className="pl-9"
+                    data-testid="input-search-available-carriers"
+                  />
+                </div>
+                {selectedCarrierIds.length > 0 && (
+                  <Badge variant="secondary" className="shrink-0">
+                    {selectedCarrierIds.length} selected
+                  </Badge>
+                )}
               </div>
               
+              {filteredAvailableCarriers && filteredAvailableCarriers.length > 0 && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    {filteredAvailableCarriers.length} carrier{filteredAvailableCarriers.length !== 1 ? "s" : ""} available
+                  </span>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={selectAllFiltered}
+                      className="h-7 text-xs"
+                    >
+                      Select All
+                    </Button>
+                    {selectedCarrierIds.length > 0 && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={clearSelection}
+                        className="h-7 text-xs"
+                      >
+                        Clear
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+              
               {filteredAvailableCarriers && filteredAvailableCarriers.length > 0 ? (
-                <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                  {filteredAvailableCarriers.slice(0, 20).map((carrier) => (
+                <div className="space-y-1 overflow-y-auto flex-1 pr-2">
+                  {filteredAvailableCarriers.map((carrier) => (
                     <div
                       key={carrier.id}
-                      className={`flex items-center justify-between p-3 rounded-md border cursor-pointer transition-colors ${
-                        selectedCarrierId === carrier.id
+                      className={`flex items-center gap-3 p-3 rounded-md border cursor-pointer transition-colors ${
+                        selectedCarrierIds.includes(carrier.id)
                           ? "border-primary bg-primary/5"
                           : "hover:bg-muted/50"
                       }`}
-                      onClick={() => setSelectedCarrierId(carrier.id)}
+                      onClick={() => toggleCarrierSelection(carrier.id)}
                       data-testid={`select-carrier-${carrier.id}`}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted text-sm font-semibold">
-                          {carrier.name.slice(0, 2).toUpperCase()}
-                        </div>
-                        <div>
-                          <div className="font-medium">{carrier.name}</div>
-                          {carrier.phone && (
-                            <div className="text-sm text-muted-foreground">{carrier.phone}</div>
-                          )}
-                        </div>
-                      </div>
-                      {carrier.clearinghouseCompatible && (
-                        <Badge
-                          variant="outline"
-                          className="shrink-0 gap-1 border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-900/20 dark:text-emerald-400"
-                        >
+                      <div className={`flex h-5 w-5 items-center justify-center rounded border-2 shrink-0 ${
+                        selectedCarrierIds.includes(carrier.id)
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-muted-foreground/30"
+                      }`}>
+                        {selectedCarrierIds.includes(carrier.id) && (
                           <CheckCircle className="h-3 w-3" />
-                          EDI
-                        </Badge>
-                      )}
+                        )}
+                      </div>
+                      <div className="flex h-9 w-9 items-center justify-center rounded-md bg-muted text-xs font-semibold shrink-0">
+                        {carrier.name.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium truncate">{carrier.name}</div>
+                        {carrier.phone && (
+                          <div className="text-xs text-muted-foreground">{carrier.phone}</div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {carrier.insuranceType && (
+                          <Badge variant="outline" className="text-xs capitalize">
+                            {carrier.insuranceType}
+                          </Badge>
+                        )}
+                        {carrier.clearinghouseCompatible && (
+                          <Badge
+                            variant="outline"
+                            className="gap-1 border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-900/20 dark:text-emerald-400"
+                          >
+                            <CheckCircle className="h-3 w-3" />
+                            EDI
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   ))}
-                  {filteredAvailableCarriers.length > 20 && (
-                    <p className="text-sm text-muted-foreground text-center py-2">
-                      Showing first 20 results. Type to narrow down.
-                    </p>
-                  )}
                 </div>
-              ) : carrierSearchQuery.length >= 2 ? (
+              ) : carrierSearchQuery ? (
                 <p className="text-sm text-muted-foreground text-center py-4">
                   No carriers found matching "{carrierSearchQuery}"
                 </p>
@@ -3016,9 +3078,9 @@ function InsuranceCarriersTab() {
                   All available carriers have been added to your practice.
                 </p>
               ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  Start typing to search for carriers
-                </p>
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
               )}
             </div>
             <div className="flex justify-end gap-2 pt-4 border-t">
@@ -3030,11 +3092,13 @@ function InsuranceCarriersTab() {
                 Cancel
               </Button>
               <Button
-                onClick={() => selectedCarrierId && addCarrierMutation.mutate(selectedCarrierId)}
-                disabled={!selectedCarrierId || addCarrierMutation.isPending}
+                onClick={() => selectedCarrierIds.length > 0 && addCarriersMutation.mutate(selectedCarrierIds)}
+                disabled={selectedCarrierIds.length === 0 || addCarriersMutation.isPending}
                 data-testid="button-submit-carrier"
               >
-                {addCarrierMutation.isPending ? "Adding..." : "Add Carrier"}
+                {addCarriersMutation.isPending 
+                  ? "Adding..." 
+                  : `Add ${selectedCarrierIds.length > 0 ? selectedCarrierIds.length : ""} Carrier${selectedCarrierIds.length !== 1 ? "s" : ""}`}
               </Button>
             </div>
           </DialogContent>
