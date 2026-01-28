@@ -2840,10 +2840,17 @@ type PracticeInsuranceCarrierWithDetails = {
 function InsuranceCarriersTab() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+  const [selectedDetailCarrier, setSelectedDetailCarrier] = useState<PracticeInsuranceCarrierWithDetails | null>(null);
   const [carrierSearchQuery, setCarrierSearchQuery] = useState("");
   const [selectedCarrierId, setSelectedCarrierId] = useState<string | null>(null);
   const { toast } = useToast();
   const practiceId = useSettingsPracticeId();
+
+  const openCarrierDetails = (pc: PracticeInsuranceCarrierWithDetails) => {
+    setSelectedDetailCarrier(pc);
+    setIsDetailDialogOpen(true);
+  };
 
   // Fetch practice-specific carriers
   const { data: practiceCarriers, isLoading } = useQuery<PracticeInsuranceCarrierWithDetails[]>({
@@ -3065,7 +3072,12 @@ function InsuranceCarriersTab() {
       ) : filteredPracticeCarriers && filteredPracticeCarriers.length > 0 ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filteredPracticeCarriers.map((pc) => (
-            <Card key={pc.id} className="hover-elevate" data-testid={`card-carrier-${pc.carrier.id}`}>
+            <Card 
+              key={pc.id} 
+              className="hover-elevate cursor-pointer" 
+              onClick={() => openCarrierDetails(pc)}
+              data-testid={`card-carrier-${pc.carrier.id}`}
+            >
               <CardContent className="p-4">
                 <div className="flex items-start gap-4">
                   <div className="flex h-12 w-12 items-center justify-center rounded-md bg-muted text-lg font-semibold">
@@ -3094,14 +3106,9 @@ function InsuranceCarriersTab() {
                       {pc.carrier.website && (
                         <div className="flex items-center gap-2">
                           <Globe className="h-3.5 w-3.5" />
-                          <a
-                            href={pc.carrier.website}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="truncate hover:underline"
-                          >
+                          <span className="truncate">
                             {pc.carrier.website.replace(/^https?:\/\//, "")}
-                          </a>
+                          </span>
                         </div>
                       )}
                     </div>
@@ -3110,7 +3117,10 @@ function InsuranceCarriersTab() {
                     variant="ghost"
                     size="icon"
                     className="shrink-0"
-                    onClick={() => removeCarrierMutation.mutate(pc.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeCarrierMutation.mutate(pc.id);
+                    }}
                     disabled={removeCarrierMutation.isPending}
                     data-testid={`button-remove-carrier-${pc.carrier.id}`}
                   >
@@ -3140,6 +3150,195 @@ function InsuranceCarriersTab() {
           }
         />
       )}
+
+      {/* Carrier Detail Dialog */}
+      <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              {selectedDetailCarrier && (
+                <>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted text-sm font-semibold">
+                    {selectedDetailCarrier.carrier.name.slice(0, 2).toUpperCase()}
+                  </div>
+                  <span>{selectedDetailCarrier.carrier.name}</span>
+                </>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedDetailCarrier && (
+            <div className="space-y-6">
+              {/* Insurance Type */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-muted-foreground">Insurance Type</Label>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="capitalize">
+                    {selectedDetailCarrier.carrier.insuranceType || "Dental"}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Contact Information */}
+              <div className="space-y-3">
+                <Label className="text-sm font-medium text-muted-foreground">Contact Information</Label>
+                <div className="space-y-2">
+                  {selectedDetailCarrier.carrier.phone ? (
+                    <div className="flex items-center gap-3 p-3 rounded-md bg-muted/50">
+                      <Phone className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm font-medium">Phone</p>
+                        <a 
+                          href={`tel:${selectedDetailCarrier.carrier.phone}`}
+                          className="text-sm text-primary hover:underline"
+                        >
+                          {selectedDetailCarrier.carrier.phone}
+                        </a>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3 p-3 rounded-md bg-muted/50">
+                      <Phone className="h-4 w-4 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">No phone number available</p>
+                    </div>
+                  )}
+                  
+                  {selectedDetailCarrier.carrier.website ? (
+                    <div className="flex items-center gap-3 p-3 rounded-md bg-muted/50">
+                      <Globe className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm font-medium">Website</p>
+                        <a 
+                          href={selectedDetailCarrier.carrier.website}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-primary hover:underline"
+                        >
+                          {selectedDetailCarrier.carrier.website.replace(/^https?:\/\//, "")}
+                        </a>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3 p-3 rounded-md bg-muted/50">
+                      <Globe className="h-4 w-4 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">No website available</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Integration Capabilities */}
+              <div className="space-y-3">
+                <Label className="text-sm font-medium text-muted-foreground">Integration Capabilities</Label>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between p-3 rounded-md bg-muted/50">
+                    <div className="flex items-center gap-3">
+                      <Plug className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm font-medium">Electronic Data Interchange (EDI)</p>
+                        <p className="text-xs text-muted-foreground">Real-time eligibility verification</p>
+                      </div>
+                    </div>
+                    {selectedDetailCarrier.carrier.clearinghouseCompatible ? (
+                      <Badge 
+                        variant="outline"
+                        className="gap-1 border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-900/20 dark:text-emerald-400"
+                      >
+                        <CheckCircle className="h-3 w-3" />
+                        Supported
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="gap-1">
+                        <XCircle className="h-3 w-3" />
+                        Not Available
+                      </Badge>
+                    )}
+                  </div>
+
+                  {selectedDetailCarrier.carrier.payerId && (
+                    <div className="flex items-center gap-3 p-3 rounded-md bg-muted/50">
+                      <Database className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm font-medium">Payer ID</p>
+                        <p className="text-sm font-mono text-muted-foreground">
+                          {selectedDetailCarrier.carrier.payerId}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between p-3 rounded-md bg-muted/50">
+                    <div className="flex items-center gap-3">
+                      <CreditCard className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm font-medium">Claims Submission</p>
+                        <p className="text-xs text-muted-foreground">Electronic claims processing</p>
+                      </div>
+                    </div>
+                    {selectedDetailCarrier.carrier.clearinghouseCompatible ? (
+                      <Badge 
+                        variant="outline"
+                        className="gap-1 border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-900/20 dark:text-emerald-400"
+                      >
+                        <CheckCircle className="h-3 w-3" />
+                        Supported
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="gap-1">
+                        <XCircle className="h-3 w-3" />
+                        Manual Only
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 rounded-md bg-muted/50">
+                    <div className="flex items-center gap-3">
+                      <RefreshCw className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm font-medium">Real-time Benefits Check</p>
+                        <p className="text-xs text-muted-foreground">Instant benefit verification</p>
+                      </div>
+                    </div>
+                    {selectedDetailCarrier.carrier.clearinghouseCompatible ? (
+                      <Badge 
+                        variant="outline"
+                        className="gap-1 border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-900/20 dark:text-emerald-400"
+                      >
+                        <CheckCircle className="h-3 w-3" />
+                        Supported
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="gap-1">
+                        <XCircle className="h-3 w-3" />
+                        Not Available
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Practice Notes */}
+              {selectedDetailCarrier.notes && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-muted-foreground">Practice Notes</Label>
+                  <p className="text-sm p-3 rounded-md bg-muted/50">
+                    {selectedDetailCarrier.notes}
+                  </p>
+                </div>
+              )}
+
+              {/* Added Date */}
+              {selectedDetailCarrier.createdAt && (
+                <div className="pt-2 border-t">
+                  <p className="text-xs text-muted-foreground">
+                    Added to practice on {new Date(selectedDetailCarrier.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
