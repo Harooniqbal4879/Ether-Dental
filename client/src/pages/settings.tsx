@@ -573,8 +573,11 @@ type LocationProfile = {
 
 function OfficeProfileTab() {
   const { toast } = useToast();
-  const { currentLocationId, currentLocation, locations } = useLocation();
-  const practiceId = useSettingsPracticeId();
+  const { currentLocationId, currentLocation, locations, currentPracticeId } = useLocation();
+  const { admin, practice } = useAuth();
+  // Get practiceId from multiple sources with fallbacks
+  const contextPracticeId = useSettingsPracticeId();
+  const practiceId = contextPracticeId || currentPracticeId || practice?.id || admin?.practiceId || null;
   const hasLocations = locations && locations.length > 0;
   
   const { uploadFile, isUploading } = useUpload({
@@ -595,7 +598,7 @@ function OfficeProfileTab() {
   });
 
   // Load practice data (used when no locations exist, or for practice-level fields)
-  const { data: practice, isLoading: isLoadingPractice } = useQuery<PracticeProfile>({
+  const { data: practiceData, isLoading: isLoadingPractice } = useQuery<PracticeProfile>({
     queryKey: ["/api/practices", practiceId],
     enabled: !!practiceId,
   });
@@ -650,32 +653,32 @@ function OfficeProfileTab() {
         arrivalInstructions: locationProfile.arrivalInstructions || "",
         dressCode: locationProfile.dressCode || "",
       });
-    } else if (!hasLocations && practice) {
+    } else if (!hasLocations && practiceData) {
       // Use practice data when no locations exist
       setOfficeData({
-        name: practice.name || "",
-        address: practice.address || "",
-        city: practice.city || "",
-        stateCode: practice.stateCode || "",
-        zipCode: practice.zipCode || "",
-        phone: practice.phone || "",
-        email: practice.email || "",
-        website: practice.website || "",
-        aboutOffice: practice.aboutOffice || "",
-        parkingInfo: practice.parkingInfo || "",
-        numDentists: practice.numDentists || 0,
-        numHygienists: practice.numHygienists || 0,
-        numSupportStaff: practice.numSupportStaff || 0,
-        breakRoomAvailable: practice.breakRoomAvailable || false,
-        refrigeratorAvailable: practice.refrigeratorAvailable || false,
-        microwaveAvailable: practice.microwaveAvailable || false,
-        hiringPermanently: practice.hiringPermanently || false,
-        photos: practice.photos || [],
-        arrivalInstructions: "",
-        dressCode: "",
+        name: practiceData.name || "",
+        address: practiceData.address || "",
+        city: practiceData.city || "",
+        stateCode: practiceData.stateCode || "",
+        zipCode: practiceData.zipCode || "",
+        phone: practiceData.phone || "",
+        email: practiceData.email || "",
+        website: practiceData.website || "",
+        aboutOffice: practiceData.aboutOffice || "",
+        parkingInfo: practiceData.parkingInfo || "",
+        numDentists: practiceData.numDentists || 0,
+        numHygienists: practiceData.numHygienists || 0,
+        numSupportStaff: practiceData.numSupportStaff || 0,
+        breakRoomAvailable: practiceData.breakRoomAvailable || false,
+        refrigeratorAvailable: practiceData.refrigeratorAvailable || false,
+        microwaveAvailable: practiceData.microwaveAvailable || false,
+        hiringPermanently: practiceData.hiringPermanently || false,
+        photos: practiceData.photos || [],
+        arrivalInstructions: practiceData.arrivalInstructions || "",
+        dressCode: practiceData.dressCode || "",
       });
     }
-  }, [locationProfile, practice, hasLocations, currentLocationId]);
+  }, [locationProfile, practiceData, hasLocations, currentLocationId]);
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
     const file = e.target.files?.[0];
@@ -781,17 +784,15 @@ function OfficeProfileTab() {
       microwaveAvailable: officeData.microwaveAvailable,
       hiringPermanently: officeData.hiringPermanently,
       photos: officeData.photos,
+      arrivalInstructions: officeData.arrivalInstructions,
+      dressCode: officeData.dressCode,
     };
 
     if (hasLocations && currentLocationId) {
       // Save to location profile
-      updateLocationMutation.mutate({
-        ...profileData,
-        arrivalInstructions: officeData.arrivalInstructions,
-        dressCode: officeData.dressCode,
-      } as Partial<LocationProfile>);
+      updateLocationMutation.mutate(profileData as Partial<LocationProfile>);
     } else if (practiceId) {
-      // Save to practice
+      // Save to practice (includes all fields since practice table has these columns)
       updatePracticeMutation.mutate(profileData);
     } else {
       toast({
@@ -3953,7 +3954,10 @@ function UsersTab() {
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState("office-profile");
-  const { practice } = useAuth();
+  const { practice, admin, isLoading } = useAuth();
+  
+  // Use admin.practiceId as fallback if practice object hasn't loaded yet
+  const practiceId = practice?.id || admin?.practiceId || null;
 
   const tabCounts = {
     "office-profile": 3,
@@ -3964,9 +3968,18 @@ export default function Settings() {
     "carriers": 0,
     "users": 0,
   };
+  
+  // Show loading state while auth is loading
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
-    <SettingsPracticeContext.Provider value={practice?.id || null}>
+    <SettingsPracticeContext.Provider value={practiceId}>
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <PageHeader
