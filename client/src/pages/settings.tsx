@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, createContext, useContext } from "react";
+import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -520,7 +521,13 @@ interface PracticeProfile {
   hiringPermanently: boolean | null;
 }
 
-const PRACTICE_ID = "practice-1"; // Hardcoded for now - should come from auth context
+// Practice ID context for settings components
+const SettingsPracticeContext = createContext<string | null>(null);
+
+function useSettingsPracticeId() {
+  const practiceId = useContext(SettingsPracticeContext);
+  return practiceId;
+}
 
 // Type for resolved location profile (returned by /api/locations/:id/profile)
 type LocationProfile = {
@@ -1070,10 +1077,12 @@ function PracticeInformationTab() {
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
   const { currentLocationId, currentLocation } = useLocation();
+  const practiceId = useSettingsPracticeId();
 
   // Load practice data for NPI and Tax ID
   const { data: practice } = useQuery<Practice>({
-    queryKey: ["/api/practices", PRACTICE_ID],
+    queryKey: ["/api/practices", practiceId],
+    enabled: !!practiceId,
   });
 
   // Load location-specific profile data
@@ -1169,11 +1178,12 @@ function PracticeInformationTab() {
 
   const updatePracticeMutation = useMutation({
     mutationFn: async (data: { npiNumber?: string; taxId?: string }) => {
-      const res = await apiRequest("PATCH", `/api/practices/${PRACTICE_ID}`, data);
+      if (!practiceId) throw new Error("No practice selected");
+      const res = await apiRequest("PATCH", `/api/practices/${practiceId}`, data);
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/practices", PRACTICE_ID] });
+      queryClient.invalidateQueries({ queryKey: ["/api/practices", practiceId] });
     },
     onError: (error: Error) => {
       toast({
@@ -3827,6 +3837,7 @@ function UsersTab() {
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState("office-profile");
+  const { practice } = useAuth();
 
   const tabCounts = {
     "office-profile": 3,
@@ -3839,6 +3850,7 @@ export default function Settings() {
   };
 
   return (
+    <SettingsPracticeContext.Provider value={practice?.id || null}>
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <PageHeader
@@ -3929,5 +3941,6 @@ export default function Settings() {
         </TabsContent>
       </Tabs>
     </div>
+    </SettingsPracticeContext.Provider>
   );
 }
