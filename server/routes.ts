@@ -127,6 +127,7 @@ export async function registerRoutes(
           lastName: admin.lastName,
           role: admin.role,
           practiceId: admin.practiceId,
+          isSuperAdmin: admin.isSuperAdmin || false,
         },
         practice: practiceList[0] || null,
       });
@@ -2701,7 +2702,7 @@ export async function registerRoutes(
           practiceId: practice.id,
           firstName: adminFirstName,
           lastName: adminLastName,
-          email: adminEmail,
+          email: adminEmail.toLowerCase(), // Normalize email to lowercase
           phone: adminPhone || null,
           role: "admin",
           passwordHash,

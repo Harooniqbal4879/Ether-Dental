@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { useAuth } from "./auth-context";
 
 export type Persona = 
   | "system_admin"
@@ -85,6 +86,19 @@ function getStoredPersona(): Persona {
 
 export function PersonaProvider({ children }: { children: ReactNode }) {
   const [currentPersona, setCurrentPersonaState] = useState<Persona>(getStoredPersona);
+  const { admin } = useAuth();
+  
+  // Auto-select system_admin persona for super admins
+  useEffect(() => {
+    if (admin?.isSuperAdmin && currentPersona !== "system_admin") {
+      setCurrentPersonaState("system_admin");
+      try {
+        localStorage.setItem(PERSONA_STORAGE_KEY, "system_admin");
+      } catch (e) {
+        // localStorage not available
+      }
+    }
+  }, [admin?.isSuperAdmin]);
   
   const setCurrentPersona = (persona: Persona) => {
     setCurrentPersonaState(persona);

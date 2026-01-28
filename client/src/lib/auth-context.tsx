@@ -8,6 +8,7 @@ interface AuthAdmin {
   lastName: string;
   role: string;
   practiceId: string;
+  isSuperAdmin: boolean;
 }
 
 interface AuthPractice {
