@@ -2934,6 +2934,22 @@ export async function registerRoutes(
     }
   });
 
+  // Staff Roles
+  app.get("/api/staff-roles", async (req, res) => {
+    try {
+      const { staffRoles } = await import("@shared/schema");
+      const { asc } = await import("drizzle-orm");
+      const roles = await db
+        .select()
+        .from(staffRoles)
+        .orderBy(asc(staffRoles.sortOrder));
+      res.json(roles);
+    } catch (error) {
+      console.error("Error fetching staff roles:", error);
+      res.status(500).json({ error: "Failed to fetch staff roles" });
+    }
+  });
+
   // Service Subscriptions
   app.get("/api/practices/:practiceId/service-subscriptions", async (req, res) => {
     try {

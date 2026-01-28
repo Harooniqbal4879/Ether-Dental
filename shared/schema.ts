@@ -352,6 +352,27 @@ export type PatientBillingWithDetails = PatientBilling & {
   payments?: PatientPayment[];
 };
 
+// Staff Roles - configurable roles for staffing
+export const staffRoles = pgTable("staff_roles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  key: text("key").notNull().unique(), // e.g., "hygienist", "dentist"
+  label: text("label").notNull(), // e.g., "Hygienist", "Dentist"
+  category: text("category").notNull(), // "clinical" or "administrative"
+  badgeColor: text("badge_color"), // Tailwind classes for badge styling
+  sortOrder: integer("sort_order").default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertStaffRoleSchema = createInsertSchema(staffRoles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertStaffRole = z.infer<typeof insertStaffRoleSchema>;
+export type StaffRole = typeof staffRoles.$inferSelect;
+
 // Staff Shifts - for staffing management
 export const staffShifts = pgTable("staff_shifts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

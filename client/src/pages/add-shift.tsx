@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useLocation as useLocationContext } from "@/lib/location-context";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import type { ResolvedFeeRates, PracticeLocation } from "@shared/schema";
+import type { ResolvedFeeRates, PracticeLocation, StaffRole } from "@shared/schema";
 import { Card } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Slider } from "@/components/ui/slider";
@@ -50,14 +50,21 @@ const TIME_OPTIONS = [
 
 const BREAK_OPTIONS = ["No break", "15 min", "30 min", "45 min", "60 min", "90 min"];
 
-const ROLE_OPTIONS = [
-  { value: "Hygienist", label: "Hygienist", category: "Clinical" },
-  { value: "Dentist", label: "Dentist", category: "Clinical" },
-  { value: "Dental Assistant", label: "Dental Assistant", category: "Clinical" },
-  { value: "Office Coordinator", label: "Office Coordinator", category: "Administrative" },
-  { value: "Front Desk", label: "Front Desk", category: "Administrative" },
-  { value: "Billing Staff", label: "Billing Staff", category: "Administrative" },
-];
+function useStaffRoles() {
+  const { data: roles = [], isLoading } = useQuery<StaffRole[]>({
+    queryKey: ["/api/staff-roles"],
+  });
+  
+  const roleOptions = useMemo(() => {
+    return roles.map((role) => ({
+      value: role.label,
+      label: role.label,
+      category: role.category === "clinical" ? "Clinical" : "Administrative",
+    }));
+  }, [roles]);
+  
+  return { roles, roleOptions, isLoading };
+}
 
 // Default payroll breakdown rates (overridden by API values when available)
 // Note: Social Security (6.2%) and Medicare (1.45%) are federally mandated fixed rates
@@ -130,6 +137,7 @@ export default function AddShiftPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { currentPracticeId, locations } = useLocationContext();
+  const { roleOptions } = useStaffRoles();
   
   // Get practiceId from location context
   const practiceId = currentPracticeId;
@@ -449,7 +457,7 @@ export default function AddShiftPage() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {ROLE_OPTIONS.map((role) => (
+                          {roleOptions.map((role) => (
                             <SelectItem key={role.value} value={role.value} data-testid={`option-role-${role.value.replace(/[ ]/g, '-')}`}>
                               {role.label}
                             </SelectItem>

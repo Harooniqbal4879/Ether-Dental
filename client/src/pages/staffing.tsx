@@ -44,41 +44,43 @@ import {
   Send,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { StaffShift, ShiftTransactionWithDetails, ProfessionalWithBadges } from "@shared/schema";
+import type { StaffShift, ShiftTransactionWithDetails, ProfessionalWithBadges, StaffRole as StaffRoleType } from "@shared/schema";
 import { ShiftInviteModal } from "@/components/shift-invite-modal";
 
-const STAFF_ROLES = {
-  all: { label: "All Roles", category: "all" },
-  dentist: { label: "Dentist", category: "clinical" },
-  hygienist: { label: "Hygienist", category: "clinical" },
-  dental_assistant: { label: "Dental Assistant", category: "clinical" },
-  office_coordinator: { label: "Office Coordinator", category: "administrative" },
-  front_desk: { label: "Front Desk", category: "administrative" },
-  billing: { label: "Billing Staff", category: "administrative" },
-} as const;
+type StaffRoleKey = string;
 
-type StaffRole = keyof typeof STAFF_ROLES;
+function useStaffRoles() {
+  const { data: roles = [], isLoading } = useQuery<StaffRoleType[]>({
+    queryKey: ["/api/staff-roles"],
+  });
+  
+  const rolesMap = useMemo(() => {
+    const map: Record<string, { label: string; category: string; badgeColor: string }> = {
+      all: { label: "All Roles", category: "all", badgeColor: "bg-muted text-muted-foreground" },
+    };
+    roles.forEach((role) => {
+      map[role.key] = {
+        label: role.label,
+        category: role.category,
+        badgeColor: role.badgeColor || "bg-muted text-muted-foreground",
+      };
+    });
+    return map;
+  }, [roles]);
+  
+  const badgeColorsByLabel = useMemo(() => {
+    const map: Record<string, string> = {};
+    roles.forEach((role) => {
+      map[role.label] = role.badgeColor || "bg-muted text-muted-foreground";
+    });
+    return map;
+  }, [roles]);
+  
+  return { roles, rolesMap, badgeColorsByLabel, isLoading };
+}
 
-const ROLE_BADGE_COLORS: Record<StaffRole, string> = {
-  all: "bg-muted text-muted-foreground",
-  dentist: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  hygienist: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  dental_assistant: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
-  office_coordinator: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
-  front_desk: "bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200",
-  billing: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-};
-
-function getRoleBadgeColor(role: string): string {
-  const roleMap: Record<string, string> = {
-    "Dentist": "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-    "Hygienist": "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-    "Dental Assistant": "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
-    "Office Coordinator": "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
-    "Front Desk": "bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200",
-    "Billing Staff": "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-  };
-  return roleMap[role] || "bg-muted text-muted-foreground";
+function getRoleBadgeColor(role: string, badgeColorsByLabel: Record<string, string>): string {
+  return badgeColorsByLabel[role] || "bg-muted text-muted-foreground";
 }
 
 const DAYS_OF_WEEK = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -115,6 +117,7 @@ function ShiftDetailDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const { badgeColorsByLabel } = useStaffRoles();
   
   const { data: transaction, isLoading: txLoading } = useQuery<ShiftTransactionWithDetails>({
     queryKey: [`/api/shifts/${shift?.id}/transaction`],
@@ -149,7 +152,7 @@ function ShiftDetailDialog({
         <div className="space-y-4 overflow-y-auto pr-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Badge className={cn("text-xs", getRoleBadgeColor(shift.role))} data-testid="badge-shift-role">
+              <Badge className={cn("text-xs", getRoleBadgeColor(shift.role, badgeColorsByLabel))} data-testid="badge-shift-role">
                 {shift.role}
               </Badge>
               {getStatusBadge(shift.status)}
@@ -392,6 +395,7 @@ function CalendarView() {
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
   const [selectedShift, setSelectedShift] = useState<StaffShift | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const { badgeColorsByLabel } = useStaffRoles();
   
   const monthName = new Date(currentYear, currentMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   const days = getMonthData(currentYear, currentMonth);
@@ -527,7 +531,7 @@ function CalendarView() {
                         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleShiftClick(shift); }}
                         className={cn(
                           "text-xs px-1.5 py-0.5 rounded w-full text-left cursor-pointer hover-elevate",
-                          getRoleBadgeColor(shift.role),
+                          getRoleBadgeColor(shift.role, badgeColorsByLabel),
                           shift.status === "completed" && "border-l-2 border-emerald-500"
                         )}
                         data-testid={`shift-${shift.id}`}
@@ -594,10 +598,11 @@ function PendingView() {
   );
 }
 
-function TeamView({ roleFilter }: { roleFilter: StaffRole }) {
+function TeamView({ roleFilter }: { roleFilter: StaffRoleKey }) {
   const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState("all");
-  const roleLabel = roleFilter === "all" ? "team members" : STAFF_ROLES[roleFilter].label.toLowerCase() + "s";
+  const { rolesMap } = useStaffRoles();
+  const roleLabel = roleFilter === "all" ? "team members" : (rolesMap[roleFilter]?.label.toLowerCase() || roleFilter) + "s";
   
   return (
     <div className="space-y-4">
@@ -666,11 +671,12 @@ function TeamView({ roleFilter }: { roleFilter: StaffRole }) {
   );
 }
 
-function ShiftHistoryView({ roleFilter }: { roleFilter: StaffRole }) {
+function ShiftHistoryView({ roleFilter }: { roleFilter: StaffRoleKey }) {
   const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState("completed");
   const [searchQuery, setSearchQuery] = useState("");
-  const roleLabel = roleFilter === "all" ? "staff" : STAFF_ROLES[roleFilter].label.toLowerCase();
+  const { rolesMap } = useStaffRoles();
+  const roleLabel = roleFilter === "all" ? "staff" : (rolesMap[roleFilter]?.label.toLowerCase() || roleFilter);
   
   return (
     <div className="space-y-4">
@@ -728,10 +734,11 @@ function ShiftHistoryView({ roleFilter }: { roleFilter: StaffRole }) {
   );
 }
 
-function PaymentTransactionsView({ roleFilter }: { roleFilter: StaffRole }) {
+function PaymentTransactionsView({ roleFilter }: { roleFilter: StaffRoleKey }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const roleLabel = roleFilter === "all" ? "transactions" : `${STAFF_ROLES[roleFilter].label.toLowerCase()} transactions`;
+  const { rolesMap } = useStaffRoles();
+  const roleLabel = roleFilter === "all" ? "transactions" : `${rolesMap[roleFilter]?.label.toLowerCase() || roleFilter} transactions`;
   
   const { data: transactions, isLoading } = useQuery<ShiftTransactionWithDetails[]>({
     queryKey: ["/api/shift-transactions"],
@@ -740,7 +747,7 @@ function PaymentTransactionsView({ roleFilter }: { roleFilter: StaffRole }) {
   const filteredTransactions = useMemo(() => {
     if (!transactions) return [];
     return transactions.filter((tx) => {
-      const matchesRole = roleFilter === "all" || tx.shift?.role === STAFF_ROLES[roleFilter].label;
+      const matchesRole = roleFilter === "all" || tx.shift?.role === rolesMap[roleFilter]?.label;
       const matchesStatus = statusFilter === "all" || tx.status === statusFilter;
       const matchesSearch = searchQuery === "" || 
         `${tx.professional?.firstName} ${tx.professional?.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -969,18 +976,11 @@ function PaymentTransactionsView({ roleFilter }: { roleFilter: StaffRole }) {
   );
 }
 
-function RoleFilterBadge({ role }: { role: StaffRole }) {
-  if (role === "all") return null;
-  return (
-    <Badge className={cn("text-xs", ROLE_BADGE_COLORS[role])} data-testid={`badge-role-${role}`}>
-      {STAFF_ROLES[role].label}
-    </Badge>
-  );
-}
 
 export default function StaffingPage() {
   const [location, setLocation] = useLocation();
-  const [roleFilter, setRoleFilter] = useState<StaffRole>("all");
+  const [roleFilter, setRoleFilter] = useState<StaffRoleKey>("all");
+  const { roles, rolesMap, badgeColorsByLabel, isLoading: rolesLoading } = useStaffRoles();
   
   const urlParams = new URLSearchParams(window.location.search);
   const tabFromUrl = urlParams.get("tab") || "calendar";
@@ -997,8 +997,14 @@ export default function StaffingPage() {
     setLocation(`/staffing?tab=${value}`);
   };
 
-  const clinicalRoles = Object.entries(STAFF_ROLES).filter(([_, v]) => v.category === "clinical");
-  const adminRoles = Object.entries(STAFF_ROLES).filter(([_, v]) => v.category === "administrative");
+  const clinicalRoles = useMemo(() => 
+    Object.entries(rolesMap).filter(([_, v]) => v.category === "clinical"),
+    [rolesMap]
+  );
+  const adminRoles = useMemo(() => 
+    Object.entries(rolesMap).filter(([_, v]) => v.category === "administrative"),
+    [rolesMap]
+  );
 
   return (
     <div className="flex-1 space-y-6 p-6">
@@ -1009,7 +1015,7 @@ export default function StaffingPage() {
         />
         <div className="flex items-center gap-3">
           <span className="text-sm text-muted-foreground">Filter by role:</span>
-          <Select value={roleFilter} onValueChange={(v) => setRoleFilter(v as StaffRole)}>
+          <Select value={roleFilter} onValueChange={(v) => setRoleFilter(v)}>
             <SelectTrigger className="w-[200px]" data-testid="select-role-filter">
               <SelectValue placeholder="All Roles" />
             </SelectTrigger>
@@ -1019,7 +1025,7 @@ export default function StaffingPage() {
               {clinicalRoles.map(([key, role]) => (
                 <SelectItem key={key} value={key} data-testid={`option-${key}`}>
                   <div className="flex items-center gap-2">
-                    <span className={cn("w-2 h-2 rounded-full", ROLE_BADGE_COLORS[key as StaffRole].split(" ")[0])} />
+                    <span className={cn("w-2 h-2 rounded-full", role.badgeColor.split(" ")[0])} />
                     {role.label}
                   </div>
                 </SelectItem>
@@ -1028,15 +1034,17 @@ export default function StaffingPage() {
               {adminRoles.map(([key, role]) => (
                 <SelectItem key={key} value={key} data-testid={`option-${key}`}>
                   <div className="flex items-center gap-2">
-                    <span className={cn("w-2 h-2 rounded-full", ROLE_BADGE_COLORS[key as StaffRole].split(" ")[0])} />
+                    <span className={cn("w-2 h-2 rounded-full", role.badgeColor.split(" ")[0])} />
                     {role.label}
                   </div>
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          {roleFilter !== "all" && (
-            <RoleFilterBadge role={roleFilter} />
+          {roleFilter !== "all" && rolesMap[roleFilter] && (
+            <Badge className={cn("text-xs", rolesMap[roleFilter].badgeColor)} data-testid={`badge-role-${roleFilter}`}>
+              {rolesMap[roleFilter].label}
+            </Badge>
           )}
         </div>
       </div>
