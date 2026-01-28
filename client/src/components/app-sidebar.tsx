@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { usePersona, personas, type Persona } from "@/lib/persona-context";
 import { useLocation as useLocationContext } from "@/lib/location-context";
+import { useAuth } from "@/lib/auth-context";
 
 const allNavItems = [
   {
@@ -108,7 +109,9 @@ export function AppSidebar() {
   const [routeLocation] = useWouterLocation();
   const { currentPersona, setCurrentPersona, personaInfo } = usePersona();
   const { currentLocation, locations, setCurrentLocationId, isLoading: isLoadingLocations } = useLocationContext();
+  const { practice } = useAuth();
   
+  const practiceName = practice?.name || "Dental Practice";
   const isPracticePersona = ["admin", "front_desk", "treatment_coordinator", "billing_manager"].includes(currentPersona);
 
   const visibleMainItems = allNavItems.filter((item) =>
@@ -244,7 +247,7 @@ export function AppSidebar() {
                   {personaInfo.title}
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  Sunny Pines Dental
+                  {practiceName}
                 </span>
               </div>
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
