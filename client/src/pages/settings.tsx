@@ -573,7 +573,10 @@ type LocationProfile = {
 
 function OfficeProfileTab() {
   const { toast } = useToast();
-  const { currentLocationId, currentLocation } = useLocation();
+  const { currentLocationId, currentLocation, locations } = useLocation();
+  const practiceId = useSettingsPracticeId();
+  const hasLocations = locations && locations.length > 0;
+  
   const { uploadFile, isUploading } = useUpload({
     onError: (error) => {
       toast({
@@ -585,16 +588,28 @@ function OfficeProfileTab() {
   });
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
   
-  // Load location-specific profile data
-  const { data: profile, isLoading } = useQuery<LocationProfile>({
+  // Load location-specific profile data (when locations exist)
+  const { data: locationProfile, isLoading: isLoadingLocation } = useQuery<LocationProfile>({
     queryKey: ["/api/locations", currentLocationId, "profile"],
-    enabled: !!currentLocationId,
+    enabled: !!currentLocationId && hasLocations,
   });
 
+  // Load practice data (used when no locations exist, or for practice-level fields)
+  const { data: practice, isLoading: isLoadingPractice } = useQuery<PracticeProfile>({
+    queryKey: ["/api/practices", practiceId],
+    enabled: !!practiceId,
+  });
+
+  const isLoading = hasLocations ? isLoadingLocation : isLoadingPractice;
+
   const [officeData, setOfficeData] = useState({
-    officeName: "",
-    officeAddress: "",
-    officePhone: "",
+    name: "",
+    address: "",
+    city: "",
+    stateCode: "",
+    zipCode: "",
+    phone: "",
+    email: "",
     website: "",
     aboutOffice: "",
     parkingInfo: "",
@@ -610,29 +625,57 @@ function OfficeProfileTab() {
     dressCode: "",
   });
   
-  // Sync profile data to local state when it loads or location changes
+  // Sync profile data to local state - use location profile if available, otherwise use practice
   useEffect(() => {
-    if (profile) {
+    if (hasLocations && locationProfile) {
       setOfficeData({
-        officeName: profile.locationName || "",
-        officeAddress: [profile.address, profile.city, profile.stateCode, profile.zipCode].filter(Boolean).join(", "),
-        officePhone: profile.phone || "",
+        name: locationProfile.locationName || "",
+        address: locationProfile.address || "",
+        city: locationProfile.city || "",
+        stateCode: locationProfile.stateCode || "",
+        zipCode: locationProfile.zipCode || "",
+        phone: locationProfile.phone || "",
+        email: locationProfile.email || "",
         website: "", // Website is not part of location profile
-        aboutOffice: profile.aboutOffice || "",
-        parkingInfo: profile.parkingInfo || "",
-        numDentists: profile.numDentists || 0,
-        numHygienists: profile.numHygienists || 0,
-        numSupportStaff: profile.numSupportStaff || 0,
-        breakRoomAvailable: profile.breakRoomAvailable || false,
-        refrigeratorAvailable: profile.refrigeratorAvailable || false,
-        microwaveAvailable: profile.microwaveAvailable || false,
-        hiringPermanently: profile.hiringPermanently || false,
-        photos: profile.photos || [],
-        arrivalInstructions: profile.arrivalInstructions || "",
-        dressCode: profile.dressCode || "",
+        aboutOffice: locationProfile.aboutOffice || "",
+        parkingInfo: locationProfile.parkingInfo || "",
+        numDentists: locationProfile.numDentists || 0,
+        numHygienists: locationProfile.numHygienists || 0,
+        numSupportStaff: locationProfile.numSupportStaff || 0,
+        breakRoomAvailable: locationProfile.breakRoomAvailable || false,
+        refrigeratorAvailable: locationProfile.refrigeratorAvailable || false,
+        microwaveAvailable: locationProfile.microwaveAvailable || false,
+        hiringPermanently: locationProfile.hiringPermanently || false,
+        photos: locationProfile.photos || [],
+        arrivalInstructions: locationProfile.arrivalInstructions || "",
+        dressCode: locationProfile.dressCode || "",
+      });
+    } else if (!hasLocations && practice) {
+      // Use practice data when no locations exist
+      setOfficeData({
+        name: practice.name || "",
+        address: practice.address || "",
+        city: practice.city || "",
+        stateCode: practice.stateCode || "",
+        zipCode: practice.zipCode || "",
+        phone: practice.phone || "",
+        email: practice.email || "",
+        website: practice.website || "",
+        aboutOffice: practice.aboutOffice || "",
+        parkingInfo: practice.parkingInfo || "",
+        numDentists: practice.numDentists || 0,
+        numHygienists: practice.numHygienists || 0,
+        numSupportStaff: practice.numSupportStaff || 0,
+        breakRoomAvailable: practice.breakRoomAvailable || false,
+        refrigeratorAvailable: practice.refrigeratorAvailable || false,
+        microwaveAvailable: practice.microwaveAvailable || false,
+        hiringPermanently: practice.hiringPermanently || false,
+        photos: practice.photos || [],
+        arrivalInstructions: "",
+        dressCode: "",
       });
     }
-  }, [profile, currentLocationId]);
+  }, [locationProfile, practice, hasLocations, currentLocationId]);
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
     const file = e.target.files?.[0];
@@ -673,7 +716,8 @@ function OfficeProfileTab() {
     });
   };
 
-  const updateProfileMutation = useMutation({
+  // Mutation for updating location profile
+  const updateLocationMutation = useMutation({
     mutationFn: async (data: Partial<LocationProfile>) => {
       if (!currentLocationId) throw new Error("No location selected");
       const res = await apiRequest("PATCH", `/api/locations/${currentLocationId}/profile`, data);
@@ -695,16 +739,38 @@ function OfficeProfileTab() {
     },
   });
 
-  const handleSave = () => {
-    if (!currentLocationId) {
+  // Mutation for updating practice (when no locations exist)
+  const updatePracticeMutation = useMutation({
+    mutationFn: async (data: Partial<PracticeProfile>) => {
+      if (!practiceId) throw new Error("No practice selected");
+      const res = await apiRequest("PATCH", `/api/practices/${practiceId}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/practices", practiceId] });
       toast({
-        title: "No Location Selected",
-        description: "Please select a location from the sidebar to save profile data.",
+        title: "Profile Saved",
+        description: "Practice profile has been updated successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save profile",
         variant: "destructive",
       });
-      return;
-    }
-    updateProfileMutation.mutate({
+    },
+  });
+
+  const handleSave = () => {
+    const profileData = {
+      name: officeData.name,
+      address: officeData.address,
+      city: officeData.city,
+      stateCode: officeData.stateCode,
+      zipCode: officeData.zipCode,
+      phone: officeData.phone,
+      website: officeData.website,
       aboutOffice: officeData.aboutOffice,
       parkingInfo: officeData.parkingInfo,
       numDentists: officeData.numDentists,
@@ -715,10 +781,28 @@ function OfficeProfileTab() {
       microwaveAvailable: officeData.microwaveAvailable,
       hiringPermanently: officeData.hiringPermanently,
       photos: officeData.photos,
-      arrivalInstructions: officeData.arrivalInstructions,
-      dressCode: officeData.dressCode,
-    });
+    };
+
+    if (hasLocations && currentLocationId) {
+      // Save to location profile
+      updateLocationMutation.mutate({
+        ...profileData,
+        arrivalInstructions: officeData.arrivalInstructions,
+        dressCode: officeData.dressCode,
+      } as Partial<LocationProfile>);
+    } else if (practiceId) {
+      // Save to practice
+      updatePracticeMutation.mutate(profileData);
+    } else {
+      toast({
+        title: "Error",
+        description: "No practice or location found to save data.",
+        variant: "destructive",
+      });
+    }
   };
+
+  const isSaving = updateLocationMutation.isPending || updatePracticeMutation.isPending;
 
   if (isLoading) {
     return (
@@ -810,25 +894,55 @@ function OfficeProfileTab() {
             <Label htmlFor="office-name">Office name</Label>
             <Input
               id="office-name"
-              value={officeData.officeName}
-              readOnly
-              disabled
-              className="bg-muted"
+              value={officeData.name}
+              onChange={(e) => setOfficeData({ ...officeData, name: e.target.value })}
               data-testid="input-office-name"
             />
-            <p className="text-xs text-muted-foreground">Contact support to update core practice details</p>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="office-address">Office address</Label>
+            <Label htmlFor="office-address">Street address</Label>
             <div className="relative">
               <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
                 id="office-address"
-                className="pl-10 bg-muted"
-                value={officeData.officeAddress}
-                readOnly
-                disabled
+                className="pl-10"
+                value={officeData.address}
+                onChange={(e) => setOfficeData({ ...officeData, address: e.target.value })}
+                placeholder="123 Main Street"
                 data-testid="input-office-address"
+              />
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="office-city">City</Label>
+              <Input
+                id="office-city"
+                value={officeData.city}
+                onChange={(e) => setOfficeData({ ...officeData, city: e.target.value })}
+                placeholder="City"
+                data-testid="input-office-city"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="office-state">State</Label>
+              <Input
+                id="office-state"
+                value={officeData.stateCode}
+                onChange={(e) => setOfficeData({ ...officeData, stateCode: e.target.value })}
+                placeholder="CA"
+                maxLength={2}
+                data-testid="input-office-state"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="office-zip">ZIP Code</Label>
+              <Input
+                id="office-zip"
+                value={officeData.zipCode}
+                onChange={(e) => setOfficeData({ ...officeData, zipCode: e.target.value })}
+                placeholder="12345"
+                data-testid="input-office-zip"
               />
             </div>
           </div>
@@ -840,10 +954,10 @@ function OfficeProfileTab() {
                 <Input
                   id="office-phone"
                   type="tel"
-                  className="pl-10 bg-muted"
-                  value={officeData.officePhone}
-                  readOnly
-                  disabled
+                  className="pl-10"
+                  value={officeData.phone}
+                  onChange={(e) => setOfficeData({ ...officeData, phone: e.target.value })}
+                  placeholder="(555) 123-4567"
                   data-testid="input-office-phone"
                 />
               </div>
@@ -858,6 +972,7 @@ function OfficeProfileTab() {
                   className="pl-10"
                   value={officeData.website}
                   onChange={(e) => setOfficeData({ ...officeData, website: e.target.value })}
+                  placeholder="https://example.com"
                   data-testid="input-website"
                 />
               </div>
@@ -1056,10 +1171,10 @@ function OfficeProfileTab() {
       <div className="flex justify-end">
         <Button 
           onClick={handleSave} 
-          disabled={updateProfileMutation.isPending}
+          disabled={isSaving}
           data-testid="button-save-office-profile"
         >
-          {updateProfileMutation.isPending ? "Saving..." : "Save Changes"}
+          {isSaving ? "Saving..." : "Save Changes"}
         </Button>
       </div>
     </div>
