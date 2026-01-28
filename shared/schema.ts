@@ -1502,6 +1502,31 @@ export const insertDentrixPatientMappingSchema = createInsertSchema(dentrixPatie
 export type InsertDentrixPatientMapping = z.infer<typeof insertDentrixPatientMappingSchema>;
 export type DentrixPatientMapping = typeof dentrixPatientMapping.$inferSelect;
 
+// Service Subscriptions - tracks which services a practice has subscribed to
+export const serviceSubscriptions = pgTable("service_subscriptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  practiceId: varchar("practice_id").notNull().references(() => practices.id, { onDelete: "cascade" }),
+  service: text("service").notNull(), // verification, insurance_billing, patient_billing
+  status: text("status").notNull().default("inactive"), // active, inactive, pending
+  tier: text("tier"), // per_patient, flat_rate, percentage
+  monthlyProduction: integer("monthly_production"),
+  subscribedAt: timestamp("subscribed_at"),
+  cancelledAt: timestamp("cancelled_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const serviceSubscriptionsRelations = relations(serviceSubscriptions, ({ one }) => ({
+  practice: one(practices, {
+    fields: [serviceSubscriptions.practiceId],
+    references: [practices.id],
+  }),
+}));
+
+export const insertServiceSubscriptionSchema = createInsertSchema(serviceSubscriptions).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertServiceSubscription = z.infer<typeof insertServiceSubscriptionSchema>;
+export type ServiceSubscription = typeof serviceSubscriptions.$inferSelect;
+
 // US States for dropdown
 export const US_STATES = [
   { code: "AL", name: "Alabama" },
