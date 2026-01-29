@@ -51,7 +51,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error("Logout error:", error);
     }
-    queryClient.invalidateQueries({ queryKey: ["/api/auth/session"] });
+    // Clear persona from localStorage on logout
+    try {
+      localStorage.removeItem("etherAI_persona");
+    } catch (e) {
+      // localStorage not available
+    }
+    // Clear all cached queries to ensure fresh data on next login
+    queryClient.clear();
+    // Force refetch the session to update auth state immediately
+    await refetch();
   };
 
   const refreshSession = () => {

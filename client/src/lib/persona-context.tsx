@@ -108,37 +108,41 @@ function getAllowedPersonasForRole(role?: string, isSuperAdmin?: boolean): Perso
 export function PersonaProvider({ children }: { children: ReactNode }) {
   const { admin } = useAuth();
   const [currentPersona, setCurrentPersonaState] = useState<Persona>("front_desk");
-  const [hasInitialized, setHasInitialized] = useState(false);
+  const [lastAdminId, setLastAdminId] = useState<string | null>(null);
   
   const allowedPersonaIds = getAllowedPersonasForRole(admin?.role, admin?.isSuperAdmin);
   const allowedPersonas = personas.filter(p => allowedPersonaIds.includes(p.id));
   
+  // Reset persona when user changes (different admin ID or logout/login)
   useEffect(() => {
-    if (admin && !hasInitialized) {
+    if (admin && admin.id !== lastAdminId) {
       const defaultPersona = getDefaultPersonaForRole(admin.role, admin.isSuperAdmin);
       setCurrentPersonaState(defaultPersona);
-      setHasInitialized(true);
+      setLastAdminId(admin.id);
+      try {
+        localStorage.setItem(PERSONA_STORAGE_KEY, defaultPersona);
+      } catch (e) {
+        // localStorage not available
+      }
+    } else if (!admin && lastAdminId) {
+      // User logged out
+      setLastAdminId(null);
+      setCurrentPersonaState("front_desk");
+    }
+  }, [admin, lastAdminId]);
+
+  // Ensure current persona is always allowed for the current user
+  useEffect(() => {
+    if (admin && !allowedPersonaIds.includes(currentPersona)) {
+      const defaultPersona = getDefaultPersonaForRole(admin.role, admin.isSuperAdmin);
+      setCurrentPersonaState(defaultPersona);
       try {
         localStorage.setItem(PERSONA_STORAGE_KEY, defaultPersona);
       } catch (e) {
         // localStorage not available
       }
     }
-  }, [admin, hasInitialized]);
-
-  useEffect(() => {
-    if (admin && hasInitialized) {
-      if (!allowedPersonaIds.includes(currentPersona)) {
-        const defaultPersona = getDefaultPersonaForRole(admin.role, admin.isSuperAdmin);
-        setCurrentPersonaState(defaultPersona);
-        try {
-          localStorage.setItem(PERSONA_STORAGE_KEY, defaultPersona);
-        } catch (e) {
-          // localStorage not available
-        }
-      }
-    }
-  }, [admin, currentPersona, allowedPersonaIds, hasInitialized]);
+  }, [admin, currentPersona, allowedPersonaIds]);
   
   const setCurrentPersona = (persona: Persona) => {
     if (allowedPersonaIds.includes(persona)) {
