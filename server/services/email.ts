@@ -35,9 +35,18 @@ async function getCredentials() {
 
 async function getResendClient() {
   const { apiKey, fromEmail } = await getCredentials();
+  
+  // Check if the from email is from a common personal domain that won't be verified
+  // In that case, use Resend's onboarding email for testing
+  const personalDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com', 'icloud.com'];
+  const emailDomain = fromEmail?.split('@')[1]?.toLowerCase();
+  const safeFromEmail = personalDomains.includes(emailDomain) 
+    ? 'EtherAI <onboarding@resend.dev>' 
+    : fromEmail;
+  
   return {
     client: new Resend(apiKey),
-    fromEmail
+    fromEmail: safeFromEmail
   };
 }
 
