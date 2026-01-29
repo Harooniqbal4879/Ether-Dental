@@ -18,6 +18,7 @@ The platform is built on a modern web stack designed for scalability and maintai
     - **Insurance Verification**: Tracks verification status and provides detailed benefits breakdowns, supporting dual dental (DentalXchange) and medical (Availity) insurance with automated background processing.
     - **Staffing Management**: Multi-role shift postings, calendar views, dual pricing models, and a "Professionals Hub" with online status and shift invitation system.
     - **Professional Hub**: Personalized portal for professionals to manage profiles, view shifts, track earnings, and manage credentials.
+    - **Professional Self-Registration**: Professionals can register their own accounts via `/register-professional` with email/password authentication, then login via `/login/professional`. Passwords are hashed using bcrypt.
     - **Patient Portal**: Allows patients to view bills and make payments.
     - **Services**: Manages subscription offerings for insurance and patient billing with tiered pricing.
     - **Settings**: Consolidated practice configuration.
