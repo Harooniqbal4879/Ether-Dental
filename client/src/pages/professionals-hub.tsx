@@ -42,6 +42,7 @@ import {
   Upload,
   ExternalLink,
   MessageCircle,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1973,6 +1974,28 @@ export default function ProfessionalsHub() {
     enabled: !!practiceId,
   });
 
+  // Cancel/delete invitation mutation
+  const cancelInvitationMutation = useMutation({
+    mutationFn: async (invitationId: string) => {
+      if (!practiceId) throw new Error("Practice ID is required");
+      await apiRequest("DELETE", `/api/practices/${practiceId}/invitations/${invitationId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/practices", practiceId, "invitations"] });
+      toast({
+        title: "Invitation Cancelled",
+        description: "The invitation has been cancelled.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to cancel invitation",
+        variant: "destructive",
+      });
+    },
+  });
+
   const { data: selectedProfessional, isLoading: isLoadingDetail } = useQuery<ProfessionalWithBadges>({
     queryKey: ["/api/professionals", professionalId],
     enabled: !!professionalId,
@@ -2097,12 +2120,24 @@ export default function ProfessionalsHub() {
                 <Badge 
                   key={invitation.id} 
                   variant="outline" 
-                  className="py-1.5 px-3 bg-background"
+                  className="py-1.5 px-3 bg-background flex items-center gap-1"
                   data-testid={`badge-pending-invitation-${invitation.id}`}
                 >
-                  <Clock className="h-3 w-3 mr-1.5 text-muted-foreground" />
+                  <Clock className="h-3 w-3 mr-1 text-muted-foreground" />
                   <span className="font-medium">{invitation.email}</span>
-                  <span className="text-muted-foreground ml-1.5">({invitation.role})</span>
+                  <span className="text-muted-foreground ml-1">({invitation.role})</span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      cancelInvitationMutation.mutate(invitation.id);
+                    }}
+                    disabled={cancelInvitationMutation.isPending}
+                    className="ml-1.5 p-0.5 rounded-full hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+                    data-testid={`button-cancel-invitation-${invitation.id}`}
+                    title="Cancel invitation"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
                 </Badge>
               ))}
             </div>
