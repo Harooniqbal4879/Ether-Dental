@@ -66,53 +66,95 @@ interface PersonaContextType {
   currentPersona: Persona;
   setCurrentPersona: (persona: Persona) => void;
   personaInfo: PersonaInfo;
+  allowedPersonas: PersonaInfo[];
 }
 
 const PersonaContext = createContext<PersonaContextType | undefined>(undefined);
 
 const PERSONA_STORAGE_KEY = "etherAI_persona";
 
-function getStoredPersona(): Persona {
-  try {
-    const stored = localStorage.getItem(PERSONA_STORAGE_KEY);
-    if (stored && personas.some(p => p.id === stored)) {
-      return stored as Persona;
-    }
-  } catch (e) {
-    // localStorage not available
+function getDefaultPersonaForRole(role?: string, isSuperAdmin?: boolean): Persona {
+  if (isSuperAdmin) return "system_admin";
+  
+  switch (role) {
+    case "admin":
+      return "admin";
+    case "staff":
+      return "front_desk";
+    case "billing":
+      return "billing_manager";
+    default:
+      return "front_desk";
   }
-  return "admin";
+}
+
+function getAllowedPersonasForRole(role?: string, isSuperAdmin?: boolean): Persona[] {
+  if (isSuperAdmin) {
+    return ["system_admin", "admin", "front_desk", "treatment_coordinator", "billing_manager"];
+  }
+  
+  switch (role) {
+    case "admin":
+      return ["admin", "front_desk", "treatment_coordinator", "billing_manager"];
+    case "staff":
+      return ["front_desk", "treatment_coordinator"];
+    case "billing":
+      return ["billing_manager"];
+    default:
+      return ["front_desk"];
+  }
 }
 
 export function PersonaProvider({ children }: { children: ReactNode }) {
-  const [currentPersona, setCurrentPersonaState] = useState<Persona>(getStoredPersona);
   const { admin } = useAuth();
+  const [currentPersona, setCurrentPersonaState] = useState<Persona>("front_desk");
+  const [hasInitialized, setHasInitialized] = useState(false);
   
-  // Auto-select system_admin persona for super admins
+  const allowedPersonaIds = getAllowedPersonasForRole(admin?.role, admin?.isSuperAdmin);
+  const allowedPersonas = personas.filter(p => allowedPersonaIds.includes(p.id));
+  
   useEffect(() => {
-    if (admin?.isSuperAdmin && currentPersona !== "system_admin") {
-      setCurrentPersonaState("system_admin");
+    if (admin && !hasInitialized) {
+      const defaultPersona = getDefaultPersonaForRole(admin.role, admin.isSuperAdmin);
+      setCurrentPersonaState(defaultPersona);
+      setHasInitialized(true);
       try {
-        localStorage.setItem(PERSONA_STORAGE_KEY, "system_admin");
+        localStorage.setItem(PERSONA_STORAGE_KEY, defaultPersona);
       } catch (e) {
         // localStorage not available
       }
     }
-  }, [admin?.isSuperAdmin]);
+  }, [admin, hasInitialized]);
+
+  useEffect(() => {
+    if (admin && hasInitialized) {
+      if (!allowedPersonaIds.includes(currentPersona)) {
+        const defaultPersona = getDefaultPersonaForRole(admin.role, admin.isSuperAdmin);
+        setCurrentPersonaState(defaultPersona);
+        try {
+          localStorage.setItem(PERSONA_STORAGE_KEY, defaultPersona);
+        } catch (e) {
+          // localStorage not available
+        }
+      }
+    }
+  }, [admin, currentPersona, allowedPersonaIds, hasInitialized]);
   
   const setCurrentPersona = (persona: Persona) => {
-    setCurrentPersonaState(persona);
-    try {
-      localStorage.setItem(PERSONA_STORAGE_KEY, persona);
-    } catch (e) {
-      // localStorage not available
+    if (allowedPersonaIds.includes(persona)) {
+      setCurrentPersonaState(persona);
+      try {
+        localStorage.setItem(PERSONA_STORAGE_KEY, persona);
+      } catch (e) {
+        // localStorage not available
+      }
     }
   };
   
-  const personaInfo = personas.find((p) => p.id === currentPersona) || personas[0];
+  const personaInfo = personas.find((p) => p.id === currentPersona) || personas[2];
 
   return (
-    <PersonaContext.Provider value={{ currentPersona, setCurrentPersona, personaInfo }}>
+    <PersonaContext.Provider value={{ currentPersona, setCurrentPersona, personaInfo, allowedPersonas }}>
       {children}
     </PersonaContext.Provider>
   );

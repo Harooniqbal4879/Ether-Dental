@@ -107,9 +107,9 @@ const configNavItems = [
 
 export function AppSidebar() {
   const [routeLocation] = useWouterLocation();
-  const { currentPersona, setCurrentPersona, personaInfo } = usePersona();
+  const { currentPersona, setCurrentPersona, personaInfo, allowedPersonas } = usePersona();
   const { currentLocation, locations, setCurrentLocationId, isLoading: isLoadingLocations } = useLocationContext();
-  const { practice } = useAuth();
+  const { practice, admin } = useAuth();
   
   const practiceName = practice?.name || "Dental Practice";
   const isPracticePersona = ["admin", "front_desk", "treatment_coordinator", "billing_manager"].includes(currentPersona);
@@ -254,29 +254,39 @@ export function AppSidebar() {
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-64">
-            <DropdownMenuLabel>Switch Persona</DropdownMenuLabel>
+            <DropdownMenuLabel>
+              {admin?.firstName} {admin?.lastName}
+              <span className="block text-xs font-normal text-muted-foreground capitalize">
+                {admin?.role} Role
+              </span>
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {personas.map((persona) => (
-              <DropdownMenuItem
-                key={persona.id}
-                onClick={() => setCurrentPersona(persona.id as Persona)}
-                className="flex items-center gap-3"
-                data-testid={`persona-${persona.id}`}
-              >
-                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-xs font-medium">
-                  {persona.initials}
-                </div>
-                <div className="flex flex-1 flex-col">
-                  <span className="text-sm font-medium">{persona.title}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {persona.description}
-                  </span>
-                </div>
-                {currentPersona === persona.id && (
-                  <Check className="h-4 w-4 text-primary" />
-                )}
-              </DropdownMenuItem>
-            ))}
+            {allowedPersonas.length > 1 && (
+              <>
+                <DropdownMenuLabel className="text-xs">Switch View</DropdownMenuLabel>
+                {allowedPersonas.map((persona) => (
+                  <DropdownMenuItem
+                    key={persona.id}
+                    onClick={() => setCurrentPersona(persona.id as Persona)}
+                    className="flex items-center gap-3"
+                    data-testid={`persona-${persona.id}`}
+                  >
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-xs font-medium">
+                      {persona.initials}
+                    </div>
+                    <div className="flex flex-1 flex-col">
+                      <span className="text-sm font-medium">{persona.title}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {persona.description}
+                      </span>
+                    </div>
+                    {currentPersona === persona.id && (
+                      <Check className="h-4 w-4 text-primary" />
+                    )}
+                  </DropdownMenuItem>
+                ))}
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarFooter>
