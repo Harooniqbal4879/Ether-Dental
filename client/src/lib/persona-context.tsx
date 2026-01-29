@@ -109,7 +109,7 @@ export function PersonaProvider({ children }: { children: ReactNode }) {
   const { admin, isProfessionalAuthenticated, professional } = useAuth();
   const [currentPersona, setCurrentPersonaState] = useState<Persona>("front_desk");
   const [lastAdminId, setLastAdminId] = useState<string | null>(null);
-  const [lastProfessionalId, setLastProfessionalId] = useState<number | null>(null);
+  const [lastProfessionalId, setLastProfessionalId] = useState<string | null>(null);
   
   // Determine allowed personas based on user type
   const allowedPersonaIds = isProfessionalAuthenticated 
