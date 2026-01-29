@@ -2034,6 +2034,315 @@ export async function registerRoutes(
     }
   });
 
+  // ===== Practice Invitations - Invite professionals to connect =====
+  
+  // Get all invitations for a practice
+  app.get("/api/practices/:practiceId/invitations", async (req, res) => {
+    try {
+      const invitations = await storage.getPracticeInvitations(req.params.practiceId);
+      res.json(invitations);
+    } catch (error) {
+      console.error("Error fetching practice invitations:", error);
+      res.status(500).json({ error: "Failed to fetch invitations" });
+    }
+  });
+
+  // Send a new invitation to a professional
+  app.post("/api/practices/:practiceId/invitations", async (req, res) => {
+    try {
+      const session = req.session as any;
+      if (!session.adminId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { email, firstName, lastName, role, message } = req.body;
+      
+      if (!email || !role) {
+        return res.status(400).json({ error: "Email and role are required" });
+      }
+
+      // Check if already connected
+      const existingConnection = await storage.getPracticeProfessionalByEmail(req.params.practiceId, email);
+      if (existingConnection) {
+        return res.status(400).json({ error: "This professional is already connected to your practice" });
+      }
+
+      // Check for pending invitation
+      const existingInvitation = await storage.getPracticeInvitationByEmail(req.params.practiceId, email);
+      if (existingInvitation) {
+        return res.status(400).json({ error: "A pending invitation already exists for this email" });
+      }
+
+      // Generate unique token for invitation link
+      const crypto = await import("crypto");
+      const token = crypto.randomBytes(32).toString("hex");
+      
+      // Set expiration to 30 days from now
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30);
+
+      const invitation = await storage.createPracticeInvitation({
+        practiceId: req.params.practiceId,
+        invitedByAdminId: session.adminId,
+        email: email.toLowerCase(),
+        firstName,
+        lastName,
+        role,
+        message,
+        token,
+        expiresAt,
+      });
+
+      // TODO: Send email invitation (integrate with email service)
+      // For now, return the invitation with the token for testing
+      const invitationLink = `${process.env.APP_URL || 'https://etherai.replit.app'}/invitation/${token}`;
+
+      res.status(201).json({
+        ...invitation,
+        invitationLink,
+        message: "Invitation created successfully. Email will be sent to the professional.",
+      });
+    } catch (error) {
+      console.error("Error creating invitation:", error);
+      res.status(500).json({ error: "Failed to create invitation" });
+    }
+  });
+
+  // Get invitation by token (for professionals to view)
+  app.get("/api/invitations/:token", async (req, res) => {
+    try {
+      const invitation = await storage.getPracticeInvitationByToken(req.params.token);
+      
+      if (!invitation) {
+        return res.status(404).json({ error: "Invitation not found" });
+      }
+
+      if (invitation.status !== "pending") {
+        return res.status(400).json({ error: `This invitation has already been ${invitation.status}` });
+      }
+
+      if (new Date(invitation.expiresAt) < new Date()) {
+        await storage.updatePracticeInvitation(invitation.id, { status: "expired" });
+        return res.status(400).json({ error: "This invitation has expired" });
+      }
+
+      // Get practice details
+      const practice = await storage.getPractice(invitation.practiceId);
+
+      res.json({
+        ...invitation,
+        practice: practice ? { id: practice.id, name: practice.name } : null,
+      });
+    } catch (error) {
+      console.error("Error fetching invitation:", error);
+      res.status(500).json({ error: "Failed to fetch invitation" });
+    }
+  });
+
+  // Accept invitation
+  app.post("/api/invitations/:token/accept", async (req, res) => {
+    try {
+      const invitation = await storage.getPracticeInvitationByToken(req.params.token);
+      
+      if (!invitation) {
+        return res.status(404).json({ error: "Invitation not found" });
+      }
+
+      if (invitation.status !== "pending") {
+        return res.status(400).json({ error: `This invitation has already been ${invitation.status}` });
+      }
+
+      if (new Date(invitation.expiresAt) < new Date()) {
+        await storage.updatePracticeInvitation(invitation.id, { status: "expired" });
+        return res.status(400).json({ error: "This invitation has expired" });
+      }
+
+      // Check if professional exists with this email
+      const professionals = await storage.getProfessionals({});
+      let professional = professionals.find(p => p.email.toLowerCase() === invitation.email.toLowerCase());
+
+      // If professional doesn't exist, we need to create one or prompt registration
+      if (!professional) {
+        // For now, create a basic professional record
+        // In production, this would redirect to professional registration
+        const newProfessional = await storage.createProfessional({
+          firstName: invitation.firstName || "New",
+          lastName: invitation.lastName || "Professional",
+          email: invitation.email,
+          role: invitation.role,
+        });
+        professional = { ...newProfessional, badges: [] };
+      }
+
+      // Create the practice-professional connection
+      await storage.createPracticeProfessional({
+        practiceId: invitation.practiceId,
+        professionalId: professional.id,
+        invitationId: invitation.id,
+        status: "active",
+      });
+
+      // Update invitation status
+      await storage.updatePracticeInvitation(invitation.id, {
+        status: "accepted",
+        professionalId: professional.id,
+        respondedAt: new Date(),
+      });
+
+      res.json({
+        success: true,
+        message: "Invitation accepted! You are now connected with the practice.",
+        professionalId: professional.id,
+      });
+    } catch (error) {
+      console.error("Error accepting invitation:", error);
+      res.status(500).json({ error: "Failed to accept invitation" });
+    }
+  });
+
+  // Decline invitation
+  app.post("/api/invitations/:token/decline", async (req, res) => {
+    try {
+      const invitation = await storage.getPracticeInvitationByToken(req.params.token);
+      
+      if (!invitation) {
+        return res.status(404).json({ error: "Invitation not found" });
+      }
+
+      if (invitation.status !== "pending") {
+        return res.status(400).json({ error: `This invitation has already been ${invitation.status}` });
+      }
+
+      await storage.updatePracticeInvitation(invitation.id, {
+        status: "declined",
+        respondedAt: new Date(),
+      });
+
+      res.json({
+        success: true,
+        message: "Invitation declined.",
+      });
+    } catch (error) {
+      console.error("Error declining invitation:", error);
+      res.status(500).json({ error: "Failed to decline invitation" });
+    }
+  });
+
+  // Resend invitation
+  app.post("/api/practices/:practiceId/invitations/:id/resend", async (req, res) => {
+    try {
+      const session = req.session as any;
+      if (!session.adminId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const invitations = await storage.getPracticeInvitations(req.params.practiceId);
+      const invitation = invitations.find(i => i.id === req.params.id);
+
+      if (!invitation) {
+        return res.status(404).json({ error: "Invitation not found" });
+      }
+
+      if (invitation.status !== "pending") {
+        return res.status(400).json({ error: "Can only resend pending invitations" });
+      }
+
+      // Generate new token and extend expiration
+      const crypto = await import("crypto");
+      const token = crypto.randomBytes(32).toString("hex");
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30);
+
+      await storage.updatePracticeInvitation(invitation.id, {
+        token,
+        expiresAt,
+      });
+
+      // TODO: Send email with new invitation link
+
+      res.json({
+        success: true,
+        message: "Invitation resent successfully.",
+      });
+    } catch (error) {
+      console.error("Error resending invitation:", error);
+      res.status(500).json({ error: "Failed to resend invitation" });
+    }
+  });
+
+  // Cancel invitation
+  app.delete("/api/practices/:practiceId/invitations/:id", async (req, res) => {
+    try {
+      const session = req.session as any;
+      if (!session.adminId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      await storage.updatePracticeInvitation(req.params.id, {
+        status: "cancelled",
+      });
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error cancelling invitation:", error);
+      res.status(500).json({ error: "Failed to cancel invitation" });
+    }
+  });
+
+  // ===== Practice-Professional Connections =====
+  
+  // Get all connected professionals for a practice
+  app.get("/api/practices/:practiceId/professionals", async (req, res) => {
+    try {
+      const connections = await storage.getPracticeProfessionals(req.params.practiceId);
+      res.json(connections);
+    } catch (error) {
+      console.error("Error fetching practice professionals:", error);
+      res.status(500).json({ error: "Failed to fetch connected professionals" });
+    }
+  });
+
+  // Remove a professional connection
+  app.delete("/api/practices/:practiceId/professionals/:connectionId", async (req, res) => {
+    try {
+      const session = req.session as any;
+      if (!session.adminId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      await storage.deletePracticeProfessional(req.params.connectionId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error removing professional connection:", error);
+      res.status(500).json({ error: "Failed to remove professional" });
+    }
+  });
+
+  // Update professional connection (e.g., add notes, change status)
+  app.patch("/api/practices/:practiceId/professionals/:connectionId", async (req, res) => {
+    try {
+      const session = req.session as any;
+      if (!session.adminId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { status, notes } = req.body;
+      const updated = await storage.updatePracticeProfessional(req.params.connectionId, {
+        status,
+        notes,
+      });
+
+      if (!updated) {
+        return res.status(404).json({ error: "Connection not found" });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating professional connection:", error);
+      res.status(500).json({ error: "Failed to update professional connection" });
+    }
+  });
+
   // Professional transactions (shifts endpoint moved to mobile API section with practice data)
   app.get("/api/professionals/:id/transactions", async (req, res) => {
     try {

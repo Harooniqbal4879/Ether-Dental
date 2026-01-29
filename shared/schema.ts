@@ -981,6 +981,99 @@ export type ProfessionalWithBadges = Professional & {
   badges: ProfessionalBadge[];
 };
 
+// Practice Invitations - invitations sent by practices to professionals
+export const practiceInvitations = pgTable("practice_invitations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  practiceId: varchar("practice_id").notNull().references(() => practices.id, { onDelete: "cascade" }),
+  invitedByAdminId: varchar("invited_by_admin_id").notNull().references(() => practiceAdmins.id),
+  email: text("email").notNull(),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  role: text("role").notNull(), // Hygienist, Dentist, Dental Assistant
+  message: text("message"), // Optional personal message
+  token: text("token").notNull().unique(), // Unique token for invitation link
+  status: text("status").notNull().default("pending"), // pending, accepted, declined, expired
+  professionalId: varchar("professional_id").references(() => professionals.id), // Set when accepted
+  expiresAt: timestamp("expires_at").notNull(),
+  respondedAt: timestamp("responded_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const practiceInvitationsRelations = relations(practiceInvitations, ({ one }) => ({
+  practice: one(practices, {
+    fields: [practiceInvitations.practiceId],
+    references: [practices.id],
+  }),
+  invitedBy: one(practiceAdmins, {
+    fields: [practiceInvitations.invitedByAdminId],
+    references: [practiceAdmins.id],
+  }),
+  professional: one(professionals, {
+    fields: [practiceInvitations.professionalId],
+    references: [professionals.id],
+  }),
+}));
+
+export const insertPracticeInvitationSchema = createInsertSchema(practiceInvitations).omit({
+  id: true,
+  token: true,
+  status: true,
+  professionalId: true,
+  respondedAt: true,
+  createdAt: true,
+});
+export type InsertPracticeInvitation = z.infer<typeof insertPracticeInvitationSchema>;
+export type PracticeInvitation = typeof practiceInvitations.$inferSelect;
+
+// Practice-Professional Connections - links between practices and professionals
+export const practiceProfessionals = pgTable("practice_professionals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  practiceId: varchar("practice_id").notNull().references(() => practices.id, { onDelete: "cascade" }),
+  professionalId: varchar("professional_id").notNull().references(() => professionals.id, { onDelete: "cascade" }),
+  invitationId: varchar("invitation_id").references(() => practiceInvitations.id),
+  status: text("status").notNull().default("active"), // active, inactive, blocked
+  addedAt: timestamp("added_at").defaultNow(),
+  lastShiftDate: timestamp("last_shift_date"),
+  totalShifts: integer("total_shifts").default(0),
+  notes: text("notes"), // Practice-specific notes about the professional
+});
+
+export const practiceProfessionalsRelations = relations(practiceProfessionals, ({ one }) => ({
+  practice: one(practices, {
+    fields: [practiceProfessionals.practiceId],
+    references: [practices.id],
+  }),
+  professional: one(professionals, {
+    fields: [practiceProfessionals.professionalId],
+    references: [professionals.id],
+  }),
+  invitation: one(practiceInvitations, {
+    fields: [practiceProfessionals.invitationId],
+    references: [practiceInvitations.id],
+  }),
+}));
+
+export const insertPracticeProfessionalSchema = createInsertSchema(practiceProfessionals).omit({
+  id: true,
+  addedAt: true,
+  lastShiftDate: true,
+  totalShifts: true,
+});
+export type InsertPracticeProfessional = z.infer<typeof insertPracticeProfessionalSchema>;
+export type PracticeProfessional = typeof practiceProfessionals.$inferSelect;
+
+// Extended types for invitations with related data
+export type PracticeInvitationWithDetails = PracticeInvitation & {
+  practice: Practice;
+  invitedBy: PracticeAdmin;
+  professional?: Professional;
+};
+
+export type PracticeProfessionalWithDetails = PracticeProfessional & {
+  professional: Professional;
+  practice: Practice;
+};
+
 // Platform Settings - Global fee and tax configuration
 export const platformSettings = pgTable("platform_settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

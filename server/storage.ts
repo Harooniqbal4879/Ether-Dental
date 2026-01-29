@@ -35,6 +35,8 @@ import {
   conversations,
   messages,
   userOnlineStatus,
+  practiceInvitations,
+  practiceProfessionals,
   type Patient,
   type InsertPatient,
   type InsuranceCarrier,
@@ -118,6 +120,11 @@ import {
   type UserOnlineStatus,
   type InsertUserOnlineStatus,
   type ConversationWithDetails,
+  type PracticeInvitation,
+  type InsertPracticeInvitation,
+  type PracticeProfessional,
+  type InsertPracticeProfessional,
+  type PracticeProfessionalWithDetails,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -352,6 +359,20 @@ export interface IStorage {
   getOnlineHygienists(): Promise<{ id: string; firstName: string; lastName: string; photoUrl: string | null; isOnline: boolean }[]>;
   getProfessionalsOnlineStatus(): Promise<Map<string, boolean>>;
   getPracticeContacts(): Promise<{ id: string; name: string; practiceName: string; isOnline: boolean }[]>;
+
+  // Practice Invitations
+  createPracticeInvitation(invitation: InsertPracticeInvitation & { token: string; expiresAt: Date }): Promise<PracticeInvitation>;
+  getPracticeInvitations(practiceId: string): Promise<PracticeInvitation[]>;
+  getPracticeInvitationByToken(token: string): Promise<PracticeInvitation | undefined>;
+  getPracticeInvitationByEmail(practiceId: string, email: string): Promise<PracticeInvitation | undefined>;
+  updatePracticeInvitation(id: string, data: Partial<PracticeInvitation>): Promise<PracticeInvitation | undefined>;
+  
+  // Practice-Professional Connections
+  getPracticeProfessionals(practiceId: string): Promise<PracticeProfessionalWithDetails[]>;
+  createPracticeProfessional(connection: InsertPracticeProfessional): Promise<PracticeProfessional>;
+  getPracticeProfessionalByEmail(practiceId: string, email: string): Promise<PracticeProfessional | undefined>;
+  updatePracticeProfessional(id: string, data: Partial<PracticeProfessional>): Promise<PracticeProfessional | undefined>;
+  deletePracticeProfessional(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2488,6 +2509,106 @@ export class DatabaseStorage implements IStorage {
     }
 
     return result;
+  }
+
+  // Practice Invitations
+  async createPracticeInvitation(invitation: InsertPracticeInvitation & { token: string; expiresAt: Date }): Promise<PracticeInvitation> {
+    const [created] = await db.insert(practiceInvitations).values(invitation).returning();
+    return created;
+  }
+
+  async getPracticeInvitations(practiceId: string): Promise<PracticeInvitation[]> {
+    return db.select()
+      .from(practiceInvitations)
+      .where(eq(practiceInvitations.practiceId, practiceId))
+      .orderBy(desc(practiceInvitations.createdAt));
+  }
+
+  async getPracticeInvitationByToken(token: string): Promise<PracticeInvitation | undefined> {
+    const [invitation] = await db.select()
+      .from(practiceInvitations)
+      .where(eq(practiceInvitations.token, token));
+    return invitation;
+  }
+
+  async getPracticeInvitationByEmail(practiceId: string, email: string): Promise<PracticeInvitation | undefined> {
+    const [invitation] = await db.select()
+      .from(practiceInvitations)
+      .where(and(
+        eq(practiceInvitations.practiceId, practiceId),
+        eq(practiceInvitations.email, email.toLowerCase()),
+        eq(practiceInvitations.status, "pending")
+      ));
+    return invitation;
+  }
+
+  async updatePracticeInvitation(id: string, data: Partial<PracticeInvitation>): Promise<PracticeInvitation | undefined> {
+    const [updated] = await db.update(practiceInvitations)
+      .set(data)
+      .where(eq(practiceInvitations.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Practice-Professional Connections
+  async getPracticeProfessionals(practiceId: string): Promise<PracticeProfessionalWithDetails[]> {
+    const connections = await db.select()
+      .from(practiceProfessionals)
+      .where(eq(practiceProfessionals.practiceId, practiceId));
+    
+    const result: PracticeProfessionalWithDetails[] = [];
+    for (const conn of connections) {
+      const [professional] = await db.select()
+        .from(professionals)
+        .where(eq(professionals.id, conn.professionalId));
+      const [practice] = await db.select()
+        .from(practices)
+        .where(eq(practices.id, conn.practiceId));
+      
+      if (professional && practice) {
+        result.push({
+          ...conn,
+          professional,
+          practice,
+        });
+      }
+    }
+    return result;
+  }
+
+  async createPracticeProfessional(connection: InsertPracticeProfessional): Promise<PracticeProfessional> {
+    const [created] = await db.insert(practiceProfessionals).values(connection).returning();
+    return created;
+  }
+
+  async getPracticeProfessionalByEmail(practiceId: string, email: string): Promise<PracticeProfessional | undefined> {
+    const allProfessionals = await db.select()
+      .from(professionals)
+      .where(eq(professionals.email, email.toLowerCase()));
+    
+    if (allProfessionals.length === 0) return undefined;
+    
+    const [connection] = await db.select()
+      .from(practiceProfessionals)
+      .where(and(
+        eq(practiceProfessionals.practiceId, practiceId),
+        eq(practiceProfessionals.professionalId, allProfessionals[0].id)
+      ));
+    return connection;
+  }
+
+  async updatePracticeProfessional(id: string, data: Partial<PracticeProfessional>): Promise<PracticeProfessional | undefined> {
+    const [updated] = await db.update(practiceProfessionals)
+      .set(data)
+      .where(eq(practiceProfessionals.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deletePracticeProfessional(id: string): Promise<boolean> {
+    const result = await db.delete(practiceProfessionals)
+      .where(eq(practiceProfessionals.id, id));
+    return true;
   }
 }
 
