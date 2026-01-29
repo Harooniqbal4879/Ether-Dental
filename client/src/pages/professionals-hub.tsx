@@ -88,13 +88,16 @@ import {
   type ProfessionalTraining,
   type StaffShift,
   type ShiftTransactionWithDetails,
+  type PracticeInvitation,
   StaffRoles,
   DentalSpecialties,
 } from "@shared/schema";
 import { PageHeader } from "@/components/page-header";
 import { usePersona } from "@/lib/persona-context";
+import { useAuth } from "@/lib/auth-context";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Textarea } from "@/components/ui/textarea";
 
 const badgeIcons: Record<string, React.ReactNode> = {
   perfect_attendance: <Award className="h-5 w-5" />,
@@ -127,42 +130,49 @@ const roleColors: Record<string, string> = {
   "Billing Staff": "bg-indigo-500",
 };
 
-const addProfessionalSchema = z.object({
-  firstName: z.string().min(1, "First name is required"),
-  lastName: z.string().min(1, "Last name is required"),
+const inviteProfessionalSchema = z.object({
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
   email: z.string().email("Valid email is required"),
-  phone: z.string().optional(),
   role: z.string().min(1, "Role is required"),
-  specialty: z.string().optional(),
+  message: z.string().optional(),
 });
 
-type AddProfessionalFormData = z.infer<typeof addProfessionalSchema>;
+type InviteProfessionalFormData = z.infer<typeof inviteProfessionalSchema>;
 
-function AddProfessionalDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+function InviteProfessionalDialog({ 
+  open, 
+  onOpenChange, 
+  practiceId 
+}: { 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void;
+  practiceId: string | null;
+}) {
   const { toast } = useToast();
 
-  const form = useForm<AddProfessionalFormData>({
-    resolver: zodResolver(addProfessionalSchema),
+  const form = useForm<InviteProfessionalFormData>({
+    resolver: zodResolver(inviteProfessionalSchema),
     defaultValues: {
       firstName: "",
       lastName: "",
       email: "",
-      phone: "",
       role: "",
-      specialty: "",
+      message: "",
     },
   });
 
-  const createProfessionalMutation = useMutation({
-    mutationFn: async (data: AddProfessionalFormData) => {
-      const response = await apiRequest("POST", "/api/professionals", data);
+  const inviteMutation = useMutation({
+    mutationFn: async (data: InviteProfessionalFormData) => {
+      if (!practiceId) throw new Error("Practice ID is required");
+      const response = await apiRequest("POST", `/api/practices/${practiceId}/invitations`, data);
       return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/professionals"] });
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/practices", practiceId, "invitations"] });
       toast({
-        title: "Professional Added",
-        description: "The professional has been added successfully.",
+        title: "Invitation Sent",
+        description: `An invitation has been sent to ${form.getValues("email")}.`,
       });
       form.reset();
       onOpenChange(false);
@@ -170,36 +180,49 @@ function AddProfessionalDialog({ open, onOpenChange }: { open: boolean; onOpenCh
     onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to add professional",
+        description: error.message || "Failed to send invitation",
         variant: "destructive",
       });
     },
   });
 
-  const onSubmit = (data: AddProfessionalFormData) => {
-    createProfessionalMutation.mutate(data);
+  const onSubmit = (data: InviteProfessionalFormData) => {
+    inviteMutation.mutate(data);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add New Professional</DialogTitle>
+          <DialogTitle>Invite Professional</DialogTitle>
           <DialogDescription>
-            Add a dental professional to your network. They can then log in via the mobile app.
+            Send an email invitation to a dental professional. They'll receive a link to join your practice network.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email Address</FormLabel>
+                  <FormControl>
+                    <Input type="email" placeholder="professional@example.com" {...field} data-testid="input-invite-email" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="firstName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>First Name</FormLabel>
+                    <FormLabel>First Name (Optional)</FormLabel>
                     <FormControl>
-                      <Input placeholder="John" {...field} data-testid="input-first-name" />
+                      <Input placeholder="John" {...field} data-testid="input-invite-first-name" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -210,9 +233,9 @@ function AddProfessionalDialog({ open, onOpenChange }: { open: boolean; onOpenCh
                 name="lastName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Last Name</FormLabel>
+                    <FormLabel>Last Name (Optional)</FormLabel>
                     <FormControl>
-                      <Input placeholder="Doe" {...field} data-testid="input-last-name" />
+                      <Input placeholder="Doe" {...field} data-testid="input-invite-last-name" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -221,39 +244,13 @@ function AddProfessionalDialog({ open, onOpenChange }: { open: boolean; onOpenCh
             </div>
             <FormField
               control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input type="email" placeholder="john.doe@example.com" {...field} data-testid="input-email" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="phone"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Phone (Optional)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="(555) 123-4567" {...field} data-testid="input-phone" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
               name="role"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Role</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                      <SelectTrigger data-testid="select-role">
+                      <SelectTrigger data-testid="select-invite-role">
                         <SelectValue placeholder="Select a role" />
                       </SelectTrigger>
                     </FormControl>
@@ -271,34 +268,28 @@ function AddProfessionalDialog({ open, onOpenChange }: { open: boolean; onOpenCh
             />
             <FormField
               control={form.control}
-              name="specialty"
+              name="message"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Specialty (Optional)</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger data-testid="select-specialty">
-                        <SelectValue placeholder="Select a specialty" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {Object.values(DentalSpecialties).map((specialty) => (
-                        <SelectItem key={specialty} value={specialty}>
-                          {specialty}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <FormLabel>Personal Message (Optional)</FormLabel>
+                  <FormControl>
+                    <Textarea 
+                      placeholder="We'd love to have you join our team..."
+                      className="resize-none"
+                      {...field} 
+                      data-testid="input-invite-message" 
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
             <div className="flex justify-end gap-3 pt-4">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} data-testid="button-cancel">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} data-testid="button-cancel-invite">
                 Cancel
               </Button>
-              <Button type="submit" disabled={createProfessionalMutation.isPending} data-testid="button-add-professional-submit">
-                {createProfessionalMutation.isPending ? "Adding..." : "Add Professional"}
+              <Button type="submit" disabled={inviteMutation.isPending || !practiceId} data-testid="button-send-invitation">
+                {inviteMutation.isPending ? "Sending..." : "Send Invitation"}
               </Button>
             </div>
           </form>
@@ -1956,11 +1947,13 @@ export default function ProfessionalsHub() {
   const [, params] = useRoute("/app/professionals/:id");
   const professionalId = params?.id;
   const { currentPersona } = usePersona();
+  const { admin, practice } = useAuth();
+  const practiceId = practice?.id || admin?.practiceId || null;
 
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [specialtyFilter, setSpecialtyFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
 
   const { data: professionals, isLoading } = useQuery<ProfessionalWithBadges[]>({
     queryKey: ["/api/professionals"],
@@ -1970,6 +1963,12 @@ export default function ProfessionalsHub() {
   const { data: onlineStatus } = useQuery<Record<string, boolean>>({
     queryKey: ["/api/professionals/online-status"],
     refetchInterval: 30000,
+  });
+
+  // Fetch pending invitations for the practice
+  const { data: invitations } = useQuery<PracticeInvitation[]>({
+    queryKey: ["/api/practices", practiceId, "invitations"],
+    enabled: !!practiceId,
   });
 
   const { data: selectedProfessional, isLoading: isLoadingDetail } = useQuery<ProfessionalWithBadges>({
@@ -2033,13 +2032,13 @@ export default function ProfessionalsHub() {
           title="Professionals Hub"
           description="View and manage dental professionals in your network"
         />
-        <Button onClick={() => setAddDialogOpen(true)} data-testid="button-add-professional">
+        <Button onClick={() => setInviteDialogOpen(true)} data-testid="button-invite-professional">
           <UserPlus className="h-4 w-4 mr-2" />
-          Add Professional
+          Invite Professional
         </Button>
       </div>
 
-      <AddProfessionalDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />
+      <InviteProfessionalDialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen} practiceId={practiceId} />
 
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
@@ -2080,6 +2079,37 @@ export default function ProfessionalsHub() {
           </SelectContent>
         </Select>
       </div>
+
+      {/* Pending Invitations Section */}
+      {invitations && invitations.filter(i => i.status === "pending").length > 0 && (
+        <Card className="border-dashed border-primary/30 bg-primary/5">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Mail className="h-4 w-4 text-primary" />
+              Pending Invitations ({invitations.filter(i => i.status === "pending").length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {invitations.filter(i => i.status === "pending").map((invitation) => (
+                <Badge 
+                  key={invitation.id} 
+                  variant="outline" 
+                  className="py-1.5 px-3 bg-background"
+                  data-testid={`badge-pending-invitation-${invitation.id}`}
+                >
+                  <Clock className="h-3 w-3 mr-1.5 text-muted-foreground" />
+                  <span className="font-medium">{invitation.email}</span>
+                  <span className="text-muted-foreground ml-1.5">({invitation.role})</span>
+                </Badge>
+              ))}
+            </div>
+            <p className="text-sm text-muted-foreground mt-3">
+              These professionals have been invited but haven't responded yet.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {isLoading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

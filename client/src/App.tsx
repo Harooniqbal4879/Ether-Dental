@@ -41,6 +41,7 @@ import Benefits from "@/pages/marketing/benefits";
 import Pricing from "@/pages/marketing/pricing";
 import FAQ from "@/pages/marketing/faq";
 import Demo from "@/pages/marketing/demo";
+import InvitationPage from "@/pages/invitation";
 
 function MainRouter() {
   return (
@@ -154,6 +155,7 @@ function App() {
               <Route path="/pricing" component={Pricing} />
               <Route path="/faq" component={FAQ} />
               <Route path="/demo" component={Demo} />
+              <Route path="/invitation/:token" component={InvitationPage} />
               <Route path="/app/:rest*">
                 <MainLayout />
               </Route>
