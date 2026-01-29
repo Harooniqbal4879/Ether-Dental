@@ -487,6 +487,7 @@ export async function registerRoutes(
       }
 
       const { db } = await import("./db");
+      const { verifyPassword } = await import("./services/auth");
       const { professionals } = await import("@shared/schema");
       const { eq } = await import("drizzle-orm");
 
@@ -505,7 +506,7 @@ export async function registerRoutes(
       }
 
       // Verify password
-      const isValid = await comparePasswords(password, professional.passwordHash);
+      const isValid = await verifyPassword(password, professional.passwordHash);
       if (!isValid) {
         return res.status(401).json({ error: "Invalid email or password" });
       }
@@ -586,6 +587,7 @@ export async function registerRoutes(
       }
 
       const { db } = await import("./db");
+      const { hashPassword } = await import("./services/auth");
       const { professionals } = await import("@shared/schema");
       const { eq } = await import("drizzle-orm");
 
