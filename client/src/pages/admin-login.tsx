@@ -169,7 +169,7 @@ export default function AdminLogin() {
               <p className="text-sm text-muted-foreground">
                 Don't have an account?{" "}
                 <Link 
-                  href="/register-practice" 
+                  href="/register" 
                   className="text-primary hover:underline"
                   data-testid="link-register"
                 >
