@@ -1774,6 +1774,8 @@ function PracticeInformationTab() {
 }
 
 function StaffingSettingsTab() {
+  const { toast } = useToast();
+  const [isSaving, setIsSaving] = useState(false);
   const [settings, setSettings] = useState({
     mainContact: "",
     emergencyContactName: "",
@@ -1796,6 +1798,26 @@ function StaffingSettingsTab() {
     reverifyStale: true,
     preferClearinghouse: true,
   });
+
+  const handleSaveSettings = async () => {
+    setIsSaving(true);
+    try {
+      // TODO: Connect to backend API when ready
+      await new Promise(resolve => setTimeout(resolve, 500));
+      toast({
+        title: "Settings saved",
+        description: "Your staffing settings have been updated successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error saving settings",
+        description: "Failed to save staffing settings. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const toggleDay = (dayKey: string) => {
     setSettings((prev) => ({
@@ -2207,8 +2229,12 @@ function StaffingSettingsTab() {
       </Card>
 
       <div className="flex justify-end">
-        <Button data-testid="button-save-staffing">
-          Save Changes
+        <Button 
+          onClick={handleSaveSettings}
+          disabled={isSaving}
+          data-testid="button-save-staffing"
+        >
+          {isSaving ? "Saving..." : "Save Changes"}
         </Button>
       </div>
     </div>
