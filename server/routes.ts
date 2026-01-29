@@ -618,11 +618,7 @@ export async function registerRoutes(
           })
           .where(eq(professionals.id, existingProfessional.id));
 
-        // Set session
-        const session = req.session as any;
-        session.professionalId = existingProfessional.id;
-        session.isProfessionalAuthenticated = true;
-
+        // Don't auto-login - user will need to log in after registration
         return res.status(201).json({
           success: true,
           professional: {
@@ -649,11 +645,7 @@ export async function registerRoutes(
         })
         .returning();
 
-      // Set session
-      const session = req.session as any;
-      session.professionalId = newProfessional.id;
-      session.isProfessionalAuthenticated = true;
-
+      // Don't auto-login - user will need to log in after registration
       res.status(201).json({
         success: true,
         professional: {

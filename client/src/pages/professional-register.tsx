@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation, Link } from "wouter";
+import { Link } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -8,10 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Stethoscope, ArrowLeft, Loader2, Eye, EyeOff } from "lucide-react";
+import { Stethoscope, ArrowLeft, Loader2, Eye, EyeOff, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { usePersona } from "@/lib/persona-context";
+import { apiRequest } from "@/lib/queryClient";
 import {
   Form,
   FormControl,
@@ -64,12 +63,12 @@ const PROFESSIONAL_ROLES = [
 ];
 
 export default function ProfessionalRegister() {
-  const [, navigate] = useLocation();
   const { toast } = useToast();
-  const { setCurrentPersona } = usePersona();
   
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [submittedName, setSubmittedName] = useState("");
 
   const form = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
@@ -92,13 +91,8 @@ export default function ProfessionalRegister() {
       return result;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/professional/auth/session"] });
-      toast({
-        title: "Registration successful",
-        description: `Welcome to EtherAI, ${data.professional.firstName}!`,
-      });
-      setCurrentPersona("professional");
-      navigate("/app/professionals/" + data.professional.id);
+      setSubmittedName(data.professional.firstName);
+      setSubmitted(true);
     },
     onError: (error: Error) => {
       toast({
@@ -112,6 +106,58 @@ export default function ProfessionalRegister() {
   const onSubmit = (data: RegisterFormData) => {
     registerMutation.mutate(data);
   };
+
+  if (submitted) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background" data-testid="professional-register-success">
+        <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="container mx-auto flex h-16 items-center justify-between px-4 gap-4">
+            <Link href="/" className="flex items-center gap-2" data-testid="link-home">
+              <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary">
+                <Stethoscope className="h-5 w-5 text-primary-foreground" />
+              </div>
+              <span className="text-xl font-bold">EtherAI</span>
+            </Link>
+            <ThemeToggle />
+          </div>
+        </header>
+
+        <main className="flex-1 flex items-center justify-center p-4">
+          <Card className="w-full max-w-md text-center" data-testid="success-card">
+            <CardHeader>
+              <div className="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mb-4">
+                <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
+              </div>
+              <CardTitle className="text-2xl" data-testid="text-success-title">
+                Registration Successful!
+              </CardTitle>
+              <CardDescription className="text-base">
+                Welcome to EtherAI, {submittedName}!
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <p className="text-muted-foreground">
+                Your professional account has been created. You can now log in to access your dashboard and connect with dental practices.
+              </p>
+              <div className="flex flex-col gap-2">
+                <Link href="/login/professional">
+                  <Button className="w-full" data-testid="button-go-to-login">
+                    Go to Login
+                  </Button>
+                </Link>
+                <Link href="/">
+                  <Button variant="outline" className="w-full" data-testid="button-back-home">
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Back to Home
+                  </Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-background" data-testid="professional-register-page">
