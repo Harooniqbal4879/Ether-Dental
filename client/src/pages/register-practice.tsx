@@ -355,7 +355,7 @@ export default function RegisterPracticePage() {
                   </div>
 
                   <div className="space-y-4">
-                    <h3 className="font-medium text-lg border-b pb-2">Practice Owner Information</h3>
+                    <h3 className="font-medium text-lg border-b pb-2">Practice Admin Information</h3>
                     <div className="grid md:grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
@@ -405,7 +405,7 @@ export default function RegisterPracticePage() {
                                 placeholder="john.doe@example.com"
                               />
                             </FormControl>
-                            <p className="text-xs text-muted-foreground mt-1">We'll send approval notifications here</p>
+                            <p className="text-xs text-muted-foreground mt-1">This will be your login email</p>
                             <FormMessage />
                           </FormItem>
                         )}
