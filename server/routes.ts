@@ -2039,6 +2039,17 @@ export async function registerRoutes(
   // Get all invitations for a practice
   app.get("/api/practices/:practiceId/invitations", async (req, res) => {
     try {
+      const session = req.session as any;
+      if (!session.adminId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      // Verify admin belongs to this practice
+      const admin = await storage.getPracticeAdmin(session.adminId);
+      if (!admin || admin.practiceId !== req.params.practiceId) {
+        return res.status(403).json({ error: "You don't have permission to view this practice's invitations" });
+      }
+
       const invitations = await storage.getPracticeInvitations(req.params.practiceId);
       res.json(invitations);
     } catch (error) {
@@ -2053,6 +2064,12 @@ export async function registerRoutes(
       const session = req.session as any;
       if (!session.adminId) {
         return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      // Verify admin belongs to this practice
+      const admin = await storage.getPracticeAdmin(session.adminId);
+      if (!admin || admin.practiceId !== req.params.practiceId) {
+        return res.status(403).json({ error: "You don't have permission to invite professionals to this practice" });
       }
 
       const { email, firstName, lastName, role, message } = req.body;
@@ -2236,6 +2253,12 @@ export async function registerRoutes(
         return res.status(401).json({ error: "Not authenticated" });
       }
 
+      // Verify admin belongs to this practice
+      const admin = await storage.getPracticeAdmin(session.adminId);
+      if (!admin || admin.practiceId !== req.params.practiceId) {
+        return res.status(403).json({ error: "You don't have permission to manage invitations for this practice" });
+      }
+
       const invitations = await storage.getPracticeInvitations(req.params.practiceId);
       const invitation = invitations.find(i => i.id === req.params.id);
 
@@ -2276,6 +2299,19 @@ export async function registerRoutes(
       const session = req.session as any;
       if (!session.adminId) {
         return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      // Verify admin belongs to this practice
+      const admin = await storage.getPracticeAdmin(session.adminId);
+      if (!admin || admin.practiceId !== req.params.practiceId) {
+        return res.status(403).json({ error: "You don't have permission to manage invitations for this practice" });
+      }
+
+      // Verify invitation belongs to this practice
+      const invitations = await storage.getPracticeInvitations(req.params.practiceId);
+      const invitation = invitations.find(i => i.id === req.params.id);
+      if (!invitation) {
+        return res.status(404).json({ error: "Invitation not found" });
       }
 
       await storage.updatePracticeInvitation(req.params.id, {
