@@ -93,6 +93,40 @@ export async function registerRoutes(
   app.get("/api/auth/session", async (req, res) => {
     const session = req.session as any;
     
+    // Check for professional authentication first
+    if (session?.isProfessionalAuthenticated && session?.professionalId) {
+      try {
+        const { db } = await import("./db");
+        const { professionals } = await import("@shared/schema");
+        const { eq } = await import("drizzle-orm");
+        
+        const profList = await db
+          .select()
+          .from(professionals)
+          .where(eq(professionals.id, session.professionalId))
+          .limit(1);
+        
+        const professional = profList[0];
+        if (professional && professional.isActive) {
+          return res.json({
+            authenticated: false,
+            isProfessionalAuthenticated: true,
+            professional: {
+              id: professional.id,
+              email: professional.email,
+              firstName: professional.firstName,
+              lastName: professional.lastName,
+              title: professional.title,
+              licenseNumber: professional.licenseNumber,
+            },
+          });
+        }
+      } catch (error) {
+        console.error("Professional session check error:", error);
+      }
+    }
+    
+    // Check for admin authentication
     if (!session || !session.isAuthenticated || !session.adminId) {
       return res.json({ authenticated: false });
     }

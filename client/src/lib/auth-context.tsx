@@ -16,10 +16,21 @@ interface AuthPractice {
   name: string;
 }
 
+interface AuthProfessional {
+  id: number;
+  email: string;
+  firstName: string;
+  lastName: string;
+  title: string;
+  licenseNumber: string | null;
+}
+
 interface AuthState {
   authenticated: boolean;
   admin: AuthAdmin | null;
   practice: AuthPractice | null;
+  professional: AuthProfessional | null;
+  isProfessionalAuthenticated: boolean;
   isLoading: boolean;
   logout: () => Promise<void>;
   refreshSession: () => void;
@@ -40,6 +51,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     authenticated: boolean;
     admin?: AuthAdmin;
     practice?: AuthPractice;
+    professional?: AuthProfessional;
+    isProfessionalAuthenticated?: boolean;
   } | undefined;
 
   const logout = async () => {
@@ -71,6 +84,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     authenticated: sessionData?.authenticated ?? false,
     admin: sessionData?.admin ?? null,
     practice: sessionData?.practice ?? null,
+    professional: sessionData?.professional ?? null,
+    isProfessionalAuthenticated: sessionData?.isProfessionalAuthenticated ?? false,
     isLoading,
     logout,
     refreshSession,
