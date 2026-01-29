@@ -38,7 +38,7 @@ export default function ProfessionalLogin() {
       return data;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/professional/auth/session"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/session"] });
       toast({
         title: "Login successful",
         description: `Welcome back, ${data.professional.firstName}!`,
