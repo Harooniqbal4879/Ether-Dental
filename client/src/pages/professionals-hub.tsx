@@ -168,11 +168,13 @@ function InviteProfessionalDialog({
       const response = await apiRequest("POST", `/api/practices/${practiceId}/invitations`, data);
       return response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: (data: { emailSent?: boolean; invitationLink?: string; message?: string }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/practices", practiceId, "invitations"] });
       toast({
-        title: "Invitation Sent",
-        description: `An invitation has been sent to ${form.getValues("email")}.`,
+        title: data.emailSent ? "Invitation Email Sent" : "Invitation Created",
+        description: data.emailSent 
+          ? `An invitation email has been sent to ${form.getValues("email")}.`
+          : `Invitation created for ${form.getValues("email")}. Share the invitation link manually if needed.`,
       });
       form.reset();
       onOpenChange(false);

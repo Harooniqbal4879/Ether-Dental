@@ -25,6 +25,7 @@ import {
 import { z } from "zod";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
+import { sendInvitationEmail } from "./services/email";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -2110,14 +2111,33 @@ export async function registerRoutes(
         expiresAt,
       });
 
-      // TODO: Send email invitation (integrate with email service)
-      // For now, return the invitation with the token for testing
       const invitationLink = `${process.env.APP_URL || 'https://etherai.replit.app'}/invitation/${token}`;
+
+      // Get practice name for email
+      const practice = await storage.getPractice(req.params.practiceId);
+      const practiceName = practice?.name || "A dental practice";
+
+      // Send invitation email using Resend integration
+      let emailSent = false;
+      try {
+        emailSent = await sendInvitationEmail({
+          toEmail: email.toLowerCase(),
+          practiceName,
+          role,
+          invitationLink,
+          message,
+        });
+      } catch (emailError) {
+        console.error("Error sending invitation email:", emailError);
+      }
 
       res.status(201).json({
         ...invitation,
         invitationLink,
-        message: "Invitation created successfully. Email will be sent to the professional.",
+        emailSent,
+        message: emailSent 
+          ? "Invitation sent successfully! The professional will receive an email with the invitation link."
+          : "Invitation created but email could not be sent. You can share the invitation link manually.",
       });
     } catch (error) {
       console.error("Error creating invitation:", error);
