@@ -106,16 +106,37 @@ function getAllowedPersonasForRole(role?: string, isSuperAdmin?: boolean): Perso
 }
 
 export function PersonaProvider({ children }: { children: ReactNode }) {
-  const { admin } = useAuth();
+  const { admin, isProfessionalAuthenticated, professional } = useAuth();
   const [currentPersona, setCurrentPersonaState] = useState<Persona>("front_desk");
   const [lastAdminId, setLastAdminId] = useState<string | null>(null);
+  const [lastProfessionalId, setLastProfessionalId] = useState<number | null>(null);
   
-  const allowedPersonaIds = getAllowedPersonasForRole(admin?.role, admin?.isSuperAdmin);
+  // Determine allowed personas based on user type
+  const allowedPersonaIds = isProfessionalAuthenticated 
+    ? ["professional" as Persona]
+    : getAllowedPersonasForRole(admin?.role, admin?.isSuperAdmin);
   const allowedPersonas = personas.filter(p => allowedPersonaIds.includes(p.id));
   
-  // Reset persona when user changes (different admin ID or logout/login)
+  // Handle professional login
   useEffect(() => {
-    if (admin && admin.id !== lastAdminId) {
+    if (isProfessionalAuthenticated && professional && professional.id !== lastProfessionalId) {
+      setCurrentPersonaState("professional");
+      setLastProfessionalId(professional.id);
+      setLastAdminId(null);
+      try {
+        localStorage.setItem(PERSONA_STORAGE_KEY, "professional");
+      } catch (e) {
+        // localStorage not available
+      }
+    } else if (!isProfessionalAuthenticated && lastProfessionalId) {
+      // Professional logged out
+      setLastProfessionalId(null);
+    }
+  }, [isProfessionalAuthenticated, professional, lastProfessionalId]);
+  
+  // Reset persona when admin user changes (different admin ID or logout/login)
+  useEffect(() => {
+    if (!isProfessionalAuthenticated && admin && admin.id !== lastAdminId) {
       const defaultPersona = getDefaultPersonaForRole(admin.role, admin.isSuperAdmin);
       setCurrentPersonaState(defaultPersona);
       setLastAdminId(admin.id);
@@ -124,25 +145,29 @@ export function PersonaProvider({ children }: { children: ReactNode }) {
       } catch (e) {
         // localStorage not available
       }
-    } else if (!admin && lastAdminId) {
+    } else if (!admin && !isProfessionalAuthenticated && lastAdminId) {
       // User logged out
       setLastAdminId(null);
       setCurrentPersonaState("front_desk");
     }
-  }, [admin, lastAdminId]);
+  }, [admin, lastAdminId, isProfessionalAuthenticated]);
 
   // Ensure current persona is always allowed for the current user
   useEffect(() => {
-    if (admin && !allowedPersonaIds.includes(currentPersona)) {
-      const defaultPersona = getDefaultPersonaForRole(admin.role, admin.isSuperAdmin);
-      setCurrentPersonaState(defaultPersona);
+    if ((admin || isProfessionalAuthenticated) && !allowedPersonaIds.includes(currentPersona)) {
+      if (isProfessionalAuthenticated) {
+        setCurrentPersonaState("professional");
+      } else if (admin) {
+        const defaultPersona = getDefaultPersonaForRole(admin.role, admin.isSuperAdmin);
+        setCurrentPersonaState(defaultPersona);
+      }
       try {
-        localStorage.setItem(PERSONA_STORAGE_KEY, defaultPersona);
+        localStorage.setItem(PERSONA_STORAGE_KEY, currentPersona);
       } catch (e) {
         // localStorage not available
       }
     }
-  }, [admin, currentPersona, allowedPersonaIds]);
+  }, [admin, isProfessionalAuthenticated, currentPersona, allowedPersonaIds]);
   
   const setCurrentPersona = (persona: Persona) => {
     if (allowedPersonaIds.includes(persona)) {
