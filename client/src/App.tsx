@@ -83,13 +83,24 @@ function MainLayout() {
     "--sidebar-width": "18rem",
     "--sidebar-width-icon": "4rem",
   };
-  const { admin, authenticated, logout } = useAuth();
+  const { admin, authenticated, logout, professional, isProfessionalAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
 
   const handleLogout = async () => {
     await logout();
-    setLocation("/login/admin");
+    if (isProfessionalAuthenticated) {
+      setLocation("/login/professional");
+    } else {
+      setLocation("/login/admin");
+    }
   };
+
+  const isLoggedIn = authenticated || isProfessionalAuthenticated;
+  const userName = admin 
+    ? `${admin.firstName} ${admin.lastName}` 
+    : professional 
+      ? `${professional.firstName} ${professional.lastName}`
+      : "";
 
   return (
     <LocationProvider>
@@ -100,23 +111,39 @@ function MainLayout() {
             <header className="sticky top-0 z-50 flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background px-4">
               <SidebarTrigger data-testid="button-sidebar-toggle" />
               <div className="flex items-center gap-2">
-                {authenticated && admin && (
+                {isLoggedIn && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="sm" className="gap-2" data-testid="button-user-menu">
                         <User className="h-4 w-4" />
-                        <span className="hidden sm:inline">{admin.firstName} {admin.lastName}</span>
+                        <span className="hidden sm:inline">{userName}</span>
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem 
-                        onClick={() => setLocation("/app/profile")}
-                        data-testid="menu-item-profile"
-                      >
-                        <User className="mr-2 h-4 w-4" />
-                        My Profile
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
+                      {admin && (
+                        <>
+                          <DropdownMenuItem 
+                            onClick={() => setLocation("/app/profile")}
+                            data-testid="menu-item-profile"
+                          >
+                            <User className="mr-2 h-4 w-4" />
+                            My Profile
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                        </>
+                      )}
+                      {professional && (
+                        <>
+                          <DropdownMenuItem 
+                            onClick={() => setLocation("/app/professionals/" + professional.id)}
+                            data-testid="menu-item-my-profile"
+                          >
+                            <User className="mr-2 h-4 w-4" />
+                            My Profile
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                        </>
+                      )}
                       <DropdownMenuItem 
                         onClick={handleLogout}
                         data-testid="menu-item-logout"
