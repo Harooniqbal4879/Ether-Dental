@@ -1215,6 +1215,7 @@ export const practiceRegistrationSchema = z.object({
   ownerLastName: z.string().min(1, "Owner last name is required"),
   ownerEmail: z.string().email("Please enter a valid owner email"),
   ownerPhone: z.string().min(10, "Owner phone is required"),
+  ownerPassword: z.string().min(8, "Password must be at least 8 characters"),
 });
 export type PracticeRegistration = z.infer<typeof practiceRegistrationSchema>;
 

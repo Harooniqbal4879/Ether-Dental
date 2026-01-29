@@ -65,6 +65,7 @@ export default function RegisterPracticePage() {
       ownerLastName: "",
       ownerEmail: "",
       ownerPhone: "",
+      ownerPassword: "",
       agreeToTerms: false,
     },
   });
@@ -427,6 +428,25 @@ export default function RegisterPracticePage() {
                         )}
                       />
                     </div>
+                    
+                    <FormField
+                      control={form.control}
+                      name="ownerPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Password *</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              type="password"
+                              data-testid="input-reg-owner-password"
+                              placeholder="Create a password (min 8 characters)"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
 
                   <div className="space-y-4">

@@ -3246,11 +3246,29 @@ export async function registerRoutes(
         });
       }
       
+      const { ownerPassword, ...practiceData } = parseResult.data;
+      
+      // Create the practice
       const practice = await storage.createPractice({
-        ...parseResult.data,
+        ...practiceData,
         registrationStatus: "pending",
         registrationSource: "self_registration",
       });
+      
+      // Hash the password and create the admin
+      const { hashPassword } = await import("./services/auth");
+      const passwordHash = await hashPassword(ownerPassword);
+      
+      await storage.createPracticeAdmin({
+        practiceId: practice.id,
+        firstName: practiceData.ownerFirstName,
+        lastName: practiceData.ownerLastName,
+        email: practiceData.ownerEmail,
+        phone: practiceData.ownerPhone,
+        passwordHash,
+        role: "admin",
+      });
+      
       res.status(201).json(practice);
     } catch (error) {
       console.error("Error registering practice:", error);
