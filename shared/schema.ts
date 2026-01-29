@@ -624,6 +624,7 @@ export const professionals = pgTable("professionals", {
   specialties: text("specialties").array(), // Additional specialties
   procedures: text("procedures").array(), // Experienced procedures
   bio: text("bio"),
+  passwordHash: text("password_hash"), // For self-registered professionals
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -634,9 +635,21 @@ export const insertProfessionalSchema = createInsertSchema(professionals).omit({
   createdAt: true,
   updatedAt: true,
   rating: true,
+  passwordHash: true, // Never expose password hash in insert schema
 });
 export type InsertProfessional = z.infer<typeof insertProfessionalSchema>;
 export type Professional = typeof professionals.$inferSelect;
+
+// Professional registration schema for self-registration
+export const professionalRegisterSchema = z.object({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  email: z.string().email("Valid email is required"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  role: z.string().min(1, "Role is required"),
+  phone: z.string().optional(),
+});
+export type ProfessionalRegister = z.infer<typeof professionalRegisterSchema>;
 
 // Professional Badges - achievements and recognitions
 export const professionalBadges = pgTable("professional_badges", {

@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Stethoscope, Building2, UserCircle, ArrowRight, Shield, Zap, Clock } from "lucide-react";
-import { usePersona } from "@/lib/persona-context";
 
 const features = [
   {
@@ -25,15 +24,13 @@ const features = [
 
 export default function Landing() {
   const [, navigate] = useLocation();
-  const { setCurrentPersona } = usePersona();
 
   const handleOrganizationLogin = () => {
     navigate("/login/admin");
   };
 
   const handleProfessionalLogin = () => {
-    setCurrentPersona("professional");
-    navigate("/app");
+    navigate("/login/professional");
   };
 
   return (

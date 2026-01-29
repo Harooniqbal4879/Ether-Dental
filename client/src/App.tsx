@@ -42,6 +42,8 @@ import Pricing from "@/pages/marketing/pricing";
 import FAQ from "@/pages/marketing/faq";
 import Demo from "@/pages/marketing/demo";
 import InvitationPage from "@/pages/invitation";
+import ProfessionalLogin from "@/pages/professional-login";
+import ProfessionalRegister from "@/pages/professional-register";
 
 function MainRouter() {
   return (
@@ -148,7 +150,9 @@ function App() {
               <Switch>
               <Route path="/" component={Landing} />
               <Route path="/login/admin" component={AdminLogin} />
+              <Route path="/login/professional" component={ProfessionalLogin} />
               <Route path="/register" component={RegisterPractice} />
+              <Route path="/register-professional" component={ProfessionalRegister} />
               <Route path="/features" component={Features} />
               <Route path="/how-it-works" component={HowItWorks} />
               <Route path="/benefits" component={Benefits} />

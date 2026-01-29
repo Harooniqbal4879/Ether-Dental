@@ -439,6 +439,201 @@ export async function registerRoutes(
     }
   });
 
+  // ============================================================
+  // Professional Authentication API
+  // ============================================================
+
+  // Professional login endpoint
+  app.post("/api/professional/auth/login", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ error: "Email and password are required" });
+      }
+
+      const { db } = await import("./db");
+      const { professionals } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+
+      // Find professional by email
+      const [professional] = await db
+        .select()
+        .from(professionals)
+        .where(eq(professionals.email, email.toLowerCase()));
+
+      if (!professional) {
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+
+      if (!professional.passwordHash) {
+        return res.status(401).json({ error: "Account not set up for login. Please register or contact support." });
+      }
+
+      // Verify password
+      const isValid = await comparePasswords(password, professional.passwordHash);
+      if (!isValid) {
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+
+      // Set session
+      const session = req.session as any;
+      session.professionalId = professional.id;
+      session.isProfessionalAuthenticated = true;
+
+      res.json({
+        success: true,
+        professional: {
+          id: professional.id,
+          email: professional.email,
+          firstName: professional.firstName,
+          lastName: professional.lastName,
+          role: professional.role,
+        },
+      });
+    } catch (error) {
+      console.error("Professional login error:", error);
+      res.status(500).json({ error: "Login failed" });
+    }
+  });
+
+  // Professional logout endpoint
+  app.post("/api/professional/auth/logout", (req, res) => {
+    const session = req.session as any;
+    session.professionalId = null;
+    session.isProfessionalAuthenticated = false;
+    res.json({ success: true });
+  });
+
+  // Professional session endpoint
+  app.get("/api/professional/auth/session", async (req, res) => {
+    const session = req.session as any;
+    
+    if (session?.isProfessionalAuthenticated && session?.professionalId) {
+      const { db } = await import("./db");
+      const { professionals } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+
+      const [professional] = await db
+        .select()
+        .from(professionals)
+        .where(eq(professionals.id, session.professionalId));
+
+      if (professional) {
+        return res.json({
+          authenticated: true,
+          professional: {
+            id: professional.id,
+            email: professional.email,
+            firstName: professional.firstName,
+            lastName: professional.lastName,
+            role: professional.role,
+          },
+        });
+      }
+    }
+
+    res.json({ authenticated: false });
+  });
+
+  // Professional registration endpoint
+  app.post("/api/professional/auth/register", async (req, res) => {
+    try {
+      const { firstName, lastName, email, password, role, phone } = req.body;
+
+      if (!firstName || !lastName || !email || !password || !role) {
+        return res.status(400).json({ 
+          error: "First name, last name, email, password, and role are required" 
+        });
+      }
+
+      if (password.length < 8) {
+        return res.status(400).json({ error: "Password must be at least 8 characters" });
+      }
+
+      const { db } = await import("./db");
+      const { professionals } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+
+      // Check if professional already exists
+      const [existingProfessional] = await db
+        .select()
+        .from(professionals)
+        .where(eq(professionals.email, email.toLowerCase()));
+
+      if (existingProfessional) {
+        // Check if they already have a password
+        if (existingProfessional.passwordHash) {
+          return res.status(400).json({ 
+            error: "An account with this email already exists. Please sign in instead." 
+          });
+        }
+        // Update existing record with password
+        const passwordHash = await hashPassword(password);
+        await db
+          .update(professionals)
+          .set({ 
+            passwordHash,
+            firstName,
+            lastName,
+            phone: phone || existingProfessional.phone,
+            role,
+            updatedAt: new Date()
+          })
+          .where(eq(professionals.id, existingProfessional.id));
+
+        // Set session
+        const session = req.session as any;
+        session.professionalId = existingProfessional.id;
+        session.isProfessionalAuthenticated = true;
+
+        return res.status(201).json({
+          success: true,
+          professional: {
+            id: existingProfessional.id,
+            email: existingProfessional.email,
+            firstName,
+            lastName,
+            role,
+          },
+        });
+      }
+
+      // Create new professional
+      const passwordHash = await hashPassword(password);
+      const [newProfessional] = await db
+        .insert(professionals)
+        .values({
+          firstName,
+          lastName,
+          email: email.toLowerCase(),
+          phone: phone || null,
+          role,
+          passwordHash,
+        })
+        .returning();
+
+      // Set session
+      const session = req.session as any;
+      session.professionalId = newProfessional.id;
+      session.isProfessionalAuthenticated = true;
+
+      res.status(201).json({
+        success: true,
+        professional: {
+          id: newProfessional.id,
+          email: newProfessional.email,
+          firstName: newProfessional.firstName,
+          lastName: newProfessional.lastName,
+          role: newProfessional.role,
+        },
+      });
+    } catch (error) {
+      console.error("Professional registration error:", error);
+      res.status(500).json({ error: "Registration failed" });
+    }
+  });
+
   // Practice Admin Management - List users for a practice
   app.get("/api/practice-admins", async (req, res) => {
     const session = req.session as any;
