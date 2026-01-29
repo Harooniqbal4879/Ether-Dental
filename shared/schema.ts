@@ -246,8 +246,9 @@ export type VerificationWithDetails = Verification & {
 // (e.g., HashiCorp Vault, AWS Secrets Manager) and only referenced by secretId here
 export const clearinghouseConfigs = pgTable("clearinghouse_configs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull(), // Change Healthcare, Availity, etc.
-  provider: text("provider").notNull(), // change_healthcare, availity, trizetto, office_ally, waystar
+  name: text("name").notNull(), // Change Healthcare, Availity, DentalXchange, etc.
+  provider: text("provider").notNull(), // dentalxchange, availity, office_ally, change_healthcare, trizetto, waystar
+  purpose: text("purpose").notNull().default("dental_eligibility"), // dental_eligibility, medical_eligibility, claims
   submitterId: text("submitter_id"), // EDI submitter ID
   secretId: text("secret_id"), // Reference to external secrets vault (production)
   isActive: boolean("is_active").default(false),
@@ -277,11 +278,19 @@ export const VerificationStatus = {
 
 // Clearinghouse providers
 export const ClearinghouseProviders = {
-  CHANGE_HEALTHCARE: "change_healthcare",
+  DENTALXCHANGE: "dentalxchange",
   AVAILITY: "availity",
-  TRIZETTO: "trizetto",
   OFFICE_ALLY: "office_ally",
+  CHANGE_HEALTHCARE: "change_healthcare",
+  TRIZETTO: "trizetto",
   WAYSTAR: "waystar",
+} as const;
+
+// Clearinghouse purposes
+export const ClearinghousePurposes = {
+  DENTAL_ELIGIBILITY: "dental_eligibility",
+  MEDICAL_ELIGIBILITY: "medical_eligibility",
+  CLAIMS: "claims",
 } as const;
 
 // Patient Billing - tracks patient balances and payment history

@@ -1076,7 +1076,7 @@ export async function registerRoutes(
 
   app.patch("/api/clearinghouse-configs/:id", async (req, res) => {
     try {
-      const allowedFields = ["name", "clearinghouseType", "endpointUrl", "username", "secretId", "isActive"];
+      const allowedFields = ["name", "provider", "purpose", "submitterId", "secretId", "isActive", "clearinghouseType", "endpointUrl", "username"];
       const updateData: Record<string, unknown> = {};
       for (const field of allowedFields) {
         if (field in req.body) {

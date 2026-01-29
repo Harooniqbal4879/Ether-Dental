@@ -99,11 +99,28 @@ import {
 import { EmptyState } from "@/components/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 
-const CLEARINGHOUSE_OPTIONS = [
+// Dental eligibility clearinghouse options
+const DENTAL_CLEARINGHOUSE_OPTIONS = [
+  { value: "dentalxchange", label: "DentalXchange" },
   { value: "change_healthcare", label: "Change Healthcare" },
-  { value: "availity", label: "Availity" },
   { value: "trizetto", label: "Trizetto" },
+] as const;
+
+// Medical eligibility clearinghouse options
+const MEDICAL_CLEARINGHOUSE_OPTIONS = [
+  { value: "availity", label: "Availity" },
   { value: "office_ally", label: "Office Ally" },
+  { value: "change_healthcare", label: "Change Healthcare" },
+  { value: "waystar", label: "Waystar" },
+] as const;
+
+// All clearinghouse options (for backward compatibility)
+const CLEARINGHOUSE_OPTIONS = [
+  { value: "dentalxchange", label: "DentalXchange" },
+  { value: "availity", label: "Availity" },
+  { value: "office_ally", label: "Office Ally" },
+  { value: "change_healthcare", label: "Change Healthcare" },
+  { value: "trizetto", label: "Trizetto" },
   { value: "waystar", label: "Waystar" },
 ] as const;
 
@@ -3823,7 +3840,395 @@ function IntegrationsTab() {
           </CardContent>
         </Card>
       )}
+
+      <EligibilityVerificationSection />
     </div>
+  );
+}
+
+function EligibilityVerificationSection() {
+  const { toast } = useToast();
+  const [dentalProvider, setDentalProvider] = useState("dentalxchange");
+  const [dentalSubmitterId, setDentalSubmitterId] = useState("");
+  const [dentalSecretId, setDentalSecretId] = useState("");
+  const [dentalEnabled, setDentalEnabled] = useState(false);
+  const [medicalProvider, setMedicalProvider] = useState("availity");
+  const [medicalSubmitterId, setMedicalSubmitterId] = useState("");
+  const [medicalSecretId, setMedicalSecretId] = useState("");
+  const [medicalEnabled, setMedicalEnabled] = useState(false);
+  const [showDentalCredentials, setShowDentalCredentials] = useState(false);
+  const [showMedicalCredentials, setShowMedicalCredentials] = useState(false);
+
+  const { data: configs, isLoading } = useQuery<ClearinghouseConfig[]>({
+    queryKey: ["/api/clearinghouse-configs"],
+  });
+
+  useEffect(() => {
+    if (configs) {
+      const dentalConfig = configs.find(c => c.purpose === "dental_eligibility");
+      const medicalConfig = configs.find(c => c.purpose === "medical_eligibility");
+      
+      if (dentalConfig) {
+        setDentalProvider(dentalConfig.provider);
+        setDentalSubmitterId(dentalConfig.submitterId || "");
+        setDentalSecretId(dentalConfig.secretId || "");
+        setDentalEnabled(dentalConfig.isActive ?? false);
+      }
+      if (medicalConfig) {
+        setMedicalProvider(medicalConfig.provider);
+        setMedicalSubmitterId(medicalConfig.submitterId || "");
+        setMedicalSecretId(medicalConfig.secretId || "");
+        setMedicalEnabled(medicalConfig.isActive ?? false);
+      }
+    }
+  }, [configs]);
+
+  const saveDentalMutation = useMutation({
+    mutationFn: async () => {
+      const existingConfig = configs?.find(c => c.purpose === "dental_eligibility");
+      const method = existingConfig ? "PATCH" : "POST";
+      const url = existingConfig 
+        ? `/api/clearinghouse-configs/${existingConfig.id}` 
+        : "/api/clearinghouse-configs";
+      
+      const response = await apiRequest(method, url, {
+        name: DENTAL_CLEARINGHOUSE_OPTIONS.find(o => o.value === dentalProvider)?.label || "Dental Eligibility",
+        provider: dentalProvider,
+        purpose: "dental_eligibility",
+        submitterId: dentalSubmitterId || null,
+        secretId: dentalSecretId || null,
+        isActive: dentalEnabled,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clearinghouse-configs"] });
+      toast({ title: "Saved", description: "Dental eligibility clearinghouse configuration saved." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to save dental configuration.", variant: "destructive" });
+    },
+  });
+
+  const saveMedicalMutation = useMutation({
+    mutationFn: async () => {
+      const existingConfig = configs?.find(c => c.purpose === "medical_eligibility");
+      const method = existingConfig ? "PATCH" : "POST";
+      const url = existingConfig 
+        ? `/api/clearinghouse-configs/${existingConfig.id}` 
+        : "/api/clearinghouse-configs";
+      
+      const response = await apiRequest(method, url, {
+        name: MEDICAL_CLEARINGHOUSE_OPTIONS.find(o => o.value === medicalProvider)?.label || "Medical Eligibility",
+        provider: medicalProvider,
+        purpose: "medical_eligibility",
+        submitterId: medicalSubmitterId || null,
+        secretId: medicalSecretId || null,
+        isActive: medicalEnabled,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clearinghouse-configs"] });
+      toast({ title: "Saved", description: "Medical eligibility clearinghouse configuration saved." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to save medical configuration.", variant: "destructive" });
+    },
+  });
+
+  const testConnectionMutation = useMutation({
+    mutationFn: async (configId: string) => {
+      const response = await apiRequest("POST", `/api/clearinghouse-configs/${configId}/test`);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clearinghouse-configs"] });
+      if (data.status === "connected") {
+        toast({ title: "Connection successful", description: "Clearinghouse connection verified." });
+      } else {
+        toast({ title: "Connection failed", description: data.message || "Could not connect to clearinghouse.", variant: "destructive" });
+      }
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Connection test failed.", variant: "destructive" });
+    },
+  });
+
+  const dentalConfig = configs?.find(c => c.purpose === "dental_eligibility");
+  const medicalConfig = configs?.find(c => c.purpose === "medical_eligibility");
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-6 w-48" />
+          <Skeleton className="h-4 w-64 mt-2" />
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-40" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-3">
+          <Shield className="h-6 w-6 text-primary" />
+          <div>
+            <CardTitle>Eligibility Verification Clearinghouses</CardTitle>
+            <CardDescription>
+              Configure clearinghouse connections for dental and medical eligibility verification
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="space-y-4 p-4 rounded-lg border">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400">
+                  Dental
+                </Badge>
+                <h4 className="font-medium">Dental Eligibility</h4>
+              </div>
+              <Switch
+                checked={dentalEnabled}
+                onCheckedChange={setDentalEnabled}
+                data-testid="switch-dental-eligibility-enabled"
+              />
+            </div>
+            
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label>Clearinghouse Provider</Label>
+                <Select value={dentalProvider} onValueChange={setDentalProvider}>
+                  <SelectTrigger data-testid="select-dental-clearinghouse">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DENTAL_CLEARINGHOUSE_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowDentalCredentials(!showDentalCredentials)}
+                className="w-full justify-start"
+                data-testid="button-toggle-dental-credentials"
+              >
+                {showDentalCredentials ? "Hide" : "Show"} Credentials
+              </Button>
+
+              {showDentalCredentials && (
+                <div className="space-y-3 pt-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="dental-submitter-id">Submitter ID</Label>
+                    <Input
+                      id="dental-submitter-id"
+                      placeholder="Your EDI submitter ID"
+                      value={dentalSubmitterId}
+                      onChange={(e) => setDentalSubmitterId(e.target.value)}
+                      data-testid="input-dental-submitter-id"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="dental-secret-id">Secret Vault Reference</Label>
+                    <Input
+                      id="dental-secret-id"
+                      placeholder="e.g., dentalxchange/api-key"
+                      value={dentalSecretId}
+                      onChange={(e) => setDentalSecretId(e.target.value)}
+                      data-testid="input-dental-secret-id"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Reference to credentials in your secrets vault
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {dentalConfig && (
+                <div className="flex items-center gap-2 pt-2">
+                  {getStatusBadge(dentalConfig.connectionStatus)}
+                  {dentalConfig.lastTestedAt && (
+                    <span className="text-xs text-muted-foreground">
+                      Tested: {new Date(dentalConfig.lastTestedAt).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <Button
+                  size="sm"
+                  onClick={() => saveDentalMutation.mutate()}
+                  disabled={saveDentalMutation.isPending}
+                  data-testid="button-save-dental-config"
+                >
+                  {saveDentalMutation.isPending ? (
+                    <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Saving</>
+                  ) : (
+                    <><Save className="h-4 w-4 mr-1" /> Save</>
+                  )}
+                </Button>
+                {dentalConfig && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => testConnectionMutation.mutate(dentalConfig.id)}
+                    disabled={testConnectionMutation.isPending}
+                    data-testid="button-test-dental-connection"
+                  >
+                    {testConnectionMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <><Plug className="h-4 w-4 mr-1" /> Test</>
+                    )}
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4 p-4 rounded-lg border">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                  Medical
+                </Badge>
+                <h4 className="font-medium">Medical Eligibility</h4>
+              </div>
+              <Switch
+                checked={medicalEnabled}
+                onCheckedChange={setMedicalEnabled}
+                data-testid="switch-medical-eligibility-enabled"
+              />
+            </div>
+            
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label>Clearinghouse Provider</Label>
+                <Select value={medicalProvider} onValueChange={setMedicalProvider}>
+                  <SelectTrigger data-testid="select-medical-clearinghouse">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MEDICAL_CLEARINGHOUSE_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowMedicalCredentials(!showMedicalCredentials)}
+                className="w-full justify-start"
+                data-testid="button-toggle-medical-credentials"
+              >
+                {showMedicalCredentials ? "Hide" : "Show"} Credentials
+              </Button>
+
+              {showMedicalCredentials && (
+                <div className="space-y-3 pt-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="medical-submitter-id">Submitter ID</Label>
+                    <Input
+                      id="medical-submitter-id"
+                      placeholder="Your EDI submitter ID"
+                      value={medicalSubmitterId}
+                      onChange={(e) => setMedicalSubmitterId(e.target.value)}
+                      data-testid="input-medical-submitter-id"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="medical-secret-id">Secret Vault Reference</Label>
+                    <Input
+                      id="medical-secret-id"
+                      placeholder="e.g., availity/api-key"
+                      value={medicalSecretId}
+                      onChange={(e) => setMedicalSecretId(e.target.value)}
+                      data-testid="input-medical-secret-id"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Reference to credentials in your secrets vault
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {medicalConfig && (
+                <div className="flex items-center gap-2 pt-2">
+                  {getStatusBadge(medicalConfig.connectionStatus)}
+                  {medicalConfig.lastTestedAt && (
+                    <span className="text-xs text-muted-foreground">
+                      Tested: {new Date(medicalConfig.lastTestedAt).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <Button
+                  size="sm"
+                  onClick={() => saveMedicalMutation.mutate()}
+                  disabled={saveMedicalMutation.isPending}
+                  data-testid="button-save-medical-config"
+                >
+                  {saveMedicalMutation.isPending ? (
+                    <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Saving</>
+                  ) : (
+                    <><Save className="h-4 w-4 mr-1" /> Save</>
+                  )}
+                </Button>
+                {medicalConfig && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => testConnectionMutation.mutate(medicalConfig.id)}
+                    disabled={testConnectionMutation.isPending}
+                    data-testid="button-test-medical-connection"
+                  >
+                    {testConnectionMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <><Plug className="h-4 w-4 mr-1" /> Test</>
+                    )}
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="pt-4 border-t">
+          <h4 className="font-medium mb-2">How It Works</h4>
+          <div className="grid gap-4 md:grid-cols-2 text-sm text-muted-foreground">
+            <div className="flex gap-2">
+              <Badge variant="outline" className="h-fit bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400">Dental</Badge>
+              <p>DentalXchange specializes in dental-specific eligibility verification, providing detailed dental benefits, frequencies, and coverage information.</p>
+            </div>
+            <div className="flex gap-2">
+              <Badge variant="outline" className="h-fit bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">Medical</Badge>
+              <p>Availity or Office Ally handles medical eligibility checks for patients with medical insurance that covers dental procedures.</p>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
