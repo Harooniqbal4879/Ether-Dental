@@ -112,15 +112,22 @@ export function PersonaProvider({ children }: { children: ReactNode }) {
   const adminId = admin?.id;
   const professionalId = professional?.id;
   
+  // Debug logging
+  console.log('[PersonaProvider] admin:', adminId, 'role:', adminRole, 'isSuperAdmin:', adminIsSuperAdmin);
+  
   // Compute default persona based on current user - using primitive dependencies
   const defaultPersona = useMemo(() => {
-    if (isProfessionalAuthenticated) {
-      return "professional" as Persona;
-    }
-    if (adminId) {
-      return getDefaultPersonaForRole(adminRole, adminIsSuperAdmin);
-    }
-    return "front_desk" as Persona;
+    const persona = (() => {
+      if (isProfessionalAuthenticated) {
+        return "professional" as Persona;
+      }
+      if (adminId) {
+        return getDefaultPersonaForRole(adminRole, adminIsSuperAdmin);
+      }
+      return "front_desk" as Persona;
+    })();
+    console.log('[PersonaProvider] computed defaultPersona:', persona);
+    return persona;
   }, [adminId, adminRole, adminIsSuperAdmin, isProfessionalAuthenticated]);
   
   // Determine allowed personas based on user type - using primitive dependencies
