@@ -109,6 +109,7 @@ export function PersonaProvider({ children }: { children: ReactNode }) {
   const { admin, isProfessionalAuthenticated, professional } = useAuth();
   const [currentPersona, setCurrentPersonaState] = useState<Persona>("front_desk");
   const [lastAdminId, setLastAdminId] = useState<string | null>(null);
+  const [lastAdminIsSuperAdmin, setLastAdminIsSuperAdmin] = useState<boolean | null>(null);
   const [lastProfessionalId, setLastProfessionalId] = useState<string | null>(null);
   
   // Determine allowed personas based on user type
@@ -134,14 +135,18 @@ export function PersonaProvider({ children }: { children: ReactNode }) {
     }
   }, [isProfessionalAuthenticated, professional, lastProfessionalId]);
   
-  // Reset persona when admin user changes (different admin ID or logout/login)
+  // Reset persona when admin user changes (different admin ID or super admin status changes)
   useEffect(() => {
     if (!isProfessionalAuthenticated && admin) {
-      // When admin ID changes (new login or different user), always set to their default persona
-      if (admin.id !== lastAdminId) {
+      // Update persona when admin ID changes OR when super admin status changes
+      const adminIdChanged = admin.id !== lastAdminId;
+      const superAdminStatusChanged = admin.isSuperAdmin !== lastAdminIsSuperAdmin;
+      
+      if (adminIdChanged || superAdminStatusChanged) {
         const defaultPersona = getDefaultPersonaForRole(admin.role, admin.isSuperAdmin);
         setCurrentPersonaState(defaultPersona);
         setLastAdminId(admin.id);
+        setLastAdminIsSuperAdmin(admin.isSuperAdmin ?? false);
         try {
           localStorage.setItem(PERSONA_STORAGE_KEY, defaultPersona);
         } catch (e) {
@@ -151,9 +156,10 @@ export function PersonaProvider({ children }: { children: ReactNode }) {
     } else if (!admin && !isProfessionalAuthenticated && lastAdminId) {
       // User logged out
       setLastAdminId(null);
+      setLastAdminIsSuperAdmin(null);
       setCurrentPersonaState("front_desk");
     }
-  }, [admin, lastAdminId, isProfessionalAuthenticated]);
+  }, [admin, lastAdminId, lastAdminIsSuperAdmin, isProfessionalAuthenticated]);
 
   // Ensure current persona is always allowed for the current user
   useEffect(() => {
