@@ -106,24 +106,30 @@ function getAllowedPersonasForRole(role?: string, isSuperAdmin?: boolean): Perso
 export function PersonaProvider({ children }: { children: ReactNode }) {
   const { admin, isProfessionalAuthenticated, professional } = useAuth();
   
-  // Compute default persona based on current user
+  // Extract primitive values for stable dependencies
+  const adminRole = admin?.role;
+  const adminIsSuperAdmin = admin?.isSuperAdmin;
+  const adminId = admin?.id;
+  const professionalId = professional?.id;
+  
+  // Compute default persona based on current user - using primitive dependencies
   const defaultPersona = useMemo(() => {
     if (isProfessionalAuthenticated) {
       return "professional" as Persona;
     }
-    if (admin) {
-      return getDefaultPersonaForRole(admin.role, admin.isSuperAdmin);
+    if (adminId) {
+      return getDefaultPersonaForRole(adminRole, adminIsSuperAdmin);
     }
     return "front_desk" as Persona;
-  }, [admin, isProfessionalAuthenticated]);
+  }, [adminId, adminRole, adminIsSuperAdmin, isProfessionalAuthenticated]);
   
-  // Determine allowed personas based on user type
+  // Determine allowed personas based on user type - using primitive dependencies
   const allowedPersonaIds = useMemo(() => {
     if (isProfessionalAuthenticated) {
       return ["professional" as Persona];
     }
-    return getAllowedPersonasForRole(admin?.role, admin?.isSuperAdmin);
-  }, [admin, isProfessionalAuthenticated]);
+    return getAllowedPersonasForRole(adminRole, adminIsSuperAdmin);
+  }, [adminRole, adminIsSuperAdmin, isProfessionalAuthenticated]);
   
   const allowedPersonas = personas.filter(p => allowedPersonaIds.includes(p.id));
   
@@ -141,7 +147,7 @@ export function PersonaProvider({ children }: { children: ReactNode }) {
   // Reset manual persona when user changes
   useEffect(() => {
     setManualPersona(null);
-  }, [admin?.id, professional?.id]);
+  }, [adminId, professionalId]);
 
   const personaInfo = personas.find(p => p.id === currentPersona) || personas[2];
   
