@@ -37,8 +37,10 @@ export default function ProfessionalLogin() {
       const data: LoginResponse = await response.json();
       return data;
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/session"] });
+    onSuccess: async (data) => {
+      // Wait for session query to refetch before navigating
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/session"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/auth/session"] });
       toast({
         title: "Login successful",
         description: `Welcome back, ${data.professional.firstName}!`,

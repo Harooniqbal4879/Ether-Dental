@@ -55,6 +55,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isProfessionalAuthenticated?: boolean;
   } | undefined;
 
+  // Debug logging
+  console.log('[AuthProvider] sessionData:', JSON.stringify(sessionData, null, 2));
+
   const logout = async () => {
     try {
       await fetch("/api/auth/logout", {
