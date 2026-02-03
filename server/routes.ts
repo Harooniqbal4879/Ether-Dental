@@ -60,10 +60,17 @@ export async function registerRoutes(
       (req.session as any).adminEmail = result.admin.email;
       (req.session as any).isAuthenticated = true;
 
-      res.json({
-        success: true,
-        admin: result.admin,
-        practice: result.practice,
+      // Explicitly save session before responding to ensure it's persisted
+      req.session.save((err) => {
+        if (err) {
+          console.error("Session save error:", err);
+          return res.status(500).json({ error: "Login failed - session error" });
+        }
+        res.json({
+          success: true,
+          admin: result.admin,
+          practice: result.practice,
+        });
       });
     } catch (error) {
       console.error("Login error:", error);
@@ -526,15 +533,22 @@ export async function registerRoutes(
       session.professionalId = professional.id;
       session.isProfessionalAuthenticated = true;
 
-      res.json({
-        success: true,
-        professional: {
-          id: professional.id,
-          email: professional.email,
-          firstName: professional.firstName,
-          lastName: professional.lastName,
-          role: professional.role,
-        },
+      // Explicitly save session before responding to ensure it's persisted
+      req.session.save((err) => {
+        if (err) {
+          console.error("Session save error:", err);
+          return res.status(500).json({ error: "Login failed - session error" });
+        }
+        res.json({
+          success: true,
+          professional: {
+            id: professional.id,
+            email: professional.email,
+            firstName: professional.firstName,
+            lastName: professional.lastName,
+            role: professional.role,
+          },
+        });
       });
     } catch (error) {
       console.error("Professional login error:", error);
