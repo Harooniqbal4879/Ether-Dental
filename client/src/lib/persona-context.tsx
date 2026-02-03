@@ -137,13 +137,9 @@ export function PersonaProvider({ children }: { children: ReactNode }) {
   // Reset persona when admin user changes (different admin ID or logout/login)
   useEffect(() => {
     if (!isProfessionalAuthenticated && admin) {
-      // Always recalculate and set the correct persona when admin is available
-      // This handles both new logins and page refreshes
-      const defaultPersona = getDefaultPersonaForRole(admin.role, admin.isSuperAdmin);
-      
-      // Only update if admin ID changed OR if current persona doesn't match what it should be for this role
-      const allowedForRole = getAllowedPersonasForRole(admin.role, admin.isSuperAdmin);
-      if (admin.id !== lastAdminId || !allowedForRole.includes(currentPersona)) {
+      // When admin ID changes (new login or different user), always set to their default persona
+      if (admin.id !== lastAdminId) {
+        const defaultPersona = getDefaultPersonaForRole(admin.role, admin.isSuperAdmin);
         setCurrentPersonaState(defaultPersona);
         setLastAdminId(admin.id);
         try {
@@ -157,7 +153,7 @@ export function PersonaProvider({ children }: { children: ReactNode }) {
       setLastAdminId(null);
       setCurrentPersonaState("front_desk");
     }
-  }, [admin, lastAdminId, isProfessionalAuthenticated, currentPersona]);
+  }, [admin, lastAdminId, isProfessionalAuthenticated]);
 
   // Ensure current persona is always allowed for the current user
   useEffect(() => {
