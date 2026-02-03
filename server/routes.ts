@@ -93,6 +93,16 @@ export async function registerRoutes(
   app.get("/api/auth/session", async (req, res) => {
     const session = req.session as any;
     
+    // Debug: log session state
+    console.log("[Session Check] Session ID:", req.sessionID);
+    console.log("[Session Check] Session data:", JSON.stringify({
+      isAuthenticated: session?.isAuthenticated,
+      adminId: session?.adminId,
+      adminEmail: session?.adminEmail,
+      isProfessionalAuthenticated: session?.isProfessionalAuthenticated,
+      professionalId: session?.professionalId,
+    }));
+    
     // Check for professional authentication first
     if (session?.isProfessionalAuthenticated && session?.professionalId) {
       try {
