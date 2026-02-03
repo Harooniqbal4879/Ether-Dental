@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode, useMemo } from "react";
 import { useAuth } from "./auth-context";
 
 export type Persona = 
@@ -71,8 +71,6 @@ interface PersonaContextType {
 
 const PersonaContext = createContext<PersonaContextType | undefined>(undefined);
 
-const PERSONA_STORAGE_KEY = "etherAI_persona";
-
 function getDefaultPersonaForRole(role?: string, isSuperAdmin?: boolean): Persona {
   if (isSuperAdmin) return "system_admin";
   
@@ -107,92 +105,61 @@ function getAllowedPersonasForRole(role?: string, isSuperAdmin?: boolean): Perso
 
 export function PersonaProvider({ children }: { children: ReactNode }) {
   const { admin, isProfessionalAuthenticated, professional } = useAuth();
-  const [currentPersona, setCurrentPersonaState] = useState<Persona>("front_desk");
-  const [lastAdminId, setLastAdminId] = useState<string | null>(null);
-  const [lastAdminIsSuperAdmin, setLastAdminIsSuperAdmin] = useState<boolean | null>(null);
-  const [lastProfessionalId, setLastProfessionalId] = useState<string | null>(null);
+  
+  // Compute default persona based on current user
+  const defaultPersona = useMemo(() => {
+    if (isProfessionalAuthenticated) {
+      return "professional" as Persona;
+    }
+    if (admin) {
+      return getDefaultPersonaForRole(admin.role, admin.isSuperAdmin);
+    }
+    return "front_desk" as Persona;
+  }, [admin, isProfessionalAuthenticated]);
   
   // Determine allowed personas based on user type
-  const allowedPersonaIds = isProfessionalAuthenticated 
-    ? ["professional" as Persona]
-    : getAllowedPersonasForRole(admin?.role, admin?.isSuperAdmin);
+  const allowedPersonaIds = useMemo(() => {
+    if (isProfessionalAuthenticated) {
+      return ["professional" as Persona];
+    }
+    return getAllowedPersonasForRole(admin?.role, admin?.isSuperAdmin);
+  }, [admin, isProfessionalAuthenticated]);
+  
   const allowedPersonas = personas.filter(p => allowedPersonaIds.includes(p.id));
   
-  // Handle professional login
-  useEffect(() => {
-    if (isProfessionalAuthenticated && professional && professional.id !== lastProfessionalId) {
-      setCurrentPersonaState("professional");
-      setLastProfessionalId(professional.id);
-      setLastAdminId(null);
-      try {
-        localStorage.setItem(PERSONA_STORAGE_KEY, "professional");
-      } catch (e) {
-        // localStorage not available
-      }
-    } else if (!isProfessionalAuthenticated && lastProfessionalId) {
-      // Professional logged out
-      setLastProfessionalId(null);
-    }
-  }, [isProfessionalAuthenticated, professional, lastProfessionalId]);
+  // Track manually selected persona (only used when user switches personas)
+  const [manualPersona, setManualPersona] = useState<Persona | null>(null);
   
-  // Reset persona when admin user changes (different admin ID or super admin status changes)
-  useEffect(() => {
-    if (!isProfessionalAuthenticated && admin) {
-      // Update persona when admin ID changes OR when super admin status changes
-      const adminIdChanged = admin.id !== lastAdminId;
-      const superAdminStatusChanged = admin.isSuperAdmin !== lastAdminIsSuperAdmin;
-      
-      if (adminIdChanged || superAdminStatusChanged) {
-        const defaultPersona = getDefaultPersonaForRole(admin.role, admin.isSuperAdmin);
-        setCurrentPersonaState(defaultPersona);
-        setLastAdminId(admin.id);
-        setLastAdminIsSuperAdmin(admin.isSuperAdmin ?? false);
-        try {
-          localStorage.setItem(PERSONA_STORAGE_KEY, defaultPersona);
-        } catch (e) {
-          // localStorage not available
-        }
-      }
-    } else if (!admin && !isProfessionalAuthenticated && lastAdminId) {
-      // User logged out
-      setLastAdminId(null);
-      setLastAdminIsSuperAdmin(null);
-      setCurrentPersonaState("front_desk");
+  // The actual current persona: use manual selection if valid, otherwise use default
+  const currentPersona = useMemo(() => {
+    if (manualPersona && allowedPersonaIds.includes(manualPersona)) {
+      return manualPersona;
     }
-  }, [admin, lastAdminId, lastAdminIsSuperAdmin, isProfessionalAuthenticated]);
+    return defaultPersona;
+  }, [manualPersona, allowedPersonaIds, defaultPersona]);
+  
+  // Reset manual persona when user changes
+  useEffect(() => {
+    setManualPersona(null);
+  }, [admin?.id, professional?.id]);
 
-  // Ensure current persona is always allowed for the current user
-  useEffect(() => {
-    if ((admin || isProfessionalAuthenticated) && !allowedPersonaIds.includes(currentPersona)) {
-      if (isProfessionalAuthenticated) {
-        setCurrentPersonaState("professional");
-      } else if (admin) {
-        const defaultPersona = getDefaultPersonaForRole(admin.role, admin.isSuperAdmin);
-        setCurrentPersonaState(defaultPersona);
-      }
-      try {
-        localStorage.setItem(PERSONA_STORAGE_KEY, currentPersona);
-      } catch (e) {
-        // localStorage not available
-      }
-    }
-  }, [admin, isProfessionalAuthenticated, currentPersona, allowedPersonaIds]);
+  const personaInfo = personas.find(p => p.id === currentPersona) || personas[2];
   
   const setCurrentPersona = (persona: Persona) => {
     if (allowedPersonaIds.includes(persona)) {
-      setCurrentPersonaState(persona);
-      try {
-        localStorage.setItem(PERSONA_STORAGE_KEY, persona);
-      } catch (e) {
-        // localStorage not available
-      }
+      setManualPersona(persona);
     }
   };
   
-  const personaInfo = personas.find((p) => p.id === currentPersona) || personas[2];
-
   return (
-    <PersonaContext.Provider value={{ currentPersona, setCurrentPersona, personaInfo, allowedPersonas }}>
+    <PersonaContext.Provider 
+      value={{ 
+        currentPersona, 
+        setCurrentPersona, 
+        personaInfo,
+        allowedPersonas
+      }}
+    >
       {children}
     </PersonaContext.Provider>
   );
