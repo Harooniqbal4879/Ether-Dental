@@ -1923,13 +1923,29 @@ export async function registerRoutes(
         return res.status(400).json({ error: parsed.error.errors });
       }
 
+      // Check if professional has completed onboarding and is payment eligible
+      const professional = await storage.getProfessional(parsed.data.professionalId);
+      if (!professional) {
+        return res.status(404).json({ error: "Professional not found" });
+      }
+
+      // Warn if professional is not payment eligible (they can still claim but won't be paid)
+      const paymentWarning = !professional.paymentEligible 
+        ? "Warning: You must complete onboarding and be verified before you can receive payment for this shift."
+        : null;
+
       const result = await storage.claimShift(req.params.id, parsed.data.professionalId);
       
       if (!result.success) {
         return res.status(409).json({ error: result.error });
       }
       
-      res.json({ success: true, shift: result.shift });
+      res.json({ 
+        success: true, 
+        shift: result.shift,
+        paymentWarning,
+        paymentEligible: professional.paymentEligible,
+      });
     } catch (error) {
       console.error("Error claiming shift:", error);
       res.status(500).json({ error: "Failed to claim shift" });
@@ -3217,6 +3233,246 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error updating contractor status:", error);
       res.status(500).json({ error: "Failed to update contractor status" });
+    }
+  });
+
+  // ============================================================
+  // Payment Processing with Eligibility Check
+  // ============================================================
+
+  // Check if a professional is eligible for payment (admin or same professional only)
+  app.get("/api/professionals/:id/payment-eligibility", async (req, res) => {
+    try {
+      const session = req.session as any;
+      
+      // Authorization: Admin or the professional themselves
+      if (!session.adminId && session.professionalId !== req.params.id) {
+        return res.status(401).json({ error: "Not authorized to view payment eligibility" });
+      }
+
+      const professional = await storage.getProfessional(req.params.id);
+      if (!professional) {
+        return res.status(404).json({ error: "Professional not found" });
+      }
+
+      const { professionalPaymentMethods } = await import("@shared/schema");
+      
+      const paymentMethods = await db.select()
+        .from(professionalPaymentMethods)
+        .where(eq(professionalPaymentMethods.professionalId, req.params.id));
+
+      const hasVerifiedPaymentMethod = paymentMethods.some(pm => pm.verificationStatus === "verified");
+      const stripeAccountId = paymentMethods.find(pm => pm.stripeAccountId && pm.stripeOnboardingComplete)?.stripeAccountId;
+
+      const eligibilityChecks = {
+        onboardingStatus: professional.onboardingStatus,
+        paymentEligible: professional.paymentEligible,
+        identityVerified: professional.identityVerified,
+        w9Completed: professional.w9Completed,
+        agreementsSigned: professional.agreementsSigned,
+        paymentMethodVerified: professional.paymentMethodVerified,
+        hasVerifiedPaymentMethod,
+        hasStripeAccount: !!stripeAccountId,
+      };
+
+      const isEligible = professional.paymentEligible && hasVerifiedPaymentMethod;
+      const missingRequirements = [];
+
+      if (!professional.paymentEligible) {
+        missingRequirements.push("Admin approval for payment eligibility required");
+      }
+      if (!professional.identityVerified) {
+        missingRequirements.push("Identity verification required");
+      }
+      if (!professional.w9Completed) {
+        missingRequirements.push("W-9 tax form required");
+      }
+      if (!professional.agreementsSigned) {
+        missingRequirements.push("Contractor agreements must be signed");
+      }
+      if (!hasVerifiedPaymentMethod) {
+        missingRequirements.push("Verified payment method required");
+      }
+
+      res.json({
+        professionalId: req.params.id,
+        eligible: isEligible,
+        checks: eligibilityChecks,
+        missingRequirements,
+        stripeAccountId: isEligible ? stripeAccountId : null,
+      });
+    } catch (error) {
+      console.error("Error checking payment eligibility:", error);
+      res.status(500).json({ error: "Failed to check payment eligibility" });
+    }
+  });
+
+  // Process payment to professional (admin only) - BLOCKS payment for unverified contractors
+  app.post("/api/admin/payments/process", async (req, res) => {
+    try {
+      const session = req.session as any;
+      if (!session.adminId) {
+        return res.status(401).json({ error: "Not authenticated as admin" });
+      }
+
+      const { professionalId, amount, description, shiftId } = req.body;
+
+      if (!professionalId || !amount) {
+        return res.status(400).json({ error: "Professional ID and amount are required" });
+      }
+
+      const professional = await storage.getProfessional(professionalId);
+      if (!professional) {
+        return res.status(404).json({ error: "Professional not found" });
+      }
+
+      const { professionalPaymentMethods } = await import("@shared/schema");
+      
+      const paymentMethods = await db.select()
+        .from(professionalPaymentMethods)
+        .where(eq(professionalPaymentMethods.professionalId, professionalId));
+
+      const hasVerifiedPaymentMethod = paymentMethods.some(pm => pm.verificationStatus === "verified");
+      const stripePaymentMethod = paymentMethods.find(
+        pm => pm.stripeAccountId && pm.stripeOnboardingComplete && pm.verificationStatus === "verified"
+      );
+
+      // CRITICAL: Enforce ALL eligibility requirements for 1099 compliance
+      // These checks are mandatory regardless of paymentEligible flag
+      const eligibilityFailures: string[] = [];
+      
+      if (!professional.identityVerified) {
+        eligibilityFailures.push("Identity not verified");
+      }
+      if (!professional.w9Completed) {
+        eligibilityFailures.push("W-9 tax form not completed/approved");
+      }
+      if (!professional.agreementsSigned) {
+        eligibilityFailures.push("Required agreements not signed");
+      }
+      if (!hasVerifiedPaymentMethod) {
+        eligibilityFailures.push("No verified payment method");
+      }
+      if (!stripePaymentMethod?.stripeAccountId) {
+        eligibilityFailures.push("No verified Stripe Connect account");
+      }
+      if (!professional.paymentEligible) {
+        eligibilityFailures.push("Admin payment eligibility approval required");
+      }
+      if (professional.onboardingStatus === "suspended" || professional.onboardingStatus === "rejected") {
+        eligibilityFailures.push(`Professional is ${professional.onboardingStatus}`);
+      }
+
+      if (eligibilityFailures.length > 0) {
+        return res.status(403).json({ 
+          error: "PAYMENT_BLOCKED",
+          message: "Cannot process payment: Professional does not meet all eligibility requirements",
+          details: {
+            identityVerified: professional.identityVerified,
+            w9Completed: professional.w9Completed,
+            agreementsSigned: professional.agreementsSigned,
+            paymentMethodVerified: professional.paymentMethodVerified,
+            paymentEligible: professional.paymentEligible,
+            onboardingStatus: professional.onboardingStatus,
+            hasVerifiedPaymentMethod,
+            hasStripeAccount: !!stripePaymentMethod?.stripeAccountId,
+          },
+          missingRequirements: eligibilityFailures,
+          resolution: "Professional must complete all onboarding steps and be verified by an admin before receiving payments.",
+        });
+      }
+
+      // Process payment via Stripe Connect transfer
+      const stripe = await getUncachableStripeClient();
+      
+      try {
+        const transfer = await stripe.transfers.create({
+          amount: Math.round(amount * 100), // Convert to cents
+          currency: "usd",
+          destination: stripePaymentMethod.stripeAccountId,
+          transfer_group: shiftId || `payment_${Date.now()}`,
+          metadata: {
+            professionalId,
+            shiftId: shiftId || null,
+            description: description || "Contractor payment",
+            processedBy: session.adminId,
+          },
+        });
+
+        // Log the payment in audit log
+        const { onboardingAuditLog } = await import("@shared/schema");
+        const admin = await storage.getPracticeAdmin(session.adminId);
+
+        await db.insert(onboardingAuditLog).values({
+          professionalId,
+          action: "payment_processed",
+          actorType: "admin",
+          actorId: session.adminId,
+          actorEmail: admin?.email,
+          newValue: JSON.stringify({
+            amount,
+            transferId: transfer.id,
+            destination: stripePaymentMethod.stripeAccountId,
+            shiftId,
+            description,
+          }),
+          ipAddress: req.ip,
+          userAgent: req.headers["user-agent"],
+        });
+
+        res.json({
+          success: true,
+          transfer: {
+            id: transfer.id,
+            amount: amount,
+            currency: "usd",
+            destination: stripePaymentMethod.stripeAccountId,
+            status: transfer.reversed ? "reversed" : "processed",
+          },
+        });
+      } catch (stripeError: any) {
+        console.error("Stripe transfer error:", stripeError);
+        return res.status(500).json({
+          error: "PAYMENT_FAILED",
+          message: stripeError.message || "Failed to process payment via Stripe",
+        });
+      }
+    } catch (error) {
+      console.error("Error processing payment:", error);
+      res.status(500).json({ error: "Failed to process payment" });
+    }
+  });
+
+  // Get payment history for a professional
+  app.get("/api/professionals/:id/payments", async (req, res) => {
+    try {
+      const session = req.session as any;
+      
+      // Allow access if admin or if professional is viewing their own payments
+      if (!session.adminId && session.professionalId !== req.params.id) {
+        return res.status(401).json({ error: "Not authorized" });
+      }
+
+      const { onboardingAuditLog } = await import("@shared/schema");
+      const { desc } = await import("drizzle-orm");
+
+      const payments = await db.select()
+        .from(onboardingAuditLog)
+        .where(eq(onboardingAuditLog.professionalId, req.params.id))
+        .orderBy(desc(onboardingAuditLog.createdAt));
+
+      const paymentRecords = payments
+        .filter(p => p.action === "payment_processed")
+        .map(p => ({
+          id: p.id,
+          date: p.createdAt,
+          ...JSON.parse(p.newValue || "{}"),
+        }));
+
+      res.json(paymentRecords);
+    } catch (error) {
+      console.error("Error fetching payment history:", error);
+      res.status(500).json({ error: "Failed to fetch payment history" });
     }
   });
 
