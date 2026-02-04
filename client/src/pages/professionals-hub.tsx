@@ -43,6 +43,15 @@ import {
   ExternalLink,
   MessageCircle,
   X,
+  ClipboardCheck,
+  ShieldAlert,
+  ShieldOff,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  FileCheck,
+  CreditCard,
+  FileSignature,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -90,8 +99,10 @@ import {
   type StaffShift,
   type ShiftTransactionWithDetails,
   type PracticeInvitation,
+  type Professional,
   StaffRoles,
   DentalSpecialties,
+  OnboardingStatus,
 } from "@shared/schema";
 import { PageHeader } from "@/components/page-header";
 import { usePersona } from "@/lib/persona-context";
@@ -122,6 +133,51 @@ const badgeColors: Record<string, string> = {
   gold: "bg-yellow-500",
 };
 
+const onboardingStatusConfig: Record<string, { label: string; color: string; bgColor: string; icon: React.ReactNode }> = {
+  invited: { 
+    label: "Invited", 
+    color: "text-blue-600 dark:text-blue-400", 
+    bgColor: "bg-blue-100 dark:bg-blue-900/30",
+    icon: <Mail className="h-3 w-3" />
+  },
+  in_progress: { 
+    label: "In Progress", 
+    color: "text-amber-600 dark:text-amber-400", 
+    bgColor: "bg-amber-100 dark:bg-amber-900/30",
+    icon: <Loader2 className="h-3 w-3" />
+  },
+  under_review: { 
+    label: "Under Review", 
+    color: "text-purple-600 dark:text-purple-400", 
+    bgColor: "bg-purple-100 dark:bg-purple-900/30",
+    icon: <ClipboardCheck className="h-3 w-3" />
+  },
+  verified: { 
+    label: "Verified", 
+    color: "text-green-600 dark:text-green-400", 
+    bgColor: "bg-green-100 dark:bg-green-900/30",
+    icon: <CheckCircle2 className="h-3 w-3" />
+  },
+  rejected: { 
+    label: "Rejected", 
+    color: "text-red-600 dark:text-red-400", 
+    bgColor: "bg-red-100 dark:bg-red-900/30",
+    icon: <XCircle className="h-3 w-3" />
+  },
+  payment_eligible: { 
+    label: "Payment Eligible", 
+    color: "text-emerald-600 dark:text-emerald-400", 
+    bgColor: "bg-emerald-100 dark:bg-emerald-900/30",
+    icon: <CreditCard className="h-3 w-3" />
+  },
+  suspended: { 
+    label: "Suspended", 
+    color: "text-gray-600 dark:text-gray-400", 
+    bgColor: "bg-gray-100 dark:bg-gray-900/30",
+    icon: <ShieldOff className="h-3 w-3" />
+  },
+};
+
 const roleColors: Record<string, string> = {
   Dentist: "bg-blue-500",
   Hygienist: "bg-teal-500",
@@ -140,6 +196,429 @@ const inviteProfessionalSchema = z.object({
 });
 
 type InviteProfessionalFormData = z.infer<typeof inviteProfessionalSchema>;
+
+function VerificationStatusBadge({ 
+  status, 
+  onClick,
+  showLabel = true,
+}: { 
+  status: string; 
+  onClick?: (e: React.MouseEvent) => void;
+  showLabel?: boolean;
+}) {
+  const config = onboardingStatusConfig[status] || onboardingStatusConfig.in_progress;
+  
+  return (
+    <button
+      onClick={onClick}
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${config.bgColor} ${config.color} hover:opacity-80 transition-opacity`}
+      title={`Verification Status: ${config.label}`}
+      data-testid="badge-verification-status"
+    >
+      {config.icon}
+      {showLabel && <span>{config.label}</span>}
+    </button>
+  );
+}
+
+interface ContractorDocument {
+  id: string;
+  type: string;
+  name: string;
+  uploadedAt: string;
+  status: string;
+  url?: string;
+}
+
+interface ContractorTaxForm {
+  id: string;
+  formType: string;
+  taxId: string;
+  businessType: string;
+  status: string;
+  submittedAt: string;
+  reviewedAt?: string;
+}
+
+interface ContractorAgreement {
+  id: string;
+  type: string;
+  signedAt: string;
+  ipAddress: string;
+}
+
+interface ContractorPaymentMethod {
+  id: string;
+  type: string;
+  status: string;
+  lastFour?: string;
+}
+
+interface ContractorVerificationData {
+  professional: ProfessionalWithBadges;
+  documents: ContractorDocument[];
+  taxForms: ContractorTaxForm[];
+  agreements: ContractorAgreement[];
+  paymentMethods: ContractorPaymentMethod[];
+}
+
+function VerificationModal({
+  open,
+  onOpenChange,
+  professionalId,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  professionalId: string;
+}) {
+  const { toast } = useToast();
+  const { currentPersona } = usePersona();
+  const isAdmin = currentPersona === "admin" || currentPersona === "system_admin";
+
+  const { data: verificationData, isLoading } = useQuery<ContractorVerificationData>({
+    queryKey: ["/api/contractors", professionalId, "verification"],
+    enabled: open && !!professionalId,
+  });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ status, reason }: { status: string; reason?: string }) => {
+      const response = await apiRequest("PATCH", `/api/contractors/${professionalId}/status`, { status, reason });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/contractors", professionalId, "verification"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/professionals"] });
+      toast({ title: "Status Updated", description: "Contractor verification status has been updated." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const approveW9Mutation = useMutation({
+    mutationFn: async (taxFormId: string) => {
+      const response = await apiRequest("PATCH", `/api/contractors/${professionalId}/tax-forms/${taxFormId}/approve`, {});
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/contractors", professionalId, "verification"] });
+      toast({ title: "W-9 Approved", description: "Tax form has been approved." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const approveIdentityMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("PATCH", `/api/contractors/${professionalId}/identity/approve`, {});
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/contractors", professionalId, "verification"] });
+      toast({ title: "Identity Verified", description: "Identity has been verified." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const professional = verificationData?.professional;
+  const documents = verificationData?.documents || [];
+  const taxForms = verificationData?.taxForms || [];
+  const agreements = verificationData?.agreements || [];
+  const paymentMethods = verificationData?.paymentMethods || [];
+
+  const statusConfig = professional?.onboardingStatus 
+    ? onboardingStatusConfig[professional.onboardingStatus] 
+    : onboardingStatusConfig.in_progress;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <ClipboardCheck className="h-5 w-5" />
+            Contractor Verification
+          </DialogTitle>
+          <DialogDescription>
+            Review and manage contractor onboarding and verification status
+          </DialogDescription>
+        </DialogHeader>
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : professional ? (
+          <div className="space-y-6">
+            <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
+              <Avatar className="h-16 w-16">
+                <AvatarImage src={professional.photoUrl || undefined} />
+                <AvatarFallback className="bg-primary text-primary-foreground text-lg">
+                  {professional.firstName[0]}{professional.lastName[0]}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1">
+                <h3 className="font-semibold text-lg">{professional.firstName} {professional.lastName}</h3>
+                <p className="text-sm text-muted-foreground">{professional.role}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusConfig.bgColor} ${statusConfig.color}`}>
+                    {statusConfig.icon}
+                    {statusConfig.label}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <Tabs defaultValue="checklist" className="w-full">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="checklist" data-testid="tab-checklist">Checklist</TabsTrigger>
+                <TabsTrigger value="documents" data-testid="tab-documents">Documents</TabsTrigger>
+                <TabsTrigger value="w9" data-testid="tab-w9">W-9</TabsTrigger>
+                <TabsTrigger value="payment" data-testid="tab-payment">Payment</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="checklist" className="mt-4 space-y-3">
+                <div className="space-y-2">
+                  <div className={`flex items-center justify-between p-3 rounded-lg border ${professional.identityVerified ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-muted/50'}`}>
+                    <div className="flex items-center gap-3">
+                      {professional.identityVerified ? (
+                        <CheckCircle2 className="h-5 w-5 text-green-600" />
+                      ) : (
+                        <AlertCircle className="h-5 w-5 text-amber-500" />
+                      )}
+                      <span className="font-medium">Identity Verification</span>
+                    </div>
+                    {isAdmin && !professional.identityVerified && documents.some(d => d.type === 'identity') && (
+                      <Button 
+                        size="sm" 
+                        onClick={() => approveIdentityMutation.mutate()}
+                        disabled={approveIdentityMutation.isPending}
+                        data-testid="button-approve-identity"
+                      >
+                        Approve
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className={`flex items-center justify-between p-3 rounded-lg border ${professional.w9Completed ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-muted/50'}`}>
+                    <div className="flex items-center gap-3">
+                      {professional.w9Completed ? (
+                        <CheckCircle2 className="h-5 w-5 text-green-600" />
+                      ) : (
+                        <AlertCircle className="h-5 w-5 text-amber-500" />
+                      )}
+                      <span className="font-medium">W-9 Tax Form</span>
+                    </div>
+                    {professional.w9Completed && <Badge variant="secondary">Approved</Badge>}
+                  </div>
+
+                  <div className={`flex items-center justify-between p-3 rounded-lg border ${professional.agreementsSigned ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-muted/50'}`}>
+                    <div className="flex items-center gap-3">
+                      {professional.agreementsSigned ? (
+                        <CheckCircle2 className="h-5 w-5 text-green-600" />
+                      ) : (
+                        <AlertCircle className="h-5 w-5 text-amber-500" />
+                      )}
+                      <span className="font-medium">Agreements Signed</span>
+                    </div>
+                    {agreements.length > 0 && (
+                      <Badge variant="secondary">{agreements.length} signed</Badge>
+                    )}
+                  </div>
+
+                  <div className={`flex items-center justify-between p-3 rounded-lg border ${professional.paymentMethodVerified ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-muted/50'}`}>
+                    <div className="flex items-center gap-3">
+                      {professional.paymentMethodVerified ? (
+                        <CheckCircle2 className="h-5 w-5 text-green-600" />
+                      ) : (
+                        <AlertCircle className="h-5 w-5 text-amber-500" />
+                      )}
+                      <span className="font-medium">Payment Method</span>
+                    </div>
+                    {professional.paymentMethodVerified && <Badge variant="secondary">Verified</Badge>}
+                  </div>
+
+                  <div className={`flex items-center justify-between p-3 rounded-lg border ${professional.paymentEligible ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-muted/50'}`}>
+                    <div className="flex items-center gap-3">
+                      {professional.paymentEligible ? (
+                        <CheckCircle2 className="h-5 w-5 text-green-600" />
+                      ) : (
+                        <AlertCircle className="h-5 w-5 text-amber-500" />
+                      )}
+                      <span className="font-medium">Payment Eligible</span>
+                    </div>
+                  </div>
+                </div>
+
+                {isAdmin && (
+                  <div className="pt-4 border-t space-y-3">
+                    <h4 className="font-medium text-sm">Admin Actions</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {professional.onboardingStatus === "under_review" && (
+                        <>
+                          <Button 
+                            size="sm" 
+                            onClick={() => updateStatusMutation.mutate({ status: "verified" })}
+                            disabled={updateStatusMutation.isPending}
+                            data-testid="button-verify-contractor"
+                          >
+                            <CheckCircle2 className="h-4 w-4 mr-1" />
+                            Verify Contractor
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="destructive"
+                            onClick={() => updateStatusMutation.mutate({ status: "rejected", reason: "Did not meet requirements" })}
+                            disabled={updateStatusMutation.isPending}
+                            data-testid="button-reject-contractor"
+                          >
+                            <XCircle className="h-4 w-4 mr-1" />
+                            Reject
+                          </Button>
+                        </>
+                      )}
+                      {professional.onboardingStatus === "verified" && !professional.paymentEligible && (
+                        <Button 
+                          size="sm" 
+                          onClick={() => updateStatusMutation.mutate({ status: "payment_eligible" })}
+                          disabled={updateStatusMutation.isPending}
+                          data-testid="button-enable-payments"
+                        >
+                          <CreditCard className="h-4 w-4 mr-1" />
+                          Enable Payments
+                        </Button>
+                      )}
+                      {professional.onboardingStatus !== "suspended" && professional.onboardingStatus !== "rejected" && (
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => updateStatusMutation.mutate({ status: "suspended", reason: "Admin action" })}
+                          disabled={updateStatusMutation.isPending}
+                          data-testid="button-suspend-contractor"
+                        >
+                          <ShieldOff className="h-4 w-4 mr-1" />
+                          Suspend
+                        </Button>
+                      )}
+                      {(professional.onboardingStatus === "suspended" || professional.onboardingStatus === "rejected") && (
+                        <Button 
+                          size="sm" 
+                          onClick={() => updateStatusMutation.mutate({ status: "under_review" })}
+                          disabled={updateStatusMutation.isPending}
+                          data-testid="button-reinstate-contractor"
+                        >
+                          <CheckCircle2 className="h-4 w-4 mr-1" />
+                          Reinstate for Review
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="documents" className="mt-4">
+                {documents.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">No documents uploaded yet</p>
+                ) : (
+                  <div className="space-y-2">
+                    {documents.map((doc) => (
+                      <div key={doc.id} className="flex items-center justify-between p-3 rounded-lg border">
+                        <div className="flex items-center gap-3">
+                          <FileCheck className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="font-medium text-sm">{doc.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {doc.type} - {new Date(doc.uploadedAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        <Badge variant={doc.status === 'approved' ? 'default' : 'secondary'}>
+                          {doc.status}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="w9" className="mt-4">
+                {taxForms.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">No W-9 submitted yet</p>
+                ) : (
+                  <div className="space-y-3">
+                    {taxForms.map((form) => (
+                      <div key={form.id} className="p-4 rounded-lg border space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-medium">{form.formType}</h4>
+                          <Badge variant={form.status === 'approved' ? 'default' : 'secondary'}>
+                            {form.status}
+                          </Badge>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Tax ID:</span>
+                            <span className="ml-2">***-**-{form.taxId}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Business Type:</span>
+                            <span className="ml-2">{form.businessType}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Submitted:</span>
+                            <span className="ml-2">{new Date(form.submittedAt).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                        {isAdmin && form.status === 'pending' && (
+                          <Button 
+                            size="sm" 
+                            onClick={() => approveW9Mutation.mutate(form.id)}
+                            disabled={approveW9Mutation.isPending}
+                            data-testid="button-approve-w9"
+                          >
+                            Approve W-9
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="payment" className="mt-4">
+                {paymentMethods.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">No payment method set up yet</p>
+                ) : (
+                  <div className="space-y-2">
+                    {paymentMethods.map((method) => (
+                      <div key={method.id} className="flex items-center justify-between p-3 rounded-lg border">
+                        <div className="flex items-center gap-3">
+                          <CreditCard className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="font-medium text-sm">{method.type}</p>
+                            {method.lastFour && (
+                              <p className="text-xs text-muted-foreground">****{method.lastFour}</p>
+                            )}
+                          </div>
+                        </div>
+                        <Badge variant={method.status === 'verified' ? 'default' : 'secondary'}>
+                          {method.status}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground text-center py-4">Unable to load verification data</p>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function InviteProfessionalDialog({ 
   open, 
@@ -1809,6 +2288,9 @@ function CredentialSection<T extends { id: string }>({
 
 function ProfessionalCard({ professional, isOnline }: { professional: ProfessionalWithBadges; isOnline?: boolean }) {
   const [, navigate] = useLocation();
+  const [verificationModalOpen, setVerificationModalOpen] = useState(false);
+  const { currentPersona } = usePersona();
+  const isAdmin = currentPersona === "admin" || currentPersona === "system_admin";
   const initials = `${professional.firstName[0]}${professional.lastName[0]}`;
   const rating = parseFloat(professional.rating || "0");
 
@@ -1818,86 +2300,108 @@ function ProfessionalCard({ professional, isOnline }: { professional: Profession
     navigate(`/app/messaging?professional=${professional.id}`);
   };
 
+  const handleVerificationClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setVerificationModalOpen(true);
+  };
+
+  const onboardingStatus = professional.onboardingStatus || "in_progress";
+
   return (
-    <Link href={`/app/professionals/${professional.id}`}>
-      <Card className="hover-elevate cursor-pointer" data-testid={`card-professional-${professional.id}`}>
-        <CardContent className="p-4">
-          <div className="flex items-start gap-4">
-            <div className="relative">
-              <Avatar className="h-14 w-14">
-                <AvatarImage src={professional.photoUrl || undefined} alt={`${professional.firstName} ${professional.lastName}`} />
-                <AvatarFallback className="bg-primary text-primary-foreground text-lg">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
-              <div
-                className={`absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-background ${
-                  isOnline ? "bg-green-500" : "bg-gray-400"
-                }`}
-                title={isOnline ? "Online" : "Offline"}
-                data-testid={`status-indicator-${professional.id}`}
-              />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <h3 className="font-semibold text-base truncate">
-                    {professional.firstName} {professional.lastName}
-                  </h3>
-                  {professional.credentialsVerified && (
-                    <BadgeCheck className="h-4 w-4 text-primary shrink-0" />
-                  )}
-                </div>
-                <Button 
-                  size="icon" 
-                  variant="ghost" 
-                  className="shrink-0"
-                  onClick={handleMessageClick}
-                  title="Send message"
-                  data-testid={`button-message-${professional.id}`}
-                >
-                  <MessageCircle className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="flex items-center gap-2">
-                <p className="text-sm text-muted-foreground">{professional.role}</p>
-                <span className={`text-xs ${isOnline ? "text-green-600" : "text-muted-foreground"}`}>
-                  {isOnline ? "Online" : "Offline"}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 mt-1">
-                {rating > 0 && (
-                  <div className="flex items-center gap-1">
-                    <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
-                    <span className="text-sm font-medium">{rating.toFixed(1)}</span>
-                  </div>
-                )}
-                {professional.specialty && (
-                  <Badge variant="secondary" className="text-xs">
-                    {professional.specialty}
-                  </Badge>
-                )}
-              </div>
-            </div>
-          </div>
-          {professional.badges && professional.badges.length > 0 && (
-            <div className="flex gap-2 mt-3 pt-3 border-t">
-              {professional.badges.slice(0, 4).map((badge) => (
+    <>
+      <Link href={`/app/professionals/${professional.id}`}>
+        <Card className="hover-elevate cursor-pointer" data-testid={`card-professional-${professional.id}`}>
+          <CardContent className="p-4">
+            <div className="flex items-start gap-4">
+              <div className="relative">
+                <Avatar className="h-14 w-14">
+                  <AvatarImage src={professional.photoUrl || undefined} alt={`${professional.firstName} ${professional.lastName}`} />
+                  <AvatarFallback className="bg-primary text-primary-foreground text-lg">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
                 <div
-                  key={badge.id}
-                  className={`flex items-center justify-center h-8 w-8 rounded-full ${badgeColors[badge.level] || "bg-muted"}`}
-                  title={`${badgeLabels[badge.badgeType] || badge.badgeType} (${badge.level})`}
-                >
-                  <span className="text-white text-xs">
-                    {badgeIcons[badge.badgeType]}
+                  className={`absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-background ${
+                    isOnline ? "bg-green-500" : "bg-gray-400"
+                  }`}
+                  title={isOnline ? "Online" : "Offline"}
+                  data-testid={`status-indicator-${professional.id}`}
+                />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <h3 className="font-semibold text-base truncate">
+                      {professional.firstName} {professional.lastName}
+                    </h3>
+                    {professional.credentialsVerified && (
+                      <BadgeCheck className="h-4 w-4 text-primary shrink-0" />
+                    )}
+                  </div>
+                  <Button 
+                    size="icon" 
+                    variant="ghost" 
+                    className="shrink-0"
+                    onClick={handleMessageClick}
+                    title="Send message"
+                    data-testid={`button-message-${professional.id}`}
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-muted-foreground">{professional.role}</p>
+                  <span className={`text-xs ${isOnline ? "text-green-600" : "text-muted-foreground"}`}>
+                    {isOnline ? "Online" : "Offline"}
                   </span>
                 </div>
-              ))}
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                  {rating > 0 && (
+                    <div className="flex items-center gap-1">
+                      <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
+                      <span className="text-sm font-medium">{rating.toFixed(1)}</span>
+                    </div>
+                  )}
+                  {professional.specialty && (
+                    <Badge variant="secondary" className="text-xs">
+                      {professional.specialty}
+                    </Badge>
+                  )}
+                  {isAdmin && (
+                    <VerificationStatusBadge 
+                      status={onboardingStatus} 
+                      onClick={handleVerificationClick}
+                      showLabel={true}
+                    />
+                  )}
+                </div>
+              </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
-    </Link>
+            {professional.badges && professional.badges.length > 0 && (
+              <div className="flex gap-2 mt-3 pt-3 border-t">
+                {professional.badges.slice(0, 4).map((badge) => (
+                  <div
+                    key={badge.id}
+                    className={`flex items-center justify-center h-8 w-8 rounded-full ${badgeColors[badge.level] || "bg-muted"}`}
+                    title={`${badgeLabels[badge.badgeType] || badge.badgeType} (${badge.level})`}
+                  >
+                    <span className="text-white text-xs">
+                      {badgeIcons[badge.badgeType]}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </Link>
+      <VerificationModal
+        open={verificationModalOpen}
+        onOpenChange={setVerificationModalOpen}
+        professionalId={professional.id}
+      />
+    </>
   );
 }
 
