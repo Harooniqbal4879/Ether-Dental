@@ -602,6 +602,18 @@ export const ExperienceRanges = {
   TEN_PLUS: "10+ Years",
 } as const;
 
+// Onboarding status enum for professionals
+export const OnboardingStatus = {
+  INVITED: "invited",
+  IN_PROGRESS: "in_progress",
+  UNDER_REVIEW: "under_review",
+  VERIFIED: "verified",
+  REJECTED: "rejected",
+  PAYMENT_ELIGIBLE: "payment_eligible",
+  SUSPENDED: "suspended",
+} as const;
+export type OnboardingStatusType = typeof OnboardingStatus[keyof typeof OnboardingStatus];
+
 // Professionals - dental professionals who can work shifts
 export const professionals = pgTable("professionals", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -626,6 +638,22 @@ export const professionals = pgTable("professionals", {
   bio: text("bio"),
   passwordHash: text("password_hash"), // For self-registered professionals
   isActive: boolean("is_active").default(true),
+  // Onboarding & Payment Eligibility
+  onboardingStatus: text("onboarding_status").default("in_progress"), // invited, in_progress, under_review, verified, rejected, payment_eligible, suspended
+  paymentEligible: boolean("payment_eligible").default(false),
+  // Personal Information
+  dateOfBirth: date("date_of_birth"),
+  addressStreet: text("address_street"),
+  addressCity: text("address_city"),
+  addressState: text("address_state"),
+  addressZip: text("address_zip"),
+  // Verification Status
+  emailVerified: boolean("email_verified").default(false),
+  phoneVerified: boolean("phone_verified").default(false),
+  identityVerified: boolean("identity_verified").default(false),
+  w9Completed: boolean("w9_completed").default(false),
+  agreementsSigned: boolean("agreements_signed").default(false),
+  paymentMethodVerified: boolean("payment_method_verified").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -923,6 +951,273 @@ export type ProfessionalWithCredentials = Professional & {
   education: ProfessionalEducation[];
   awards: ProfessionalAward[];
   training: ProfessionalTraining[];
+};
+
+// ==========================================
+// CONTRACTOR ONBOARDING TABLES
+// ==========================================
+
+// Document types for contractor onboarding
+export const ContractorDocumentType = {
+  GOVERNMENT_ID: "government_id", // Driver's license or passport
+  SELFIE: "selfie", // Live photo verification
+  W9_FORM: "w9_form", // W-9 tax form
+  RESUME: "resume", // Resume/CV
+  CONTRACTOR_AGREEMENT: "contractor_agreement",
+  NDA: "nda",
+  OTHER: "other",
+} as const;
+export type ContractorDocumentTypeValue = typeof ContractorDocumentType[keyof typeof ContractorDocumentType];
+
+// Document verification status
+export const DocumentVerificationStatus = {
+  PENDING: "pending",
+  APPROVED: "approved",
+  REJECTED: "rejected",
+  EXPIRED: "expired",
+  RESUBMIT_REQUIRED: "resubmit_required",
+} as const;
+export type DocumentVerificationStatusValue = typeof DocumentVerificationStatus[keyof typeof DocumentVerificationStatus];
+
+// Contractor Documents - stores uploaded documents for verification
+export const contractorDocuments = pgTable("contractor_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  professionalId: varchar("professional_id").notNull().references(() => professionals.id, { onDelete: "cascade" }),
+  documentType: text("document_type").notNull(), // government_id, selfie, w9_form, resume, contractor_agreement, nda
+  documentName: text("document_name"), // Original filename or description
+  documentUrl: text("document_url").notNull(), // Secure URL to stored document
+  verificationStatus: text("verification_status").default("pending"), // pending, approved, rejected, expired, resubmit_required
+  verifiedAt: timestamp("verified_at"),
+  verifiedBy: varchar("verified_by"), // Admin who verified
+  rejectionReason: text("rejection_reason"),
+  expiresAt: timestamp("expires_at"), // For documents that expire
+  metadata: text("metadata"), // JSON string for additional document-specific data
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const contractorDocumentsRelations = relations(contractorDocuments, ({ one }) => ({
+  professional: one(professionals, {
+    fields: [contractorDocuments.professionalId],
+    references: [professionals.id],
+  }),
+}));
+
+export const insertContractorDocumentSchema = createInsertSchema(contractorDocuments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  verifiedAt: true,
+  verifiedBy: true,
+});
+export type InsertContractorDocument = z.infer<typeof insertContractorDocumentSchema>;
+export type ContractorDocument = typeof contractorDocuments.$inferSelect;
+
+// Tax Classification options
+export const TaxClassification = {
+  INDIVIDUAL: "individual", // Individual/Sole Proprietor
+  LLC_SINGLE: "llc_single", // LLC - Single Member
+  LLC_C_CORP: "llc_c_corp", // LLC - C Corporation
+  LLC_S_CORP: "llc_s_corp", // LLC - S Corporation
+  LLC_PARTNERSHIP: "llc_partnership", // LLC - Partnership
+  C_CORPORATION: "c_corporation",
+  S_CORPORATION: "s_corporation",
+  PARTNERSHIP: "partnership",
+  TRUST_ESTATE: "trust_estate",
+} as const;
+export type TaxClassificationValue = typeof TaxClassification[keyof typeof TaxClassification];
+
+// Contractor Tax Forms - W-9 data with encrypted sensitive fields
+export const contractorTaxForms = pgTable("contractor_tax_forms", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  professionalId: varchar("professional_id").notNull().references(() => professionals.id, { onDelete: "cascade" }),
+  formType: text("form_type").notNull().default("w9"), // w9, 1099, etc.
+  // W-9 Fields
+  legalName: text("legal_name").notNull(),
+  businessName: text("business_name"), // DBA or business name if different
+  taxClassification: text("tax_classification").notNull(), // individual, llc_single, llc_c_corp, etc.
+  // Sensitive data - only last 4 stored in plaintext, full value encrypted
+  ssnLast4: text("ssn_last4"), // Last 4 digits of SSN (for display)
+  encryptedSsn: text("encrypted_ssn"), // Encrypted full SSN
+  einLast4: text("ein_last4"), // Last 4 digits of EIN (for display)
+  encryptedEin: text("encrypted_ein"), // Encrypted full EIN
+  useSsn: boolean("use_ssn").default(true), // true = SSN, false = EIN
+  // Address on tax form
+  taxAddressStreet: text("tax_address_street").notNull(),
+  taxAddressCity: text("tax_address_city").notNull(),
+  taxAddressState: text("tax_address_state").notNull(),
+  taxAddressZip: text("tax_address_zip").notNull(),
+  // Signature
+  signatureDate: timestamp("signature_date"),
+  signatureIp: text("signature_ip"),
+  electronicSignature: boolean("electronic_signature").default(false),
+  // Status
+  verificationStatus: text("verification_status").default("pending"), // pending, verified, rejected
+  verifiedAt: timestamp("verified_at"),
+  verifiedBy: varchar("verified_by"),
+  rejectionReason: text("rejection_reason"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const contractorTaxFormsRelations = relations(contractorTaxForms, ({ one }) => ({
+  professional: one(professionals, {
+    fields: [contractorTaxForms.professionalId],
+    references: [professionals.id],
+  }),
+}));
+
+export const insertContractorTaxFormSchema = createInsertSchema(contractorTaxForms).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  verifiedAt: true,
+  verifiedBy: true,
+  encryptedSsn: true, // Never accept encrypted values from client
+  encryptedEin: true,
+});
+export type InsertContractorTaxForm = z.infer<typeof insertContractorTaxFormSchema>;
+export type ContractorTaxForm = typeof contractorTaxForms.$inferSelect;
+
+// Payment method types
+export const PaymentMethodType = {
+  BANK_ACCOUNT: "bank_account", // ACH direct deposit
+  STRIPE_CONNECT: "stripe_connect", // Stripe Connect account
+  PAYPAL: "paypal",
+  VENMO: "venmo",
+  CHECK: "check", // Paper check
+} as const;
+export type PaymentMethodTypeValue = typeof PaymentMethodType[keyof typeof PaymentMethodType];
+
+// Professional Payment Methods - bank accounts and payment destinations
+export const professionalPaymentMethods = pgTable("professional_payment_methods", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  professionalId: varchar("professional_id").notNull().references(() => professionals.id, { onDelete: "cascade" }),
+  methodType: text("method_type").notNull(), // bank_account, stripe_connect, paypal, etc.
+  // Bank account fields (ACH)
+  bankName: text("bank_name"),
+  accountType: text("account_type"), // checking, savings
+  accountLast4: text("account_last4"), // Last 4 digits for display
+  routingLast4: text("routing_last4"), // Last 4 of routing number
+  encryptedAccountNumber: text("encrypted_account_number"),
+  encryptedRoutingNumber: text("encrypted_routing_number"),
+  // Stripe Connect
+  stripeAccountId: text("stripe_account_id"),
+  stripeAccountStatus: text("stripe_account_status"), // pending, active, restricted
+  stripeOnboardingComplete: boolean("stripe_onboarding_complete").default(false),
+  // Digital wallet
+  paymentEmail: text("payment_email"), // For PayPal/Venmo
+  // Status
+  isDefault: boolean("is_default").default(false),
+  verificationStatus: text("verification_status").default("pending"), // pending, verified, failed
+  verifiedAt: timestamp("verified_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const professionalPaymentMethodsRelations = relations(professionalPaymentMethods, ({ one }) => ({
+  professional: one(professionals, {
+    fields: [professionalPaymentMethods.professionalId],
+    references: [professionals.id],
+  }),
+}));
+
+export const insertProfessionalPaymentMethodSchema = createInsertSchema(professionalPaymentMethods).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  verifiedAt: true,
+  encryptedAccountNumber: true,
+  encryptedRoutingNumber: true,
+});
+export type InsertProfessionalPaymentMethod = z.infer<typeof insertProfessionalPaymentMethodSchema>;
+export type ProfessionalPaymentMethod = typeof professionalPaymentMethods.$inferSelect;
+
+// Agreement types
+export const AgreementType = {
+  CONTRACTOR_AGREEMENT: "contractor_agreement",
+  NDA: "nda",
+  TERMS_OF_SERVICE: "terms_of_service",
+  CODE_OF_CONDUCT: "code_of_conduct",
+  HIPAA_ACKNOWLEDGMENT: "hipaa_acknowledgment",
+} as const;
+export type AgreementTypeValue = typeof AgreementType[keyof typeof AgreementType];
+
+// Professional Agreements - signed agreements and acceptances
+export const professionalAgreements = pgTable("professional_agreements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  professionalId: varchar("professional_id").notNull().references(() => professionals.id, { onDelete: "cascade" }),
+  agreementType: text("agreement_type").notNull(), // contractor_agreement, nda, terms_of_service, code_of_conduct
+  agreementVersion: text("agreement_version").notNull(), // e.g., "1.0", "2024-01"
+  agreementUrl: text("agreement_url"), // URL to the agreement document
+  // Signature details
+  signedAt: timestamp("signed_at"),
+  signatureIp: text("signature_ip"),
+  signatureName: text("signature_name"), // Typed name as signature
+  signatureUrl: text("signature_url"), // If using drawn signature
+  // Status
+  isActive: boolean("is_active").default(true), // False if superseded by newer version
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const professionalAgreementsRelations = relations(professionalAgreements, ({ one }) => ({
+  professional: one(professionals, {
+    fields: [professionalAgreements.professionalId],
+    references: [professionals.id],
+  }),
+}));
+
+export const insertProfessionalAgreementSchema = createInsertSchema(professionalAgreements).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertProfessionalAgreement = z.infer<typeof insertProfessionalAgreementSchema>;
+export type ProfessionalAgreement = typeof professionalAgreements.$inferSelect;
+
+// Onboarding Audit Log - tracks all verification actions
+export const onboardingAuditLog = pgTable("onboarding_audit_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  professionalId: varchar("professional_id").notNull().references(() => professionals.id, { onDelete: "cascade" }),
+  action: text("action").notNull(), // status_change, document_upload, document_approved, document_rejected, agreement_signed, etc.
+  actorType: text("actor_type").notNull(), // professional, admin, system
+  actorId: varchar("actor_id"), // ID of the actor
+  actorEmail: text("actor_email"),
+  previousValue: text("previous_value"), // JSON string of previous state
+  newValue: text("new_value"), // JSON string of new state
+  documentId: varchar("document_id"), // Reference to document if applicable
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const onboardingAuditLogRelations = relations(onboardingAuditLog, ({ one }) => ({
+  professional: one(professionals, {
+    fields: [onboardingAuditLog.professionalId],
+    references: [professionals.id],
+  }),
+}));
+
+export const insertOnboardingAuditLogSchema = createInsertSchema(onboardingAuditLog).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertOnboardingAuditLog = z.infer<typeof insertOnboardingAuditLogSchema>;
+export type OnboardingAuditLog = typeof onboardingAuditLog.$inferSelect;
+
+// Extended type for professional with onboarding data
+export type ProfessionalWithOnboarding = Professional & {
+  documents: ContractorDocument[];
+  taxForm?: ContractorTaxForm;
+  paymentMethods: ProfessionalPaymentMethod[];
+  agreements: ProfessionalAgreement[];
+  onboardingProgress: {
+    identityVerified: boolean;
+    w9Completed: boolean;
+    paymentMethodVerified: boolean;
+    agreementsSigned: boolean;
+    percentComplete: number;
+  };
 };
 
 // Badge types enum
