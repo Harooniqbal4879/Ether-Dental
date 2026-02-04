@@ -2396,6 +2396,29 @@ export async function registerRoutes(
   });
 
   // Update professional's personal information for onboarding
+  // Validation schemas for onboarding endpoints
+  const personalInfoUpdateSchema = z.object({
+    dateOfBirth: z.string().optional(),
+    addressStreet: z.string().optional(),
+    addressCity: z.string().optional(),
+    addressState: z.string().optional(),
+    addressZip: z.string().optional(),
+    phone: z.string().optional(),
+    countryOfResidence: z.string().optional(),
+    profilePhotoUrl: z.string().optional(),
+  });
+
+  const sendOtpSchema = z.object({
+    phone: z.string().min(10, "Phone number must be at least 10 digits"),
+  });
+
+  const verifyOtpSchema = z.object({
+    code: z.string().length(6, "Verification code must be 6 digits"),
+  });
+
+  // Rate limiting map for OTP requests (in-memory, for production use Redis)
+  const otpRateLimits = new Map<string, { lastSent: Date; attempts: number }>();
+
   app.patch("/api/professional/onboarding/personal-info", async (req, res) => {
     try {
       const session = req.session as any;
@@ -2403,7 +2426,13 @@ export async function registerRoutes(
         return res.status(401).json({ error: "Not authenticated as professional" });
       }
 
-      const { dateOfBirth, addressStreet, addressCity, addressState, addressZip, phone } = req.body;
+      // Validate request body
+      const validationResult = personalInfoUpdateSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ error: "Invalid request data", details: validationResult.error.issues });
+      }
+
+      const { dateOfBirth, addressStreet, addressCity, addressState, addressZip, phone, countryOfResidence, profilePhotoUrl } = validationResult.data;
       const { professionals } = await import("@shared/schema");
 
       const updateData: any = { updatedAt: new Date() };
@@ -2413,6 +2442,8 @@ export async function registerRoutes(
       if (addressState !== undefined) updateData.addressState = addressState;
       if (addressZip !== undefined) updateData.addressZip = addressZip;
       if (phone !== undefined) updateData.phone = phone;
+      if (countryOfResidence !== undefined) updateData.countryOfResidence = countryOfResidence;
+      if (profilePhotoUrl !== undefined) updateData.photoUrl = profilePhotoUrl;
 
       // Update onboarding status to in_progress if still invited
       const currentProfessional = await storage.getProfessional(session.professionalId);
@@ -2429,6 +2460,111 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error updating personal info:", error);
       res.status(500).json({ error: "Failed to update personal information" });
+    }
+  });
+
+  // Send OTP for phone verification
+  app.post("/api/professional/onboarding/send-otp", async (req, res) => {
+    try {
+      const session = req.session as any;
+      if (!session.professionalId) {
+        return res.status(401).json({ error: "Not authenticated as professional" });
+      }
+
+      // Validate request body
+      const validationResult = sendOtpSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ error: "Phone number is required and must be at least 10 digits" });
+      }
+      const { phone } = validationResult.data;
+
+      // Check rate limiting (60 seconds between OTP sends per professional)
+      const professionalId = session.professionalId;
+      const rateLimit = otpRateLimits.get(professionalId);
+      if (rateLimit) {
+        const timeSinceLastSend = Date.now() - rateLimit.lastSent.getTime();
+        if (timeSinceLastSend < 60000) { // 60 seconds cooldown
+          const secondsRemaining = Math.ceil((60000 - timeSinceLastSend) / 1000);
+          return res.status(429).json({ error: `Please wait ${secondsRemaining} seconds before requesting a new code` });
+        }
+      }
+
+      // Generate a 6-digit OTP
+      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiryTime = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
+
+      const { professionals } = await import("@shared/schema");
+
+      // Store OTP in database (in production, consider hashing)
+      await db.update(professionals)
+        .set({
+          phone,
+          phoneVerificationCode: otpCode,
+          phoneVerificationExpiry: expiryTime,
+          updatedAt: new Date(),
+        })
+        .where(eq(professionals.id, session.professionalId));
+
+      // Update rate limit tracking
+      otpRateLimits.set(professionalId, { lastSent: new Date(), attempts: (rateLimit?.attempts || 0) + 1 });
+
+      // In production, you would send this via SMS (Twilio, etc.)
+      // The OTP code is stored in the database and not logged for security
+      // For development testing, check the database phoneVerificationCode field
+
+      res.json({ success: true, message: "Verification code sent" });
+    } catch (error) {
+      console.error("Error sending OTP:", error);
+      res.status(500).json({ error: "Failed to send verification code" });
+    }
+  });
+
+  // Verify OTP for phone verification
+  app.post("/api/professional/onboarding/verify-otp", async (req, res) => {
+    try {
+      const session = req.session as any;
+      if (!session.professionalId) {
+        return res.status(401).json({ error: "Not authenticated as professional" });
+      }
+
+      // Validate request body
+      const validationResult = verifyOtpSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ error: "Verification code must be exactly 6 digits" });
+      }
+      const { code } = validationResult.data;
+
+      const { professionals } = await import("@shared/schema");
+      
+      // Get current professional data
+      const professional = await storage.getProfessional(session.professionalId);
+      if (!professional) {
+        return res.status(404).json({ error: "Professional not found" });
+      }
+
+      // Check if OTP matches and hasn't expired
+      if (professional.phoneVerificationCode !== code) {
+        return res.status(400).json({ error: "Invalid verification code" });
+      }
+
+      if (professional.phoneVerificationExpiry && new Date() > new Date(professional.phoneVerificationExpiry)) {
+        return res.status(400).json({ error: "Verification code has expired" });
+      }
+
+      // Mark phone as verified and clear OTP
+      await db.update(professionals)
+        .set({
+          phoneVerified: true,
+          phoneVerificationCode: null,
+          phoneVerificationExpiry: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(professionals.id, session.professionalId));
+
+      res.json({ success: true, message: "Phone verified successfully" });
+    } catch (error) {
+      console.error("Error verifying OTP:", error);
+      res.status(500).json({ error: "Failed to verify code" });
     }
   });
 

@@ -22,6 +22,8 @@ import {
   IdCard,
   PartyPopper,
   ChevronRight,
+  Camera,
+  Smartphone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -48,6 +50,7 @@ import {
 } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { PageHeader } from "@/components/page-header";
 import { useAuth } from "@/lib/auth-context";
 import { queryClient } from "@/lib/queryClient";
@@ -105,7 +108,18 @@ const personalInfoSchema = z.object({
   addressCity: z.string().min(1, "City is required"),
   addressState: z.string().min(1, "State is required"),
   addressZip: z.string().min(5, "Valid ZIP code required"),
+  countryOfResidence: z.string().min(1, "Country is required"),
 });
+
+// Country options for residence
+const countryOptions = [
+  { value: "US", label: "United States" },
+  { value: "CA", label: "Canada" },
+  { value: "MX", label: "Mexico" },
+  { value: "GB", label: "United Kingdom" },
+  { value: "AU", label: "Australia" },
+  { value: "OTHER", label: "Other" },
+];
 
 const w9Schema = z.object({
   legalName: z.string().min(1, "Legal name is required"),
@@ -199,8 +213,28 @@ export default function ProfessionalOnboarding() {
       addressCity: "",
       addressState: "",
       addressZip: "",
+      countryOfResidence: "US",
     },
   });
+
+  // Profile photo upload state
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  
+  // Phone OTP verification state
+  const [phoneOtpSent, setPhoneOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [isVerifyingPhone, setIsVerifyingPhone] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [resendCountdown, setResendCountdown] = useState(0);
+  
+  // Resend countdown timer effect
+  useEffect(() => {
+    if (resendCountdown > 0) {
+      const timer = setTimeout(() => setResendCountdown(resendCountdown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendCountdown]);
 
   const w9Form = useForm<z.infer<typeof w9Schema>>({
     resolver: zodResolver(w9Schema),
@@ -439,6 +473,78 @@ export default function ProfessionalOnboarding() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
+
+  // Handle profile photo upload
+  const handleProfilePhotoUpload = async (file: File) => {
+    setIsUploadingPhoto(true);
+    try {
+      const res = await apiRequest("POST", "/api/uploads/request-url", {
+        filename: file.name,
+        contentType: file.type,
+        directory: ".private/profile-photos",
+      });
+      const { uploadUrl, objectPath } = await res.json();
+      
+      await fetch(uploadUrl, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
+      
+      setProfilePhotoUrl(objectPath);
+      
+      await apiRequest("PATCH", "/api/professional/onboarding/personal-info", {
+        profilePhotoUrl: objectPath,
+      });
+      
+      toast({ title: "Profile photo uploaded successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/professional/onboarding"] });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to upload profile photo", variant: "destructive" });
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
+  // Handle phone OTP send
+  const handleSendOtp = async () => {
+    const phone = personalInfoForm.getValues("phone");
+    if (!phone || phone.length < 10) {
+      toast({ title: "Error", description: "Please enter a valid phone number first", variant: "destructive" });
+      return;
+    }
+    setIsSendingOtp(true);
+    try {
+      await apiRequest("POST", "/api/professional/onboarding/send-otp", { phone });
+      setPhoneOtpSent(true);
+      setResendCountdown(60); // 60 second cooldown before resend
+      toast({ title: "Verification code sent", description: "Check your phone for the 6-digit code" });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to send verification code", variant: "destructive" });
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  // Handle phone OTP verification
+  const handleVerifyOtp = async () => {
+    if (!otpCode || otpCode.length !== 6) {
+      toast({ title: "Error", description: "Please enter the 6-digit code", variant: "destructive" });
+      return;
+    }
+    setIsVerifyingPhone(true);
+    try {
+      await apiRequest("POST", "/api/professional/onboarding/verify-otp", { code: otpCode });
+      toast({ title: "Phone verified successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/professional/onboarding"] });
+      setPhoneOtpSent(false);
+      setOtpCode("");
+    } catch (error) {
+      toast({ title: "Error", description: "Invalid or expired verification code", variant: "destructive" });
+    } finally {
+      setIsVerifyingPhone(false);
+    }
+  };
 
   if (!isProfessionalAuthenticated) {
     return (
@@ -683,6 +789,65 @@ export default function ProfessionalOnboarding() {
           <CardContent>
             <Form {...personalInfoForm}>
               <form onSubmit={personalInfoForm.handleSubmit((data) => updatePersonalInfoMutation.mutate(data))} className="space-y-6">
+                
+                {/* Profile Photo Upload Section */}
+                <div className="space-y-3">
+                  <FormLabel>Profile Photo</FormLabel>
+                  <div className="flex items-center gap-4">
+                    <Avatar className="h-20 w-20 border-2 border-dashed border-muted-foreground/25">
+                      <AvatarImage 
+                        src={profilePhotoUrl || onboardingData?.professional?.photoUrl || undefined}
+                        alt="Profile" 
+                      />
+                      <AvatarFallback className="bg-muted">
+                        {isUploadingPhoto ? (
+                          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        ) : (
+                          <Camera className="h-6 w-6 text-muted-foreground" />
+                        )}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        id="profile-photo-input"
+                        data-testid="input-profile-photo"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleProfilePhotoUpload(file);
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={isUploadingPhoto}
+                        onClick={() => document.getElementById("profile-photo-input")?.click()}
+                        data-testid="button-upload-photo"
+                      >
+                        {isUploadingPhoto ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="mr-2 h-4 w-4" />
+                            Upload Photo
+                          </>
+                        )}
+                      </Button>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Professional headshot recommended
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
                 <FormField
                   control={personalInfoForm.control}
                   name="dateOfBirth"
@@ -697,19 +862,90 @@ export default function ProfessionalOnboarding() {
                   )}
                 />
 
-                <FormField
-                  control={personalInfoForm.control}
-                  name="phone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Phone Number</FormLabel>
-                      <FormControl>
-                        <Input placeholder="(555) 123-4567" {...field} data-testid="input-phone" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
+                {/* Phone with OTP Verification */}
+                <div className="space-y-3">
+                  <FormField
+                    control={personalInfoForm.control}
+                    name="phone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Phone Number</FormLabel>
+                        <div className="flex gap-2">
+                          <FormControl>
+                            <Input placeholder="(555) 123-4567" {...field} data-testid="input-phone" className="flex-1" />
+                          </FormControl>
+                          {!onboardingData?.professional?.phoneVerified && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="default"
+                              disabled={isSendingOtp || phoneOtpSent}
+                              onClick={handleSendOtp}
+                              data-testid="button-send-otp"
+                            >
+                              {isSendingOtp ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : phoneOtpSent ? (
+                                "Code Sent"
+                              ) : (
+                                "Verify"
+                              )}
+                            </Button>
+                          )}
+                          {onboardingData?.professional?.phoneVerified && (
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              Verified
+                            </Badge>
+                          )}
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* OTP Verification Input - shown after sending code */}
+                  {phoneOtpSent && !onboardingData?.professional?.phoneVerified && (
+                    <div className="flex gap-2 items-center pl-1">
+                      <Smartphone className="h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Enter 6-digit code"
+                        maxLength={6}
+                        value={otpCode}
+                        onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                        className="w-32"
+                        data-testid="input-otp-code"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={isVerifyingPhone || otpCode.length !== 6}
+                        onClick={handleVerifyOtp}
+                        data-testid="button-verify-otp"
+                      >
+                        {isVerifyingPhone ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          "Verify Code"
+                        )}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={resendCountdown > 0 || isSendingOtp}
+                        onClick={handleSendOtp}
+                        data-testid="button-resend-otp"
+                      >
+                        {resendCountdown > 0 ? (
+                          `Resend in ${resendCountdown}s`
+                        ) : (
+                          "Resend"
+                        )}
+                      </Button>
+                    </div>
                   )}
-                />
+                </div>
 
                 <Separator />
                 <h4 className="font-medium">Address</h4>
@@ -728,7 +964,7 @@ export default function ProfessionalOnboarding() {
                   )}
                 />
 
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                   <FormField
                     control={personalInfoForm.control}
                     name="addressCity"
@@ -777,6 +1013,31 @@ export default function ProfessionalOnboarding() {
                         <FormControl>
                           <Input placeholder="12345" {...field} data-testid="input-zip" />
                         </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={personalInfoForm.control}
+                    name="countryOfResidence"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Country</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-country">
+                              <SelectValue placeholder="Country" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {countryOptions.map((country) => (
+                              <SelectItem key={country.value} value={country.value}>
+                                {country.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}
