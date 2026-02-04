@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
@@ -14,9 +14,14 @@ import {
   AlertCircle,
   Upload,
   ArrowRight,
+  ArrowLeft,
   Loader2,
   Building2,
   CheckCircle2,
+  Clock,
+  IdCard,
+  PartyPopper,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -43,7 +48,6 @@ import {
 } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { ObjectUploader } from "@/components/ObjectUploader";
 import { PageHeader } from "@/components/page-header";
 import { useAuth } from "@/lib/auth-context";
 import { queryClient } from "@/lib/queryClient";
@@ -125,11 +129,49 @@ const w9Schema = z.object({
   path: ["ssn"],
 });
 
+// Step configuration with detailed info
+const ONBOARDING_STEPS = [
+  { 
+    key: "personal_info", 
+    name: "Personal Info", 
+    shortName: "Info",
+    icon: User, 
+    description: "Your basic information and address",
+    action: "Complete your profile",
+  },
+  { 
+    key: "identity_w9", 
+    name: "Identity & W-9", 
+    shortName: "ID & Tax",
+    icon: IdCard, 
+    description: "Government ID and tax information",
+    action: "Upload ID and complete W-9",
+  },
+  { 
+    key: "agreements", 
+    name: "Agreements", 
+    shortName: "Agreements",
+    icon: ShieldCheck, 
+    description: "Sign required legal agreements",
+    action: "Review and sign agreements",
+  },
+  { 
+    key: "payment_setup", 
+    name: "Payment Setup", 
+    shortName: "Payment",
+    icon: CreditCard, 
+    description: "Set up how you receive payments",
+    action: "Connect your payment method",
+  },
+];
+
 export default function ProfessionalOnboarding() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const { professional, isProfessionalAuthenticated } = useAuth();
-  const [activeStep, setActiveStep] = useState(0);
+  const [activeStep, setActiveStep] = useState<number | null>(null);
+  const [manualStepSelection, setManualStepSelection] = useState(false);
+  const [isUploadingId, setIsUploadingId] = useState(false);
 
   const { data: onboardingData, isLoading, refetch } = useQuery<{
     professional: any;
@@ -176,6 +218,105 @@ export default function ProfessionalOnboarding() {
       electronicSignature: false,
     },
   });
+
+  // Calculate step completion status
+  const stepStatus = useMemo(() => {
+    if (!onboardingData) return { steps: [], firstIncomplete: 0 };
+    
+    const p = onboardingData.professional;
+    const docs = onboardingData.documents || [];
+    const taxForms = onboardingData.taxForms || [];
+    const agreements = onboardingData.agreements || [];
+    const paymentMethods = onboardingData.paymentMethods || [];
+    
+    const hasPersonalInfo = !!(p?.dateOfBirth && p?.phone && p?.addressStreet);
+    const hasGovernmentId = docs.some(d => d.documentType === "government_id" || d.documentType === "identity");
+    const hasW9 = taxForms.length > 0;
+    const hasIdentityAndW9 = hasGovernmentId && hasW9;
+    const hasSignedContractor = agreements.some(a => a.agreementType === "contractor_agreement" && a.signedAt);
+    const hasSignedHipaa = agreements.some(a => a.agreementType === "hipaa_acknowledgment" && a.signedAt);
+    const hasAgreements = hasSignedContractor && hasSignedHipaa;
+    const hasPayment = paymentMethods.some(pm => pm.stripeOnboardingComplete || pm.verificationStatus === "verified");
+    
+    // Check verification statuses from backend
+    const identityVerified = professional?.identityVerified || false;
+    const w9Verified = taxForms[0]?.verificationStatus === "approved";
+    const paymentVerified = professional?.stripeAccountStatus === "verified";
+    
+    const steps = [
+      { 
+        key: "personal_info", 
+        complete: hasPersonalInfo,
+        status: hasPersonalInfo ? "complete" : "pending" as const,
+        needsVerification: false,
+      },
+      { 
+        key: "identity_w9", 
+        complete: hasIdentityAndW9,
+        status: hasIdentityAndW9 ? "complete" : (hasGovernmentId || hasW9) ? "partial" : "pending" as const,
+        hasId: hasGovernmentId,
+        hasW9: hasW9,
+        w9Status: taxForms[0]?.verificationStatus,
+        needsVerification: hasIdentityAndW9 && (!identityVerified || !w9Verified),
+        isVerified: identityVerified && w9Verified,
+      },
+      { 
+        key: "agreements", 
+        complete: hasAgreements,
+        status: hasAgreements ? "complete" : (hasSignedContractor || hasSignedHipaa) ? "partial" : "pending" as const,
+        hasContractor: hasSignedContractor,
+        hasHipaa: hasSignedHipaa,
+        needsVerification: false,
+      },
+      { 
+        key: "payment_setup", 
+        complete: hasPayment,
+        status: hasPayment ? "complete" : "pending" as const,
+        needsVerification: hasPayment && !paymentVerified,
+        isVerified: paymentVerified,
+      },
+    ];
+    
+    const firstIncomplete = steps.findIndex(s => !s.complete);
+    const allComplete = steps.every(s => s.complete);
+    const hasPendingVerification = steps.some(s => s.needsVerification);
+    
+    return { 
+      steps, 
+      firstIncomplete: firstIncomplete === -1 ? steps.length - 1 : firstIncomplete,
+      allComplete,
+      hasPendingVerification,
+    };
+  }, [onboardingData]);
+
+  // Auto-navigate to first incomplete step (only on initial load)
+  useEffect(() => {
+    if (!manualStepSelection && activeStep === null && stepStatus.steps.length > 0) {
+      setActiveStep(stepStatus.firstIncomplete);
+    }
+  }, [stepStatus, manualStepSelection, activeStep]);
+
+  // Handle manual step selection
+  const handleStepClick = (stepIndex: number) => {
+    setManualStepSelection(true);
+    setActiveStep(stepIndex);
+  };
+
+  // Navigate to next step
+  const goToNextStep = () => {
+    if (activeStep !== null && activeStep < ONBOARDING_STEPS.length - 1) {
+      setActiveStep(activeStep + 1);
+      setManualStepSelection(true);
+    }
+  };
+
+  // Navigate to previous step
+  const goToPrevStep = () => {
+    if (activeStep !== null && activeStep > 0) {
+      setActiveStep(activeStep - 1);
+      setManualStepSelection(true);
+    }
+  };
 
   useEffect(() => {
     if (onboardingData?.professional) {
@@ -226,7 +367,7 @@ export default function ProfessionalOnboarding() {
     onSuccess: () => {
       toast({ title: "Personal information saved" });
       queryClient.invalidateQueries({ queryKey: ["/api/professional/onboarding"] });
-      setActiveStep(1);
+      goToNextStep();
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -241,7 +382,6 @@ export default function ProfessionalOnboarding() {
     onSuccess: () => {
       toast({ title: "W-9 form submitted" });
       queryClient.invalidateQueries({ queryKey: ["/api/professional/onboarding"] });
-      setActiveStep(2);
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -327,16 +467,8 @@ export default function ProfessionalOnboarding() {
   }
 
   const progress = onboardingData?.progress;
-  const steps = [
-    { name: "Personal Info", icon: User, key: "personal_info" },
-    { name: "Tax Forms (W-9)", icon: FileText, key: "tax_forms" },
-    { name: "Agreements", icon: ShieldCheck, key: "agreements" },
-    { name: "Payment Setup", icon: CreditCard, key: "payment_setup" },
-  ];
-
-  const isStepComplete = (stepKey: string) => {
-    return progress?.steps.find((s) => s.name === stepKey)?.complete || false;
-  };
+  const completedCount = stepStatus.steps.filter(s => s.complete).length;
+  const percentComplete = Math.round((completedCount / ONBOARDING_STEPS.length) * 100);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -364,50 +496,175 @@ export default function ProfessionalOnboarding() {
     signAgreementMutation.mutate({ agreementType: type, signatureName: name });
   };
 
+  // Get step icon based on status
+  const getStepIcon = (stepIndex: number, isActive: boolean) => {
+    const stepData = stepStatus.steps[stepIndex];
+    if (!stepData) return <Circle className="h-5 w-5" />;
+    
+    if (stepData.complete) {
+      return <CheckCircle className="h-5 w-5 text-green-600" />;
+    }
+    if (stepData.status === "partial") {
+      return <Clock className="h-5 w-5 text-amber-500" />;
+    }
+    if (isActive) {
+      return <Circle className="h-5 w-5 text-primary fill-primary" />;
+    }
+    return <Circle className="h-5 w-5 text-muted-foreground" />;
+  };
+
+  // Current step info for "What's Next" guidance
+  const currentStepInfo = activeStep !== null ? ONBOARDING_STEPS[activeStep] : null;
+  const currentStepStatus = activeStep !== null ? stepStatus.steps[activeStep] : null;
+
   return (
-    <div className="container max-w-4xl mx-auto py-8 px-4">
-      <PageHeader
-        title="Complete Your Onboarding"
-        description="Complete the steps below to become eligible to receive payments"
-      />
-
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm text-muted-foreground">Progress</span>
-          <span className="text-sm font-medium">{progress?.percentComplete || 0}%</span>
-        </div>
-        <Progress value={progress?.percentComplete || 0} className="h-2" data-testid="progress-onboarding" />
-        <div className="flex items-center justify-between mt-2">
-          <span className="text-sm text-muted-foreground">
-            {progress?.completedSteps || 0} of {progress?.totalSteps || 5} steps complete
-          </span>
-          {getStatusBadge(onboardingData?.professional?.onboardingStatus || "in_progress")}
+    <div className="min-h-screen bg-muted/30">
+      {/* Header with progress */}
+      <div className="bg-background border-b sticky top-0 z-10">
+        <div className="container max-w-6xl mx-auto px-4 py-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-xl font-semibold">Complete Your Onboarding</h1>
+              <p className="text-sm text-muted-foreground">
+                {stepStatus.allComplete 
+                  ? "All steps complete! Waiting for verification."
+                  : `Step ${(activeStep ?? 0) + 1} of ${ONBOARDING_STEPS.length}: ${currentStepInfo?.name || ""}`
+                }
+              </p>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Progress value={percentComplete} className="w-32 h-2" data-testid="progress-onboarding" />
+                <span className="text-sm font-medium">{percentComplete}%</span>
+              </div>
+              {getStatusBadge(onboardingData?.professional?.onboardingStatus || "in_progress")}
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-        {steps.map((step, idx) => {
-          const StepIcon = step.icon;
-          const complete = isStepComplete(step.key);
-          return (
-            <Button
-              key={step.key}
-              variant={activeStep === idx ? "default" : complete ? "secondary" : "outline"}
-              className="flex items-center gap-2 flex-shrink-0"
-              onClick={() => setActiveStep(idx)}
-              data-testid={`button-step-${step.key}`}
-            >
-              {complete ? (
-                <CheckCircle className="h-4 w-4 text-green-600" />
-              ) : (
-                <StepIcon className="h-4 w-4" />
-              )}
-              <span className="hidden sm:inline">{step.name}</span>
-              <span className="sm:hidden">{idx + 1}</span>
-            </Button>
-          );
-        })}
-      </div>
+      <div className="container max-w-6xl mx-auto px-4 py-6">
+        {/* What's Next Banner - only show if not all complete */}
+        {!stepStatus.allComplete && currentStepInfo && !currentStepStatus?.complete && (
+          <Card className="mb-6 border-primary/20 bg-primary/5">
+            <CardContent className="py-4">
+              <div className="flex items-center gap-4">
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <ArrowRight className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-medium">What's Next</h3>
+                  <p className="text-sm text-muted-foreground">{currentStepInfo.action}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* All Complete Banner */}
+        {stepStatus.allComplete && (
+          <Card className={`mb-6 ${stepStatus.hasPendingVerification ? "border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800" : "border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800"}`}>
+            <CardContent className="py-6">
+              <div className="flex items-center gap-4">
+                <div className={`h-12 w-12 rounded-full flex items-center justify-center flex-shrink-0 ${stepStatus.hasPendingVerification ? "bg-amber-100 dark:bg-amber-800/30" : "bg-green-100 dark:bg-green-800/30"}`}>
+                  {stepStatus.hasPendingVerification ? (
+                    <Clock className="h-6 w-6 text-amber-600" />
+                  ) : (
+                    <PartyPopper className="h-6 w-6 text-green-600" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <h3 className={`font-semibold ${stepStatus.hasPendingVerification ? "text-amber-800 dark:text-amber-200" : "text-green-800 dark:text-green-200"}`}>
+                    {stepStatus.hasPendingVerification ? "Onboarding Submitted - Pending Verification" : "Onboarding Complete!"}
+                  </h3>
+                  <p className={`text-sm ${stepStatus.hasPendingVerification ? "text-amber-700 dark:text-amber-300" : "text-green-700 dark:text-green-300"}`}>
+                    {stepStatus.hasPendingVerification 
+                      ? "Your information has been submitted. An administrator will review and verify your identity and W-9 before you can receive payments."
+                      : "Your account has been fully verified and you are eligible to receive payments."
+                    }
+                  </p>
+                </div>
+                <Button onClick={() => setLocation("/app/hub")} data-testid="button-go-to-hub">
+                  Go to Hub
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
+          {/* Vertical Stepper Sidebar */}
+          <div className="lg:sticky lg:top-24 lg:self-start">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Onboarding Steps</CardTitle>
+              </CardHeader>
+              <CardContent className="pb-4">
+                <div className="space-y-1">
+                  {ONBOARDING_STEPS.map((step, idx) => {
+                    const StepIcon = step.icon;
+                    const stepData = stepStatus.steps[idx];
+                    const isActive = activeStep === idx;
+                    const isComplete = stepData?.complete;
+                    const isPartial = stepData?.status === "partial";
+                    const needsVerification = stepData?.needsVerification;
+                    
+                    return (
+                      <button
+                        key={step.key}
+                        onClick={() => handleStepClick(idx)}
+                        className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors ${
+                          isActive 
+                            ? "bg-primary/10 text-primary" 
+                            : isComplete 
+                              ? "hover:bg-muted/80" 
+                              : "hover:bg-muted/50"
+                        }`}
+                        data-testid={`button-step-${step.key}`}
+                      >
+                        <div className="flex-shrink-0">
+                          {getStepIcon(idx, isActive)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className={`text-sm font-medium ${isActive ? "text-primary" : ""}`}>
+                            {step.name}
+                          </div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {isComplete 
+                              ? needsVerification 
+                                ? "Submitted - Pending Review" 
+                                : "Complete" 
+                              : isPartial 
+                                ? "In Progress" 
+                                : step.description}
+                          </div>
+                        </div>
+                        {isActive && (
+                          <ChevronRight className="h-4 w-4 flex-shrink-0" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Quick Stats */}
+                <Separator className="my-4" />
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Completed</span>
+                    <span className="font-medium">{completedCount} of {ONBOARDING_STEPS.length}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Status</span>
+                    {getStatusBadge(onboardingData?.professional?.onboardingStatus || "in_progress")}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Main Content Area */}
+          <div className="space-y-6">
 
       {activeStep === 0 && (
         <Card>
@@ -538,14 +795,170 @@ export default function ProfessionalOnboarding() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              W-9 Tax Form
+              <IdCard className="h-5 w-5" />
+              Identity Verification & Tax Information
             </CardTitle>
             <CardDescription>
-              Complete your W-9 form for 1099 tax reporting
+              Upload your government ID and complete your W-9 tax form
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {/* Step progress for this section */}
+            <div className="flex items-center gap-4 mb-6 p-4 bg-muted/50 rounded-lg">
+              <div className="flex items-center gap-2">
+                {stepStatus.steps[1]?.hasId ? (
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                ) : (
+                  <Circle className="h-5 w-5 text-muted-foreground" />
+                )}
+                <span className={`text-sm ${stepStatus.steps[1]?.hasId ? "text-green-700 font-medium" : ""}`}>
+                  Government ID
+                </span>
+              </div>
+              <div className="h-px flex-1 bg-border" />
+              <div className="flex items-center gap-2">
+                {stepStatus.steps[1]?.hasW9 ? (
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                ) : (
+                  <Circle className="h-5 w-5 text-muted-foreground" />
+                )}
+                <span className={`text-sm ${stepStatus.steps[1]?.hasW9 ? "text-green-700 font-medium" : ""}`}>
+                  W-9 Form
+                </span>
+              </div>
+            </div>
+
+            {/* Government ID Upload Section */}
+            <div className="mb-8">
+              <h4 className="text-base font-medium mb-2 flex items-center gap-2">
+                <span className="flex items-center justify-center h-6 w-6 rounded-full bg-primary/10 text-primary text-xs font-bold">1</span>
+                Upload Government ID
+              </h4>
+              <p className="text-sm text-muted-foreground mb-4">
+                Upload a clear photo of your government-issued ID (driver's license, passport, or state ID)
+              </p>
+              
+              {onboardingData?.documents?.some(d => d.documentType === "government_id" || d.documentType === "identity") ? (
+                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <span className="font-medium text-green-800 dark:text-green-200">ID Document Uploaded</span>
+                  </div>
+                  <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+                    Your government ID has been uploaded and is pending verification.
+                  </p>
+                </div>
+              ) : (
+                <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
+                  {isUploadingId ? (
+                    <>
+                      <Loader2 className="h-10 w-10 text-primary mx-auto mb-3 animate-spin" />
+                      <p className="text-sm text-muted-foreground mb-3">
+                        Uploading your ID document...
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                      <p className="text-sm text-muted-foreground mb-3">
+                        Upload a clear photo of your government-issued ID
+                      </p>
+                    </>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*,.pdf"
+                    className="hidden"
+                    id="id-upload"
+                    disabled={isUploadingId}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      
+                      setIsUploadingId(true);
+                      try {
+                        // Step 1: Get presigned URL for upload
+                        const urlResponse = await fetch("/api/uploads/request-url", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            name: file.name,
+                            size: file.size,
+                            contentType: file.type,
+                          }),
+                          credentials: "include",
+                        });
+                        
+                        if (!urlResponse.ok) {
+                          throw new Error("Failed to get upload URL");
+                        }
+                        
+                        const { uploadURL, objectPath } = await urlResponse.json();
+                        
+                        // Step 2: Upload file directly to object storage
+                        const uploadResponse = await fetch(uploadURL, {
+                          method: "PUT",
+                          body: file,
+                          headers: {
+                            "Content-Type": file.type,
+                          },
+                        });
+                        
+                        if (!uploadResponse.ok) {
+                          throw new Error("Failed to upload file");
+                        }
+                        
+                        // Step 3: Register the document in the database
+                        uploadDocumentMutation.mutate({
+                          documentType: "government_id",
+                          documentUrl: objectPath,
+                          documentName: file.name,
+                        });
+                      } catch (error) {
+                        toast({ title: "Upload failed", description: error instanceof Error ? error.message : "Unknown error", variant: "destructive" });
+                      } finally {
+                        setIsUploadingId(false);
+                      }
+                    }}
+                    data-testid="input-id-upload"
+                  />
+                  <label htmlFor="id-upload">
+                    <Button variant="outline" asChild disabled={isUploadingId}>
+                      <span>
+                        {isUploadingId ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-4 w-4 mr-2" />
+                            Select File
+                          </>
+                        )}
+                      </span>
+                    </Button>
+                  </label>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Accepted formats: JPEG, PNG, PDF (max 10MB)
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <Separator className="my-6" />
+
+            {/* W-9 Form Section */}
+            <div>
+              <h4 className="text-base font-medium mb-2 flex items-center gap-2">
+                <span className="flex items-center justify-center h-6 w-6 rounded-full bg-primary/10 text-primary text-xs font-bold">2</span>
+                Complete W-9 Tax Form
+              </h4>
+              <p className="text-sm text-muted-foreground mb-4">
+                Your tax information for 1099 reporting
+              </p>
+            </div>
+
             {onboardingData?.taxForms?.[0]?.verificationStatus === "pending" && (
               <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-6">
                 <div className="flex items-center gap-2">
@@ -858,7 +1271,7 @@ export default function ProfessionalOnboarding() {
             </div>
 
             {hasSignedAgreement("contractor_agreement") && hasSignedAgreement("hipaa_acknowledgment") && (
-              <Button className="w-full" onClick={() => setActiveStep(3)} data-testid="button-continue-to-payment">
+              <Button className="w-full" onClick={goToNextStep} data-testid="button-continue-to-payment">
                 Continue to Payment Setup
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
@@ -929,22 +1342,32 @@ export default function ProfessionalOnboarding() {
         </Card>
       )}
 
-      {progress?.percentComplete === 100 && !onboardingData?.professional?.paymentEligible && (
-        <Card className="mt-6 border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20 dark:border-yellow-800">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <AlertCircle className="h-8 w-8 text-yellow-600" />
-              <div>
-                <h4 className="font-medium text-yellow-800 dark:text-yellow-200">Verification Pending</h4>
-                <p className="text-sm text-yellow-700 dark:text-yellow-300">
-                  Your onboarding is complete. An administrator will review your information and verify your
-                  account. You'll receive a notification once you're approved.
-                </p>
+            {/* Navigation buttons at bottom of content */}
+            {activeStep !== null && (
+              <div className="flex items-center justify-between pt-4">
+                <Button 
+                  variant="outline" 
+                  onClick={goToPrevStep}
+                  disabled={activeStep === 0}
+                  data-testid="button-prev-step"
+                >
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Previous
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={goToNextStep}
+                  disabled={activeStep === ONBOARDING_STEPS.length - 1}
+                  data-testid="button-next-step"
+                >
+                  Next
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
