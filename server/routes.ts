@@ -26,6 +26,7 @@ import { z } from "zod";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { sendInvitationEmail } from "./services/email";
+import { registerMobileOnboardingRoutes } from "./routes/mobile-onboarding";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -33,6 +34,9 @@ export async function registerRoutes(
 ): Promise<Server> {
   // Register Object Storage routes for file uploads
   registerObjectStorageRoutes(app);
+  
+  // Register Mobile Onboarding API routes (JWT-based auth for mobile apps)
+  registerMobileOnboardingRoutes(app);
 
   // ============================================================
   // Practice Admin Authentication API
