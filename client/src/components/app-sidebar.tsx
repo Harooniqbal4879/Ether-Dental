@@ -14,6 +14,7 @@ import {
   Building2,
   MapPin,
   MessageSquare,
+  ClipboardCheck,
 } from "lucide-react";
 import {
   Sidebar,
@@ -81,6 +82,12 @@ const allNavItems = [
     url: "/app/messaging",
     icon: MessageSquare,
     personas: ["admin", "professional"],
+  },
+  {
+    title: "Contractor Verification",
+    url: "/app/contractor-verification",
+    icon: ClipboardCheck,
+    personas: ["system_admin", "admin"],
   },
 ];
 
