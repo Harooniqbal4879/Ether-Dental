@@ -239,9 +239,12 @@ export default function ProfessionalOnboarding() {
     const hasPayment = paymentMethods.some(pm => pm.stripeOnboardingComplete || pm.verificationStatus === "verified");
     
     // Check verification statuses from backend
-    const identityVerified = professional?.identityVerified || false;
+    const identityVerified = onboardingData?.documents?.some((d: any) => 
+      (d.documentType === "government_id" || d.documentType === "identity") && 
+      d.verificationStatus === "approved"
+    ) || false;
     const w9Verified = taxForms[0]?.verificationStatus === "approved";
-    const paymentVerified = professional?.stripeAccountStatus === "verified";
+    const paymentVerified = paymentMethods.some(pm => pm.verificationStatus === "verified");
     
     const steps = [
       { 
