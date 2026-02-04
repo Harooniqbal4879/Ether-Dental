@@ -462,7 +462,7 @@ function CalendarView() {
           </div>
           <h2 className="text-xl font-semibold" data-testid="text-current-month">{monthName}</h2>
         </div>
-        <Button variant="default" onClick={() => setLocation("/staffing/add-shift")} data-testid="button-add-shifts">
+        <Button variant="default" onClick={() => setLocation("/app/staffing/add-shift")} data-testid="button-add-shifts">
           <Plus className="h-4 w-4 mr-2" />
           Add shifts
         </Button>
@@ -589,7 +589,7 @@ function PendingView() {
         <p className="text-muted-foreground text-center max-w-md mb-6">
           All caught up on confirmations and reviews. Keep the momentum going — add your next shift.
         </p>
-        <Button variant="default" onClick={() => setLocation("/staffing/add-shift")} data-testid="button-add-shifts-pending">
+        <Button variant="default" onClick={() => setLocation("/app/staffing/add-shift")} data-testid="button-add-shifts-pending">
           <Plus className="h-4 w-4 mr-2" />
           Add shifts
         </Button>
@@ -638,7 +638,7 @@ function TeamView({ roleFilter }: { roleFilter: StaffRoleKey }) {
             <p className="text-muted-foreground text-center max-w-md mb-6" data-testid="text-no-professionals">
               No {roleLabel} have been scheduled to work at your office yet. When staff request shifts, you can add them to your favorites.
             </p>
-            <Button variant="default" onClick={() => setLocation("/staffing/add-shift")} data-testid="button-start-adding-shifts">
+            <Button variant="default" onClick={() => setLocation("/app/staffing/add-shift")} data-testid="button-start-adding-shifts">
               <Plus className="h-4 w-4 mr-2" />
               Start adding shifts
             </Button>
@@ -713,7 +713,7 @@ function ShiftHistoryView({ roleFilter }: { roleFilter: StaffRoleKey }) {
             <p className="text-muted-foreground text-center max-w-md mb-6">
               Once you book shifts and staff complete them, you'll see all the details here.
             </p>
-            <Button variant="default" onClick={() => setLocation("/staffing/add-shift")} data-testid="button-add-shifts-history">
+            <Button variant="default" onClick={() => setLocation("/app/staffing/add-shift")} data-testid="button-add-shifts-history">
               Add shifts
             </Button>
           </div>
