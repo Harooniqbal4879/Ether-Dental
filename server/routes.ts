@@ -2282,6 +2282,667 @@ export async function registerRoutes(
     }
   });
 
+  // ============================================================
+  // Professional Onboarding API
+  // ============================================================
+
+  // Get onboarding status and progress for current professional
+  app.get("/api/professional/onboarding", async (req, res) => {
+    try {
+      const session = req.session as any;
+      if (!session.professionalId) {
+        return res.status(401).json({ error: "Not authenticated as professional" });
+      }
+
+      const professional = await storage.getProfessional(session.professionalId);
+      if (!professional) {
+        return res.status(404).json({ error: "Professional not found" });
+      }
+
+      // Get related onboarding data
+      const { contractorDocuments, contractorTaxForms, professionalPaymentMethods, professionalAgreements } = await import("@shared/schema");
+      
+      const documents = await db.select().from(contractorDocuments).where(eq(contractorDocuments.professionalId, session.professionalId));
+      const taxForms = await db.select().from(contractorTaxForms).where(eq(contractorTaxForms.professionalId, session.professionalId));
+      const paymentMethods = await db.select().from(professionalPaymentMethods).where(eq(professionalPaymentMethods.professionalId, session.professionalId));
+      const agreements = await db.select().from(professionalAgreements).where(eq(professionalAgreements.professionalId, session.professionalId));
+
+      // Calculate progress
+      const requiredAgreements = ["contractor_agreement", "hipaa_acknowledgment"];
+      const signedAgreementTypes = agreements.filter(a => a.signedAt).map(a => a.agreementType);
+      const allRequiredAgreementsSigned = requiredAgreements.every(type => signedAgreementTypes.includes(type));
+      
+      const hasVerifiedPaymentMethod = paymentMethods.some(pm => pm.verificationStatus === "verified");
+      const hasApprovedW9 = taxForms.some(tf => tf.verificationStatus === "verified");
+      const hasApprovedId = documents.some(d => d.documentType === "government_id" && d.verificationStatus === "approved");
+
+      // Calculate percent complete (5 steps)
+      const steps = [
+        { name: "personal_info", complete: !!(professional.dateOfBirth && professional.addressStreet) },
+        { name: "identity_verification", complete: professional.identityVerified || hasApprovedId },
+        { name: "tax_forms", complete: professional.w9Completed || hasApprovedW9 },
+        { name: "agreements", complete: professional.agreementsSigned || allRequiredAgreementsSigned },
+        { name: "payment_setup", complete: professional.paymentMethodVerified || hasVerifiedPaymentMethod },
+      ];
+      
+      const completedSteps = steps.filter(s => s.complete).length;
+      const percentComplete = Math.round((completedSteps / steps.length) * 100);
+
+      res.json({
+        professional: {
+          id: professional.id,
+          firstName: professional.firstName,
+          lastName: professional.lastName,
+          email: professional.email,
+          onboardingStatus: professional.onboardingStatus,
+          paymentEligible: professional.paymentEligible,
+          emailVerified: professional.emailVerified,
+          phoneVerified: professional.phoneVerified,
+          identityVerified: professional.identityVerified,
+          w9Completed: professional.w9Completed,
+          agreementsSigned: professional.agreementsSigned,
+          paymentMethodVerified: professional.paymentMethodVerified,
+          dateOfBirth: professional.dateOfBirth,
+          addressStreet: professional.addressStreet,
+          addressCity: professional.addressCity,
+          addressState: professional.addressState,
+          addressZip: professional.addressZip,
+        },
+        documents,
+        taxForms: taxForms.map(tf => ({
+          ...tf,
+          // Never expose encrypted values
+          encryptedSsn: undefined,
+          encryptedEin: undefined,
+        })),
+        paymentMethods: paymentMethods.map(pm => ({
+          ...pm,
+          // Never expose encrypted values
+          encryptedAccountNumber: undefined,
+          encryptedRoutingNumber: undefined,
+        })),
+        agreements,
+        progress: {
+          steps,
+          completedSteps,
+          totalSteps: steps.length,
+          percentComplete,
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching onboarding status:", error);
+      res.status(500).json({ error: "Failed to fetch onboarding status" });
+    }
+  });
+
+  // Update professional's personal information for onboarding
+  app.patch("/api/professional/onboarding/personal-info", async (req, res) => {
+    try {
+      const session = req.session as any;
+      if (!session.professionalId) {
+        return res.status(401).json({ error: "Not authenticated as professional" });
+      }
+
+      const { dateOfBirth, addressStreet, addressCity, addressState, addressZip, phone } = req.body;
+      const { professionals } = await import("@shared/schema");
+
+      const updateData: any = { updatedAt: new Date() };
+      if (dateOfBirth) updateData.dateOfBirth = dateOfBirth;
+      if (addressStreet !== undefined) updateData.addressStreet = addressStreet;
+      if (addressCity !== undefined) updateData.addressCity = addressCity;
+      if (addressState !== undefined) updateData.addressState = addressState;
+      if (addressZip !== undefined) updateData.addressZip = addressZip;
+      if (phone !== undefined) updateData.phone = phone;
+
+      // Update onboarding status to in_progress if still invited
+      const currentProfessional = await storage.getProfessional(session.professionalId);
+      if (currentProfessional?.onboardingStatus === "invited") {
+        updateData.onboardingStatus = "in_progress";
+      }
+
+      await db.update(professionals)
+        .set(updateData)
+        .where(eq(professionals.id, session.professionalId));
+
+      const updated = await storage.getProfessional(session.professionalId);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating personal info:", error);
+      res.status(500).json({ error: "Failed to update personal information" });
+    }
+  });
+
+  // Upload document for onboarding
+  app.post("/api/professional/onboarding/documents", async (req, res) => {
+    try {
+      const session = req.session as any;
+      if (!session.professionalId) {
+        return res.status(401).json({ error: "Not authenticated as professional" });
+      }
+
+      const { documentType, documentName, documentUrl, metadata } = req.body;
+      
+      if (!documentType || !documentUrl) {
+        return res.status(400).json({ error: "Document type and URL are required" });
+      }
+
+      const { contractorDocuments, onboardingAuditLog } = await import("@shared/schema");
+
+      // Insert document
+      const [document] = await db.insert(contractorDocuments)
+        .values({
+          professionalId: session.professionalId,
+          documentType,
+          documentName,
+          documentUrl,
+          metadata: metadata ? JSON.stringify(metadata) : null,
+          verificationStatus: "pending",
+        })
+        .returning();
+
+      // Create audit log entry
+      await db.insert(onboardingAuditLog).values({
+        professionalId: session.professionalId,
+        action: "document_uploaded",
+        actorType: "professional",
+        actorId: session.professionalId,
+        documentId: document.id,
+        newValue: JSON.stringify({ documentType, documentName }),
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+      });
+
+      res.status(201).json(document);
+    } catch (error) {
+      console.error("Error uploading document:", error);
+      res.status(500).json({ error: "Failed to upload document" });
+    }
+  });
+
+  // Get documents for current professional
+  app.get("/api/professional/onboarding/documents", async (req, res) => {
+    try {
+      const session = req.session as any;
+      if (!session.professionalId) {
+        return res.status(401).json({ error: "Not authenticated as professional" });
+      }
+
+      const { contractorDocuments } = await import("@shared/schema");
+      const documents = await db.select()
+        .from(contractorDocuments)
+        .where(eq(contractorDocuments.professionalId, session.professionalId));
+
+      res.json(documents);
+    } catch (error) {
+      console.error("Error fetching documents:", error);
+      res.status(500).json({ error: "Failed to fetch documents" });
+    }
+  });
+
+  // Submit W-9 tax form
+  app.post("/api/professional/onboarding/w9", async (req, res) => {
+    try {
+      const session = req.session as any;
+      if (!session.professionalId) {
+        return res.status(401).json({ error: "Not authenticated as professional" });
+      }
+
+      const { 
+        legalName, businessName, taxClassification, 
+        ssn, ein, useSsn,
+        taxAddressStreet, taxAddressCity, taxAddressState, taxAddressZip,
+        electronicSignature
+      } = req.body;
+
+      if (!legalName || !taxClassification || !taxAddressStreet || !taxAddressCity || !taxAddressState || !taxAddressZip) {
+        return res.status(400).json({ error: "Required W-9 fields missing" });
+      }
+
+      // Validate SSN or EIN is provided
+      if (useSsn !== false && !ssn) {
+        return res.status(400).json({ error: "SSN is required" });
+      }
+      if (useSsn === false && !ein) {
+        return res.status(400).json({ error: "EIN is required" });
+      }
+
+      const { contractorTaxForms, onboardingAuditLog, professionals } = await import("@shared/schema");
+
+      // Extract last 4 digits and encrypt full value
+      const ssnLast4 = ssn ? ssn.slice(-4) : null;
+      const einLast4 = ein ? ein.slice(-4) : null;
+      
+      // Note: In production, use proper encryption (e.g., AWS KMS, Vault)
+      // This is a placeholder - implement with your encryption service
+      const encryptedSsn = ssn ? Buffer.from(ssn).toString("base64") : null;
+      const encryptedEin = ein ? Buffer.from(ein).toString("base64") : null;
+
+      // Check if there's an existing W-9, update it if so
+      const existing = await db.select()
+        .from(contractorTaxForms)
+        .where(eq(contractorTaxForms.professionalId, session.professionalId));
+
+      let taxForm;
+      if (existing.length > 0) {
+        [taxForm] = await db.update(contractorTaxForms)
+          .set({
+            legalName,
+            businessName,
+            taxClassification,
+            ssnLast4,
+            encryptedSsn,
+            einLast4,
+            encryptedEin,
+            useSsn: useSsn !== false,
+            taxAddressStreet,
+            taxAddressCity,
+            taxAddressState,
+            taxAddressZip,
+            electronicSignature: !!electronicSignature,
+            signatureDate: electronicSignature ? new Date() : null,
+            signatureIp: electronicSignature ? req.ip : null,
+            verificationStatus: "pending",
+            updatedAt: new Date(),
+          })
+          .where(eq(contractorTaxForms.id, existing[0].id))
+          .returning();
+      } else {
+        [taxForm] = await db.insert(contractorTaxForms)
+          .values({
+            professionalId: session.professionalId,
+            formType: "w9",
+            legalName,
+            businessName,
+            taxClassification,
+            ssnLast4,
+            encryptedSsn,
+            einLast4,
+            encryptedEin,
+            useSsn: useSsn !== false,
+            taxAddressStreet,
+            taxAddressCity,
+            taxAddressState,
+            taxAddressZip,
+            electronicSignature: !!electronicSignature,
+            signatureDate: electronicSignature ? new Date() : null,
+            signatureIp: electronicSignature ? req.ip : null,
+            verificationStatus: "pending",
+          })
+          .returning();
+      }
+
+      // Update professional status
+      await db.update(professionals)
+        .set({ 
+          onboardingStatus: "under_review",
+          updatedAt: new Date(),
+        })
+        .where(eq(professionals.id, session.professionalId));
+
+      // Audit log - never log sensitive data
+      await db.insert(onboardingAuditLog).values({
+        professionalId: session.professionalId,
+        action: "w9_submitted",
+        actorType: "professional",
+        actorId: session.professionalId,
+        newValue: JSON.stringify({ 
+          legalName, 
+          taxClassification, 
+          ssnLast4: ssnLast4 ? `***-**-${ssnLast4}` : null,
+          einLast4: einLast4 ? `**-***${einLast4}` : null,
+        }),
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+      });
+
+      // Return without encrypted values
+      res.status(201).json({
+        ...taxForm,
+        encryptedSsn: undefined,
+        encryptedEin: undefined,
+      });
+    } catch (error) {
+      console.error("Error submitting W-9:", error);
+      res.status(500).json({ error: "Failed to submit W-9 form" });
+    }
+  });
+
+  // Get W-9 form for current professional
+  app.get("/api/professional/onboarding/w9", async (req, res) => {
+    try {
+      const session = req.session as any;
+      if (!session.professionalId) {
+        return res.status(401).json({ error: "Not authenticated as professional" });
+      }
+
+      const { contractorTaxForms } = await import("@shared/schema");
+      const [taxForm] = await db.select()
+        .from(contractorTaxForms)
+        .where(eq(contractorTaxForms.professionalId, session.professionalId));
+
+      if (!taxForm) {
+        return res.json(null);
+      }
+
+      // Never return encrypted values
+      res.json({
+        ...taxForm,
+        encryptedSsn: undefined,
+        encryptedEin: undefined,
+      });
+    } catch (error) {
+      console.error("Error fetching W-9:", error);
+      res.status(500).json({ error: "Failed to fetch W-9 form" });
+    }
+  });
+
+  // Sign an agreement
+  app.post("/api/professional/onboarding/agreements", async (req, res) => {
+    try {
+      const session = req.session as any;
+      if (!session.professionalId) {
+        return res.status(401).json({ error: "Not authenticated as professional" });
+      }
+
+      const { agreementType, agreementVersion, signatureName } = req.body;
+      
+      if (!agreementType || !agreementVersion || !signatureName) {
+        return res.status(400).json({ error: "Agreement type, version, and signature are required" });
+      }
+
+      const { professionalAgreements, onboardingAuditLog, professionals } = await import("@shared/schema");
+
+      // Deactivate any previous version of this agreement
+      await db.update(professionalAgreements)
+        .set({ isActive: false })
+        .where(eq(professionalAgreements.professionalId, session.professionalId));
+
+      // Insert new signed agreement
+      const [agreement] = await db.insert(professionalAgreements)
+        .values({
+          professionalId: session.professionalId,
+          agreementType,
+          agreementVersion,
+          signedAt: new Date(),
+          signatureIp: req.ip,
+          signatureName,
+          isActive: true,
+        })
+        .returning();
+
+      // Check if all required agreements are now signed
+      const allAgreements = await db.select()
+        .from(professionalAgreements)
+        .where(eq(professionalAgreements.professionalId, session.professionalId));
+      
+      const requiredAgreements = ["contractor_agreement", "hipaa_acknowledgment"];
+      const signedTypes = allAgreements.filter(a => a.signedAt && a.isActive).map(a => a.agreementType);
+      const allSigned = requiredAgreements.every(type => signedTypes.includes(type));
+
+      if (allSigned) {
+        await db.update(professionals)
+          .set({ agreementsSigned: true, updatedAt: new Date() })
+          .where(eq(professionals.id, session.professionalId));
+      }
+
+      // Audit log
+      await db.insert(onboardingAuditLog).values({
+        professionalId: session.professionalId,
+        action: "agreement_signed",
+        actorType: "professional",
+        actorId: session.professionalId,
+        newValue: JSON.stringify({ agreementType, agreementVersion }),
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+      });
+
+      res.status(201).json(agreement);
+    } catch (error) {
+      console.error("Error signing agreement:", error);
+      res.status(500).json({ error: "Failed to sign agreement" });
+    }
+  });
+
+  // Get agreements for current professional
+  app.get("/api/professional/onboarding/agreements", async (req, res) => {
+    try {
+      const session = req.session as any;
+      if (!session.professionalId) {
+        return res.status(401).json({ error: "Not authenticated as professional" });
+      }
+
+      const { professionalAgreements } = await import("@shared/schema");
+      const agreements = await db.select()
+        .from(professionalAgreements)
+        .where(eq(professionalAgreements.professionalId, session.professionalId));
+
+      res.json(agreements);
+    } catch (error) {
+      console.error("Error fetching agreements:", error);
+      res.status(500).json({ error: "Failed to fetch agreements" });
+    }
+  });
+
+  // Add payment method (bank account or initiate Stripe Connect)
+  app.post("/api/professional/onboarding/payment-methods", async (req, res) => {
+    try {
+      const session = req.session as any;
+      if (!session.professionalId) {
+        return res.status(401).json({ error: "Not authenticated as professional" });
+      }
+
+      const { methodType, bankName, accountType, accountNumber, routingNumber, paymentEmail } = req.body;
+      
+      if (!methodType) {
+        return res.status(400).json({ error: "Payment method type is required" });
+      }
+
+      const { professionalPaymentMethods, onboardingAuditLog } = await import("@shared/schema");
+
+      if (methodType === "stripe_connect") {
+        // For Stripe Connect, we'll return a URL to complete onboarding
+        const stripe = await getUncachableStripeClient();
+        const professional = await storage.getProfessional(session.professionalId);
+        
+        if (!professional) {
+          return res.status(404).json({ error: "Professional not found" });
+        }
+
+        // Check for existing Stripe account
+        const existingMethods = await db.select()
+          .from(professionalPaymentMethods)
+          .where(eq(professionalPaymentMethods.professionalId, session.professionalId));
+        
+        let stripeAccountId = existingMethods.find(m => m.stripeAccountId)?.stripeAccountId;
+
+        if (!stripeAccountId) {
+          // Create new Stripe Connect Express account
+          const account = await stripe.accounts.create({
+            type: "express",
+            country: "US",
+            email: professional.email,
+            capabilities: {
+              transfers: { requested: true },
+            },
+            business_type: "individual",
+            metadata: {
+              professionalId: session.professionalId,
+            },
+          });
+          stripeAccountId = account.id;
+
+          // Save the Stripe account ID
+          await db.insert(professionalPaymentMethods).values({
+            professionalId: session.professionalId,
+            methodType: "stripe_connect",
+            stripeAccountId,
+            stripeAccountStatus: "pending",
+            stripeOnboardingComplete: false,
+            verificationStatus: "pending",
+          });
+        }
+
+        // Create account link for onboarding
+        const baseUrl = process.env.REPLIT_DEPLOYMENT_URL || `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
+        const accountLink = await stripe.accountLinks.create({
+          account: stripeAccountId,
+          refresh_url: `${baseUrl}/app/hub?stripe_refresh=true`,
+          return_url: `${baseUrl}/app/hub?stripe_complete=true`,
+          type: "account_onboarding",
+        });
+
+        return res.json({ 
+          type: "stripe_connect",
+          stripeAccountId,
+          onboardingUrl: accountLink.url,
+        });
+      }
+
+      // For bank account (ACH)
+      if (methodType === "bank_account") {
+        if (!accountNumber || !routingNumber) {
+          return res.status(400).json({ error: "Account and routing numbers are required for bank account" });
+        }
+
+        const accountLast4 = accountNumber.slice(-4);
+        const routingLast4 = routingNumber.slice(-4);
+        
+        // Placeholder encryption - use proper encryption in production
+        const encryptedAccountNumber = Buffer.from(accountNumber).toString("base64");
+        const encryptedRoutingNumber = Buffer.from(routingNumber).toString("base64");
+
+        // Set any existing bank accounts to not default
+        await db.update(professionalPaymentMethods)
+          .set({ isDefault: false })
+          .where(eq(professionalPaymentMethods.professionalId, session.professionalId));
+
+        const [paymentMethod] = await db.insert(professionalPaymentMethods)
+          .values({
+            professionalId: session.professionalId,
+            methodType: "bank_account",
+            bankName,
+            accountType,
+            accountLast4,
+            routingLast4,
+            encryptedAccountNumber,
+            encryptedRoutingNumber,
+            isDefault: true,
+            verificationStatus: "pending",
+          })
+          .returning();
+
+        // Audit log - never log full account numbers
+        await db.insert(onboardingAuditLog).values({
+          professionalId: session.professionalId,
+          action: "payment_method_added",
+          actorType: "professional",
+          actorId: session.professionalId,
+          newValue: JSON.stringify({ 
+            methodType, 
+            bankName, 
+            accountLast4: `****${accountLast4}`,
+          }),
+          ipAddress: req.ip,
+          userAgent: req.headers["user-agent"],
+        });
+
+        return res.status(201).json({
+          ...paymentMethod,
+          encryptedAccountNumber: undefined,
+          encryptedRoutingNumber: undefined,
+        });
+      }
+
+      res.status(400).json({ error: "Unsupported payment method type" });
+    } catch (error) {
+      console.error("Error adding payment method:", error);
+      res.status(500).json({ error: "Failed to add payment method" });
+    }
+  });
+
+  // Get payment methods for current professional
+  app.get("/api/professional/onboarding/payment-methods", async (req, res) => {
+    try {
+      const session = req.session as any;
+      if (!session.professionalId) {
+        return res.status(401).json({ error: "Not authenticated as professional" });
+      }
+
+      const { professionalPaymentMethods } = await import("@shared/schema");
+      const methods = await db.select()
+        .from(professionalPaymentMethods)
+        .where(eq(professionalPaymentMethods.professionalId, session.professionalId));
+
+      // Never return encrypted values
+      res.json(methods.map(m => ({
+        ...m,
+        encryptedAccountNumber: undefined,
+        encryptedRoutingNumber: undefined,
+      })));
+    } catch (error) {
+      console.error("Error fetching payment methods:", error);
+      res.status(500).json({ error: "Failed to fetch payment methods" });
+    }
+  });
+
+  // Stripe Connect webhook callback to update onboarding status
+  app.get("/api/professional/onboarding/stripe-status", async (req, res) => {
+    try {
+      const session = req.session as any;
+      if (!session.professionalId) {
+        return res.status(401).json({ error: "Not authenticated as professional" });
+      }
+
+      const { professionalPaymentMethods, professionals } = await import("@shared/schema");
+      
+      const [paymentMethod] = await db.select()
+        .from(professionalPaymentMethods)
+        .where(eq(professionalPaymentMethods.professionalId, session.professionalId));
+
+      if (!paymentMethod?.stripeAccountId) {
+        return res.json({ connected: false });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      const account = await stripe.accounts.retrieve(paymentMethod.stripeAccountId);
+
+      const isComplete = account.details_submitted && account.charges_enabled;
+      
+      // Update status
+      await db.update(professionalPaymentMethods)
+        .set({
+          stripeOnboardingComplete: isComplete,
+          stripeAccountStatus: isComplete ? "active" : "pending",
+          verificationStatus: isComplete ? "verified" : "pending",
+          verifiedAt: isComplete ? new Date() : null,
+          updatedAt: new Date(),
+        })
+        .where(eq(professionalPaymentMethods.id, paymentMethod.id));
+
+      // If complete, update professional's payment method verified status
+      if (isComplete) {
+        await db.update(professionals)
+          .set({ 
+            paymentMethodVerified: true,
+            updatedAt: new Date(),
+          })
+          .where(eq(professionals.id, session.professionalId));
+      }
+
+      res.json({
+        connected: true,
+        stripeAccountId: paymentMethod.stripeAccountId,
+        detailsSubmitted: account.details_submitted,
+        chargesEnabled: account.charges_enabled,
+        payoutsEnabled: account.payouts_enabled,
+        complete: isComplete,
+      });
+    } catch (error) {
+      console.error("Error checking Stripe status:", error);
+      res.status(500).json({ error: "Failed to check Stripe status" });
+    }
+  });
+
   // ===== Practice Invitations - Invite professionals to connect =====
   
   // Get all invitations for a practice
