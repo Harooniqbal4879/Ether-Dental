@@ -1,0 +1,227 @@
+You are building a **Freelancer / Independent Contractor Onboarding & Verification Module** for a web platform (similar to Upwork onboarding), where professionals will work as **1099 contractors** before they are eligible to receive payments.
+
+Your goal is to design and implement the **end-to-end onboarding workflow**, including document collection, verification tracking, and payment readiness status.
+
+---
+
+## 1️⃣ Functional Objective
+
+Create a system that ensures freelancers cannot receive payments until all required onboarding and compliance documents are completed and verified.
+
+The system must:
+
+* Collect required contractor documents
+* Store them securely
+* Track verification status
+* Flag missing items
+* Mark contractors as **“Payment Eligible”** only after completion
+
+---
+
+## 2️⃣ Required Contractor Verifications
+
+Design the onboarding checklist to include the following:
+
+### Identity Verification
+
+* Government-issued ID upload
+
+  * Driver’s License or Passport
+* Selfie / live photo verification (optional but recommended)
+* Full legal name
+* Date of birth
+* Address
+
+### Tax Compliance (1099)
+
+* W-9 Form collection
+
+  * Legal name
+  * Business name (if applicable)
+  * SSN or EIN
+  * Address
+  * Signature (e-signature supported)
+* Tax classification selection:
+
+  * Individual / Sole Proprietor
+  * LLC
+  * Corporation
+  * Partnership
+
+### Payment Details
+
+Support multiple payout methods:
+
+* Bank account (ACH)
+
+  * Account number
+  * Routing number
+  * Account type
+* Stripe Connect / PayPal / Wise integration (design as pluggable)
+* Payment email (if digital wallet)
+
+### Contact Information
+
+* Email verification
+* Phone verification (OTP)
+
+### Professional Details
+
+* Resume / CV upload
+* Certifications / licenses (if applicable)
+* Skills & specialization
+* LinkedIn / portfolio links
+
+### Agreement & Compliance
+
+* Independent Contractor Agreement (e-sign)
+* NDA (optional)
+* Code of conduct / platform terms acceptance
+
+---
+
+## 3️⃣ System Status Model
+
+Each contractor must have an onboarding status:
+
+```text
+INVITED
+IN_PROGRESS
+UNDER_REVIEW
+VERIFIED
+REJECTED
+PAYMENT_ELIGIBLE
+SUSPENDED
+```
+
+Payment eligibility requires:
+
+* Identity verified
+* W-9 completed
+* Payment method verified
+* Agreements signed
+
+---
+
+## 4️⃣ Database Schema (Design)
+
+Create tables such as:
+
+### contractors
+
+* id (UUID)
+* legal_name
+* email
+* phone
+* status
+* payment_eligible (boolean)
+* created_at
+
+### contractor_documents
+
+* id
+* contractor_id
+* document_type
+* file_url
+* verification_status
+* uploaded_at
+* verified_at
+
+### tax_forms
+
+* contractor_id
+* w9_completed (boolean)
+* tax_classification
+* ssn_ein_encrypted
+
+### payment_methods
+
+* contractor_id
+* method_type
+* last4
+* verification_status
+
+### agreements
+
+* contractor_id
+* agreement_type
+* signed_at
+* ip_address
+
+---
+
+## 5️⃣ Admin Verification Panel
+
+Build an admin dashboard to:
+
+* View submitted documents
+* Approve / reject verifications
+* Request resubmission
+* See onboarding completion %
+* Toggle “Payment Eligible”
+
+---
+
+## 6️⃣ User Experience Flow
+
+1. Freelancer invited via email
+2. Account created
+3. Onboarding checklist displayed
+4. Uploads documents step-by-step
+5. Signs agreements
+6. Adds payment method
+7. Submits for review
+8. Admin verifies
+9. Status → Payment Eligible
+
+---
+
+## 7️⃣ Security & Compliance Requirements
+
+* Encrypt SSN/EIN data at rest
+* Use secure file storage (S3 or equivalent)
+* Signed URLs for document access
+* Audit logs for all verification actions
+* Role-based access (Admin vs Reviewer)
+
+---
+
+## 8️⃣ Payment Blocking Logic
+
+Implement rule:
+
+```pseudo
+IF identity_verified
+AND w9_completed
+AND payment_method_verified
+AND agreements_signed
+THEN payment_eligible = TRUE
+ELSE block payouts
+```
+
+---
+
+## 9️⃣ Deliverables
+
+* Backend APIs for onboarding
+* Document upload service
+* Status tracking system
+* Admin review dashboard
+* Payment eligibility logic
+* Database schema + migrations
+
+---
+
+## 10️⃣ Tech Stack (assume or make configurable)
+
+* Backend: Node.js / Python / Laravel
+* DB: PostgreSQL
+* Storage: AWS S3
+* Auth: JWT / Cognito
+* Payments: Stripe Connect (preferred)
+
+Design code to be modular so payment providers can be swapped.
+
+---
+
+End goal: A production-ready contractor onboarding system that ensures 1099 compliance and payment readiness verification before freelancers can be paid.
