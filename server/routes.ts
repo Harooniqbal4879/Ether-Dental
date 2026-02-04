@@ -2943,6 +2943,283 @@ export async function registerRoutes(
     }
   });
 
+  // ============================================================
+  // Admin Contractor Verification API
+  // ============================================================
+
+  // Get all professionals with onboarding status for admin review
+  app.get("/api/admin/contractors", async (req, res) => {
+    try {
+      const session = req.session as any;
+      if (!session.adminId) {
+        return res.status(401).json({ error: "Not authenticated as admin" });
+      }
+
+      const { professionals, contractorDocuments, contractorTaxForms, professionalPaymentMethods, professionalAgreements } = await import("@shared/schema");
+      const { desc, sql: sqlFn } = await import("drizzle-orm");
+
+      // Get all professionals with onboarding data
+      const allProfessionals = await db.select().from(professionals).orderBy(desc(professionals.createdAt));
+
+      // Enrich with onboarding data
+      const enrichedProfessionals = await Promise.all(allProfessionals.map(async (prof) => {
+        const documents = await db.select().from(contractorDocuments).where(eq(contractorDocuments.professionalId, prof.id));
+        const taxForms = await db.select().from(contractorTaxForms).where(eq(contractorTaxForms.professionalId, prof.id));
+        const paymentMethods = await db.select().from(professionalPaymentMethods).where(eq(professionalPaymentMethods.professionalId, prof.id));
+        const agreements = await db.select().from(professionalAgreements).where(eq(professionalAgreements.professionalId, prof.id));
+
+        return {
+          ...prof,
+          documents,
+          taxForms: taxForms.map(tf => ({
+            ...tf,
+            encryptedSsn: undefined,
+            encryptedEin: undefined,
+          })),
+          paymentMethods: paymentMethods.map(pm => ({
+            ...pm,
+            encryptedAccountNumber: undefined,
+            encryptedRoutingNumber: undefined,
+          })),
+          agreements,
+          pendingDocuments: documents.filter(d => d.verificationStatus === "pending").length,
+          pendingW9: taxForms.some(tf => tf.verificationStatus === "pending"),
+        };
+      }));
+
+      res.json(enrichedProfessionals);
+    } catch (error) {
+      console.error("Error fetching contractors for admin:", error);
+      res.status(500).json({ error: "Failed to fetch contractors" });
+    }
+  });
+
+  // Get specific contractor details for admin review
+  app.get("/api/admin/contractors/:id", async (req, res) => {
+    try {
+      const session = req.session as any;
+      if (!session.adminId) {
+        return res.status(401).json({ error: "Not authenticated as admin" });
+      }
+
+      const professional = await storage.getProfessional(req.params.id);
+      if (!professional) {
+        return res.status(404).json({ error: "Professional not found" });
+      }
+
+      const { contractorDocuments, contractorTaxForms, professionalPaymentMethods, professionalAgreements, onboardingAuditLog } = await import("@shared/schema");
+      const { desc } = await import("drizzle-orm");
+
+      const documents = await db.select().from(contractorDocuments).where(eq(contractorDocuments.professionalId, req.params.id));
+      const taxForms = await db.select().from(contractorTaxForms).where(eq(contractorTaxForms.professionalId, req.params.id));
+      const paymentMethods = await db.select().from(professionalPaymentMethods).where(eq(professionalPaymentMethods.professionalId, req.params.id));
+      const agreements = await db.select().from(professionalAgreements).where(eq(professionalAgreements.professionalId, req.params.id));
+      const auditLogs = await db.select().from(onboardingAuditLog).where(eq(onboardingAuditLog.professionalId, req.params.id)).orderBy(desc(onboardingAuditLog.createdAt));
+
+      res.json({
+        professional,
+        documents,
+        taxForms: taxForms.map(tf => ({
+          ...tf,
+          encryptedSsn: undefined,
+          encryptedEin: undefined,
+        })),
+        paymentMethods: paymentMethods.map(pm => ({
+          ...pm,
+          encryptedAccountNumber: undefined,
+          encryptedRoutingNumber: undefined,
+        })),
+        agreements,
+        auditLogs,
+      });
+    } catch (error) {
+      console.error("Error fetching contractor details:", error);
+      res.status(500).json({ error: "Failed to fetch contractor details" });
+    }
+  });
+
+  // Approve or reject a document
+  app.post("/api/admin/contractors/:id/documents/:documentId/verify", async (req, res) => {
+    try {
+      const session = req.session as any;
+      if (!session.adminId) {
+        return res.status(401).json({ error: "Not authenticated as admin" });
+      }
+
+      const { action, rejectionReason } = req.body;
+      if (!action || !["approve", "reject"].includes(action)) {
+        return res.status(400).json({ error: "Valid action (approve/reject) is required" });
+      }
+
+      const { contractorDocuments, onboardingAuditLog, professionals } = await import("@shared/schema");
+
+      const [document] = await db.select().from(contractorDocuments).where(eq(contractorDocuments.id, req.params.documentId));
+      if (!document || document.professionalId !== req.params.id) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+
+      const admin = await storage.getPracticeAdmin(session.adminId);
+
+      // Update document status
+      await db.update(contractorDocuments)
+        .set({
+          verificationStatus: action === "approve" ? "approved" : "rejected",
+          verifiedAt: new Date(),
+          verifiedBy: session.adminId,
+          rejectionReason: action === "reject" ? rejectionReason : null,
+          updatedAt: new Date(),
+        })
+        .where(eq(contractorDocuments.id, req.params.documentId));
+
+      // If it's a government ID being approved, update identity verified flag
+      if (action === "approve" && document.documentType === "government_id") {
+        await db.update(professionals)
+          .set({ identityVerified: true, updatedAt: new Date() })
+          .where(eq(professionals.id, req.params.id));
+      }
+
+      // Audit log
+      await db.insert(onboardingAuditLog).values({
+        professionalId: req.params.id,
+        action: action === "approve" ? "document_approved" : "document_rejected",
+        actorType: "admin",
+        actorId: session.adminId,
+        actorEmail: admin?.email,
+        documentId: req.params.documentId,
+        previousValue: JSON.stringify({ status: document.verificationStatus }),
+        newValue: JSON.stringify({ status: action === "approve" ? "approved" : "rejected", rejectionReason }),
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+      });
+
+      res.json({ success: true, message: `Document ${action}d successfully` });
+    } catch (error) {
+      console.error("Error verifying document:", error);
+      res.status(500).json({ error: "Failed to verify document" });
+    }
+  });
+
+  // Approve or reject W-9 form
+  app.post("/api/admin/contractors/:id/w9/verify", async (req, res) => {
+    try {
+      const session = req.session as any;
+      if (!session.adminId) {
+        return res.status(401).json({ error: "Not authenticated as admin" });
+      }
+
+      const { action, rejectionReason } = req.body;
+      if (!action || !["approve", "reject"].includes(action)) {
+        return res.status(400).json({ error: "Valid action (approve/reject) is required" });
+      }
+
+      const { contractorTaxForms, onboardingAuditLog, professionals } = await import("@shared/schema");
+
+      const [taxForm] = await db.select().from(contractorTaxForms).where(eq(contractorTaxForms.professionalId, req.params.id));
+      if (!taxForm) {
+        return res.status(404).json({ error: "W-9 form not found" });
+      }
+
+      const admin = await storage.getPracticeAdmin(session.adminId);
+
+      // Update W-9 status
+      await db.update(contractorTaxForms)
+        .set({
+          verificationStatus: action === "approve" ? "verified" : "rejected",
+          verifiedAt: new Date(),
+          verifiedBy: session.adminId,
+          rejectionReason: action === "reject" ? rejectionReason : null,
+          updatedAt: new Date(),
+        })
+        .where(eq(contractorTaxForms.id, taxForm.id));
+
+      // If approved, update professional's w9Completed flag
+      if (action === "approve") {
+        await db.update(professionals)
+          .set({ w9Completed: true, updatedAt: new Date() })
+          .where(eq(professionals.id, req.params.id));
+      }
+
+      // Audit log
+      await db.insert(onboardingAuditLog).values({
+        professionalId: req.params.id,
+        action: action === "approve" ? "w9_approved" : "w9_rejected",
+        actorType: "admin",
+        actorId: session.adminId,
+        actorEmail: admin?.email,
+        previousValue: JSON.stringify({ status: taxForm.verificationStatus }),
+        newValue: JSON.stringify({ status: action === "approve" ? "verified" : "rejected", rejectionReason }),
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+      });
+
+      res.json({ success: true, message: `W-9 ${action}d successfully` });
+    } catch (error) {
+      console.error("Error verifying W-9:", error);
+      res.status(500).json({ error: "Failed to verify W-9" });
+    }
+  });
+
+  // Update contractor onboarding status (approve for payment, suspend, etc.)
+  app.post("/api/admin/contractors/:id/status", async (req, res) => {
+    try {
+      const session = req.session as any;
+      if (!session.adminId) {
+        return res.status(401).json({ error: "Not authenticated as admin" });
+      }
+
+      const { status, notes } = req.body;
+      const validStatuses = ["verified", "payment_eligible", "rejected", "suspended", "in_progress"];
+      if (!status || !validStatuses.includes(status)) {
+        return res.status(400).json({ error: "Valid status is required" });
+      }
+
+      const { professionals, onboardingAuditLog } = await import("@shared/schema");
+
+      const professional = await storage.getProfessional(req.params.id);
+      if (!professional) {
+        return res.status(404).json({ error: "Professional not found" });
+      }
+
+      const admin = await storage.getPracticeAdmin(session.adminId);
+
+      // Update professional status
+      const updateData: any = {
+        onboardingStatus: status,
+        updatedAt: new Date(),
+      };
+
+      // If marking as payment_eligible, also set the flag
+      if (status === "payment_eligible") {
+        updateData.paymentEligible = true;
+      } else if (status === "suspended" || status === "rejected") {
+        updateData.paymentEligible = false;
+      }
+
+      await db.update(professionals)
+        .set(updateData)
+        .where(eq(professionals.id, req.params.id));
+
+      // Audit log
+      await db.insert(onboardingAuditLog).values({
+        professionalId: req.params.id,
+        action: "status_changed",
+        actorType: "admin",
+        actorId: session.adminId,
+        actorEmail: admin?.email,
+        previousValue: JSON.stringify({ status: professional.onboardingStatus, paymentEligible: professional.paymentEligible }),
+        newValue: JSON.stringify({ status, paymentEligible: status === "payment_eligible" }),
+        notes,
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+      });
+
+      res.json({ success: true, message: `Contractor status updated to ${status}` });
+    } catch (error) {
+      console.error("Error updating contractor status:", error);
+      res.status(500).json({ error: "Failed to update contractor status" });
+    }
+  });
+
   // ===== Practice Invitations - Invite professionals to connect =====
   
   // Get all invitations for a practice
