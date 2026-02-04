@@ -3245,6 +3245,9 @@ export async function registerRoutes(
   // ============================================================
 
   // Get contractor verification data for the professionals hub modal
+  // Note: Professionals are independent contractors who can work with multiple practices.
+  // System admins (isSuperAdmin) can view all contractors. Regular admins can only view
+  // contractors who have worked with their practice (through shifts).
   app.get("/api/contractors/:id/verification", async (req, res) => {
     try {
       const session = req.session as any;
@@ -3252,9 +3255,31 @@ export async function registerRoutes(
         return res.status(401).json({ error: "Not authenticated as admin" });
       }
 
+      const admin = await storage.getPracticeAdmin(session.adminId);
+      if (!admin) {
+        return res.status(401).json({ error: "Admin not found" });
+      }
+
       const professional = await storage.getProfessional(req.params.id);
       if (!professional) {
         return res.status(404).json({ error: "Professional not found" });
+      }
+
+      // For non-super admins, verify the professional has worked with their practice
+      if (!admin.isSuperAdmin && admin.practiceId) {
+        const { staffShifts } = await import("@shared/schema");
+        const { and } = await import("drizzle-orm");
+        const practiceShifts = await db.select()
+          .from(staffShifts)
+          .where(and(
+            eq(staffShifts.claimedBy, req.params.id),
+            eq(staffShifts.practiceId, admin.practiceId)
+          ))
+          .limit(1);
+        
+        if (practiceShifts.length === 0) {
+          return res.status(403).json({ error: "Access denied: Professional not associated with your practice" });
+        }
       }
 
       const { contractorDocuments, contractorTaxForms, professionalPaymentMethods, professionalAgreements } = await import("@shared/schema");
@@ -3303,6 +3328,7 @@ export async function registerRoutes(
   });
 
   // Update contractor status from professionals hub
+  // Only system admins (isSuperAdmin) can modify contractor verification status
   app.patch("/api/contractors/:id/status", async (req, res) => {
     try {
       const session = req.session as any;
@@ -3310,9 +3336,19 @@ export async function registerRoutes(
         return res.status(401).json({ error: "Not authenticated as admin" });
       }
 
+      const admin = await storage.getPracticeAdmin(session.adminId);
+      if (!admin || !admin.isSuperAdmin) {
+        return res.status(403).json({ error: "Only system administrators can modify contractor status" });
+      }
+
       const { status, reason } = req.body;
       if (!status) {
         return res.status(400).json({ error: "Status is required" });
+      }
+
+      const validStatuses = ["invited", "in_progress", "under_review", "verified", "rejected", "payment_eligible", "suspended"];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ error: "Invalid status value" });
       }
 
       const { professionals, onboardingAuditLog } = await import("@shared/schema");
@@ -3321,8 +3357,6 @@ export async function registerRoutes(
       if (!professional) {
         return res.status(404).json({ error: "Professional not found" });
       }
-
-      const admin = await storage.getPracticeAdmin(session.adminId);
 
       const updateData: any = {
         onboardingStatus: status,
@@ -3360,11 +3394,17 @@ export async function registerRoutes(
   });
 
   // Approve W-9 tax form
+  // Only system admins (isSuperAdmin) can approve W-9 forms
   app.patch("/api/contractors/:professionalId/tax-forms/:taxFormId/approve", async (req, res) => {
     try {
       const session = req.session as any;
       if (!session.adminId) {
         return res.status(401).json({ error: "Not authenticated as admin" });
+      }
+
+      const admin = await storage.getPracticeAdmin(session.adminId);
+      if (!admin || !admin.isSuperAdmin) {
+        return res.status(403).json({ error: "Only system administrators can approve W-9 forms" });
       }
 
       const { contractorTaxForms, professionals, onboardingAuditLog } = await import("@shared/schema");
@@ -3373,8 +3413,6 @@ export async function registerRoutes(
       if (!taxForm || taxForm.professionalId !== req.params.professionalId) {
         return res.status(404).json({ error: "Tax form not found" });
       }
-
-      const admin = await storage.getPracticeAdmin(session.adminId);
 
       await db.update(contractorTaxForms)
         .set({
@@ -3409,11 +3447,17 @@ export async function registerRoutes(
   });
 
   // Approve identity verification
+  // Only system admins (isSuperAdmin) can approve identity verification
   app.patch("/api/contractors/:professionalId/identity/approve", async (req, res) => {
     try {
       const session = req.session as any;
       if (!session.adminId) {
         return res.status(401).json({ error: "Not authenticated as admin" });
+      }
+
+      const admin = await storage.getPracticeAdmin(session.adminId);
+      if (!admin || !admin.isSuperAdmin) {
+        return res.status(403).json({ error: "Only system administrators can approve identity verification" });
       }
 
       const { professionals, onboardingAuditLog } = await import("@shared/schema");
@@ -3422,8 +3466,6 @@ export async function registerRoutes(
       if (!professional) {
         return res.status(404).json({ error: "Professional not found" });
       }
-
-      const admin = await storage.getPracticeAdmin(session.adminId);
 
       await db.update(professionals)
         .set({ identityVerified: true, updatedAt: new Date() })

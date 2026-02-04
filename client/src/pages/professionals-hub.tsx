@@ -273,7 +273,9 @@ function VerificationModal({
 }) {
   const { toast } = useToast();
   const { currentPersona } = usePersona();
+  const { admin } = useAuth();
   const isAdmin = currentPersona === "admin" || currentPersona === "system_admin";
+  const isSuperAdmin = admin?.isSuperAdmin === true;
 
   const { data: verificationData, isLoading } = useQuery<ContractorVerificationData>({
     queryKey: ["/api/contractors", professionalId, "verification"],
@@ -390,7 +392,7 @@ function VerificationModal({
                       )}
                       <span className="font-medium">Identity Verification</span>
                     </div>
-                    {isAdmin && !professional.identityVerified && documents.some(d => d.type === 'identity') && (
+                    {isSuperAdmin && !professional.identityVerified && documents.some(d => d.type === 'identity') && (
                       <Button 
                         size="sm" 
                         onClick={() => approveIdentityMutation.mutate()}
@@ -452,9 +454,9 @@ function VerificationModal({
                   </div>
                 </div>
 
-                {isAdmin && (
+                {isSuperAdmin && (
                   <div className="pt-4 border-t space-y-3">
-                    <h4 className="font-medium text-sm">Admin Actions</h4>
+                    <h4 className="font-medium text-sm">System Admin Actions</h4>
                     <div className="flex flex-wrap gap-2">
                       {professional.onboardingStatus === "under_review" && (
                         <>
@@ -570,7 +572,7 @@ function VerificationModal({
                             <span className="ml-2">{new Date(form.submittedAt).toLocaleDateString()}</span>
                           </div>
                         </div>
-                        {isAdmin && form.status === 'pending' && (
+                        {isSuperAdmin && form.status === 'pending' && (
                           <Button 
                             size="sm" 
                             onClick={() => approveW9Mutation.mutate(form.id)}
@@ -2455,6 +2457,7 @@ export default function ProfessionalsHub() {
   const professionalId = params?.id;
   const { currentPersona } = usePersona();
   const { admin, practice } = useAuth();
+  const { toast } = useToast();
   const practiceId = practice?.id || admin?.practiceId || null;
 
   const [roleFilter, setRoleFilter] = useState<string>("all");

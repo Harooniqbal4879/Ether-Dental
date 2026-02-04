@@ -26,9 +26,14 @@ The platform is built on a modern web stack designed for scalability and maintai
         - Electronic signature for contractor agreements (Independent Contractor Agreement, HIPAA Acknowledgment)
         - Payment method setup via Stripe Connect Express accounts
         - Onboarding status tracking: INVITED → IN_PROGRESS → UNDER_REVIEW → VERIFIED → PAYMENT_ELIGIBLE
-        - Admin contractor verification dashboard at `/app/contractor-verification` for document/W-9 review and approval
+        - **Integrated verification in Professionals Hub**: Admin users see verification status badges on each professional card. Clicking the badge opens a modal with full verification details and admin actions (approve identity, approve W-9, verify contractor, enable payments, suspend)
         - Payment eligibility enforcement: Payments are blocked for contractors who haven't completed all requirements (identity verified, W-9 approved, agreements signed, verified payment method, admin approval)
         - Full audit logging for compliance
+    - **Mobile App API**: JWT-based authentication for mobile apps with endpoints for:
+        - Registration and login (`/api/mobile/auth/register`, `/api/mobile/auth/login`)
+        - Onboarding status and progress tracking (`/api/mobile/onboarding`)
+        - Document upload with multipart/form-data support (`/api/mobile/onboarding/documents/upload`)
+        - W-9 submission, agreement signing, and payment method setup
     - **Patient Portal**: Allows patients to view bills and make payments.
     - **Services**: Manages subscription offerings for insurance and patient billing with tiered pricing.
     - **Settings**: Consolidated practice configuration.
