@@ -19,6 +19,16 @@ The platform is built on a modern web stack designed for scalability and maintai
     - **Staffing Management**: Multi-role shift postings, calendar views, dual pricing models, and a "Professionals Hub" with online status and shift invitation system.
     - **Professional Hub**: Personalized portal for professionals to manage profiles, view shifts, track earnings, and manage credentials.
     - **Professional Self-Registration**: Professionals can register their own accounts via `/register-professional` with email/password authentication, then login via `/login/professional`. Passwords are hashed using bcrypt.
+    - **Contractor Onboarding & Verification Module**: 1099-compliant onboarding system for independent contractors including:
+        - 4-step onboarding wizard (Personal Info → W-9 → Agreements → Payment Setup) at `/app/onboarding`
+        - W-9 tax form collection with encrypted SSN/EIN storage (only last-4 digits stored in plaintext)
+        - Identity verification via government ID upload
+        - Electronic signature for contractor agreements (Independent Contractor Agreement, HIPAA Acknowledgment)
+        - Payment method setup via Stripe Connect Express accounts
+        - Onboarding status tracking: INVITED → IN_PROGRESS → UNDER_REVIEW → VERIFIED → PAYMENT_ELIGIBLE
+        - Admin contractor verification dashboard at `/app/contractor-verification` for document/W-9 review and approval
+        - Payment eligibility enforcement: Payments are blocked for contractors who haven't completed all requirements (identity verified, W-9 approved, agreements signed, verified payment method, admin approval)
+        - Full audit logging for compliance
     - **Patient Portal**: Allows patients to view bills and make payments.
     - **Services**: Manages subscription offerings for insurance and patient billing with tiered pricing.
     - **Settings**: Consolidated practice configuration.
