@@ -53,6 +53,14 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Form,
   FormControl,
   FormField,
@@ -305,6 +313,8 @@ export default function ProfessionalOnboarding() {
     routingNumber: "",
     accountHolderName: "",
   });
+  const [paymentModalOpen, setPaymentModalOpen] = useState<string | null>(null);
+  const [paymentAccountEmail, setPaymentAccountEmail] = useState("");
   const [faceMatchResult, setFaceMatchResult] = useState<{
     isMatch: boolean;
     confidence: number;
@@ -2895,8 +2905,7 @@ export default function ProfessionalOnboarding() {
                   <Button 
                     variant="outline" 
                     size="sm"
-                    onClick={() => addPaymentMethodMutation.mutate({ methodType: "paypal" })}
-                    disabled={addPaymentMethodMutation.isPending}
+                    onClick={() => { setPaymentAccountEmail(""); setPaymentModalOpen("paypal"); }}
                     data-testid="button-paypal"
                   >
                     Connect
@@ -2928,8 +2937,7 @@ export default function ProfessionalOnboarding() {
                   <Button 
                     variant="outline" 
                     size="sm"
-                    onClick={() => addPaymentMethodMutation.mutate({ methodType: "payoneer" })}
-                    disabled={addPaymentMethodMutation.isPending}
+                    onClick={() => { setPaymentAccountEmail(""); setPaymentModalOpen("payoneer"); }}
                     data-testid="button-payoneer"
                   >
                     Connect
@@ -2961,8 +2969,7 @@ export default function ProfessionalOnboarding() {
                   <Button 
                     variant="outline" 
                     size="sm"
-                    onClick={() => addPaymentMethodMutation.mutate({ methodType: "wise" })}
-                    disabled={addPaymentMethodMutation.isPending}
+                    onClick={() => { setPaymentAccountEmail(""); setPaymentModalOpen("wise"); }}
                     data-testid="button-wise"
                   >
                     Connect
@@ -2994,8 +3001,7 @@ export default function ProfessionalOnboarding() {
                   <Button 
                     variant="outline" 
                     size="sm"
-                    onClick={() => addPaymentMethodMutation.mutate({ methodType: "skrill" })}
-                    disabled={addPaymentMethodMutation.isPending}
+                    onClick={() => { setPaymentAccountEmail(""); setPaymentModalOpen("skrill"); }}
                     data-testid="button-skrill"
                   >
                     Connect
@@ -3003,6 +3009,67 @@ export default function ProfessionalOnboarding() {
                 )}
               </div>
             </div>
+
+            {/* Payment Method Setup Modal */}
+            <Dialog open={paymentModalOpen !== null} onOpenChange={(open) => { if (!open) setPaymentModalOpen(null); }}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle className="capitalize">
+                    Connect {paymentModalOpen === "wise" ? "Wise (TransferWise)" : paymentModalOpen}
+                  </DialogTitle>
+                  <DialogDescription>
+                    Enter your {paymentModalOpen} account email to receive payments
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="paymentEmail">
+                      {paymentModalOpen === "wise" ? "Wise" : paymentModalOpen?.charAt(0).toUpperCase() + paymentModalOpen?.slice(1)} Email Address
+                    </Label>
+                    <Input
+                      id="paymentEmail"
+                      type="email"
+                      placeholder={`Enter your ${paymentModalOpen} email`}
+                      value={paymentAccountEmail}
+                      onChange={(e) => setPaymentAccountEmail(e.target.value)}
+                      data-testid="input-payment-email"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      This email must match your verified {paymentModalOpen} account
+                    </p>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setPaymentModalOpen(null)}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      if (!paymentAccountEmail || !paymentAccountEmail.includes("@")) {
+                        toast({ title: "Please enter a valid email address", variant: "destructive" });
+                        return;
+                      }
+                      addPaymentMethodMutation.mutate({ 
+                        methodType: paymentModalOpen!, 
+                        paymentEmail: paymentAccountEmail 
+                      });
+                      setPaymentModalOpen(null);
+                    }}
+                    disabled={addPaymentMethodMutation.isPending}
+                    data-testid="button-confirm-payment"
+                  >
+                    {addPaymentMethodMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Connecting...
+                      </>
+                    ) : (
+                      "Connect Account"
+                    )}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
 
             {/* Platform Escrow Release */}
             <div className="border rounded-lg p-4">

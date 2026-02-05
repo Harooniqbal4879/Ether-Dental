@@ -3313,6 +3313,10 @@ export async function registerRoutes(
       // For digital wallet/payment processors (PayPal, Payoneer, Wise, Skrill)
       const digitalWalletTypes = ["paypal", "payoneer", "wise", "skrill"];
       if (digitalWalletTypes.includes(methodType)) {
+        if (!paymentEmail) {
+          return res.status(400).json({ error: "Account email is required for this payment method" });
+        }
+
         // Set any existing methods to not default
         await db.update(professionalPaymentMethods)
           .set({ isDefault: false })
@@ -3322,18 +3326,20 @@ export async function registerRoutes(
           .values({
             professionalId: session.professionalId,
             methodType,
+            paymentEmail,
             isDefault: true,
             verificationStatus: "pending",
           })
           .returning();
 
-        // Audit log
+        // Audit log - mask email for privacy
+        const maskedEmail = paymentEmail.replace(/(.{2})(.*)(@.*)/, "$1***$3");
         await db.insert(onboardingAuditLog).values({
           professionalId: session.professionalId,
           action: "payment_method_added",
           actorType: "professional",
           actorId: session.professionalId,
-          newValue: JSON.stringify({ methodType }),
+          newValue: JSON.stringify({ methodType, email: maskedEmail }),
           ipAddress: req.ip,
           userAgent: req.headers["user-agent"],
         });
