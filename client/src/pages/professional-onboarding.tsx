@@ -1975,9 +1975,34 @@ By signing below, I acknowledge my understanding of and commitment to HIPAA comp
               {onboardingData?.documents?.some(d => d.documentType === "selfie") ? (
                 <div className="space-y-4">
                   <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="h-5 w-5 text-green-600" />
-                      <span className="font-medium text-green-800 dark:text-green-200">Selfie Uploaded</span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="h-5 w-5 text-green-600" />
+                        <span className="font-medium text-green-800 dark:text-green-200">Selfie Uploaded</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const doc = onboardingData?.documents?.find(d => d.documentType === "selfie");
+                            if (doc?.documentUrl) window.open(doc.documentUrl, "_blank");
+                          }}
+                          data-testid="button-view-selfie"
+                        >
+                          <Eye className="h-3 w-3 mr-1" />
+                          View
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeDocumentMutation.mutate("selfie")}
+                          disabled={removeDocumentMutation.isPending}
+                          data-testid="button-remove-selfie"
+                        >
+                          {removeDocumentMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Remove"}
+                        </Button>
+                      </div>
                     </div>
                     <p className="text-sm text-green-700 dark:text-green-300 mt-1">
                       Your selfie has been uploaded. Now verify your identity.
