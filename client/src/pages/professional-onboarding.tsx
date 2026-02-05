@@ -190,6 +190,18 @@ export default function ProfessionalOnboarding() {
   const [isUploadingIdBack, setIsUploadingIdBack] = useState(false);
   const [isUploadingSelfie, setIsUploadingSelfie] = useState(false);
   const [selectedIdType, setSelectedIdType] = useState<string>("drivers_license");
+  const [isRunningFaceMatch, setIsRunningFaceMatch] = useState(false);
+  const [faceMatchResult, setFaceMatchResult] = useState<{
+    isMatch: boolean;
+    confidence: number;
+    analysisDetails: {
+      idPhotoQuality: string;
+      selfieQuality: string;
+      facialFeatures: string;
+      matchReasoning: string;
+    };
+    warnings: string[];
+  } | null>(null);
 
   const { data: onboardingData, isLoading, refetch } = useQuery<{
     professional: any;
@@ -383,6 +395,25 @@ export default function ProfessionalOnboarding() {
       setSelectedIdType(storedType);
     }
   }, [stepStatus.steps]);
+
+  // Load existing face match result from selfie document metadata
+  useEffect(() => {
+    if (onboardingData?.documents) {
+      const selfieDoc = onboardingData.documents.find(d => d.documentType === "selfie");
+      if (selfieDoc?.metadata) {
+        try {
+          const metadata = typeof selfieDoc.metadata === 'string' 
+            ? JSON.parse(selfieDoc.metadata) 
+            : selfieDoc.metadata;
+          if (metadata.faceMatchResult && !faceMatchResult) {
+            setFaceMatchResult(metadata.faceMatchResult);
+          }
+        } catch {
+          // Ignore parsing errors
+        }
+      }
+    }
+  }, [onboardingData?.documents]);
 
   // Handle manual step selection
   const handleStepClick = (stepIndex: number) => {
@@ -1497,14 +1528,111 @@ export default function ProfessionalOnboarding() {
               </p>
 
               {onboardingData?.documents?.some(d => d.documentType === "selfie") ? (
-                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="font-medium text-green-800 dark:text-green-200">Selfie Uploaded</span>
+                <div className="space-y-4">
+                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-5 w-5 text-green-600" />
+                      <span className="font-medium text-green-800 dark:text-green-200">Selfie Uploaded</span>
+                    </div>
+                    <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+                      Your selfie has been uploaded. Now verify your identity.
+                    </p>
                   </div>
-                  <p className="text-sm text-green-700 dark:text-green-300 mt-1">
-                    Your selfie has been uploaded and is pending verification.
-                  </p>
+
+                  {/* Face Match Verification */}
+                  {stepStatus.steps[1]?.hasIdFront && (
+                    <div className="border rounded-lg p-4 bg-card">
+                      <h5 className="font-medium mb-2 flex items-center gap-2">
+                        <ShieldCheck className="h-5 w-5 text-primary" />
+                        AI Identity Verification
+                      </h5>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Our AI system will compare your selfie with your ID photo to verify your identity.
+                      </p>
+
+                      {faceMatchResult ? (
+                        <div className={`rounded-lg p-4 ${faceMatchResult.isMatch ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800" : "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800"} border`}>
+                          <div className="flex items-center gap-2 mb-2">
+                            {faceMatchResult.isMatch ? (
+                              <CheckCircle className="h-5 w-5 text-green-600" />
+                            ) : (
+                              <AlertCircle className="h-5 w-5 text-red-600" />
+                            )}
+                            <span className={`font-medium ${faceMatchResult.isMatch ? "text-green-800 dark:text-green-200" : "text-red-800 dark:text-red-200"}`}>
+                              {faceMatchResult.isMatch ? "Identity Verified" : "Verification Failed"}
+                            </span>
+                            <Badge variant={faceMatchResult.isMatch ? "default" : "destructive"} className="ml-2">
+                              {faceMatchResult.confidence}% confidence
+                            </Badge>
+                          </div>
+                          <p className={`text-sm ${faceMatchResult.isMatch ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"}`}>
+                            {faceMatchResult.analysisDetails.matchReasoning}
+                          </p>
+                          {faceMatchResult.warnings.length > 0 && (
+                            <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-300">
+                              <strong>Notes:</strong> {faceMatchResult.warnings.join(", ")}
+                            </div>
+                          )}
+                          {!faceMatchResult.isMatch && (
+                            <Button 
+                              variant="outline" 
+                              className="mt-3"
+                              onClick={() => setFaceMatchResult(null)}
+                              data-testid="button-retry-face-match"
+                            >
+                              Try Again
+                            </Button>
+                          )}
+                        </div>
+                      ) : (
+                        <Button
+                          onClick={async () => {
+                            setIsRunningFaceMatch(true);
+                            try {
+                              const response = await fetch("/api/professional/onboarding/face-match", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                credentials: "include",
+                              });
+                              if (!response.ok) {
+                                const error = await response.json();
+                                throw new Error(error.error || "Verification failed");
+                              }
+                              const result = await response.json();
+                              setFaceMatchResult(result);
+                              if (result.isMatch) {
+                                toast({ title: "Identity Verified", description: `Face match confirmed with ${result.confidence}% confidence.` });
+                              } else {
+                                toast({ title: "Verification Failed", description: "The photos don't appear to match. Please try with better quality photos.", variant: "destructive" });
+                              }
+                            } catch (error) {
+                              toast({ 
+                                title: "Verification Error", 
+                                description: error instanceof Error ? error.message : "Unknown error", 
+                                variant: "destructive" 
+                              });
+                            } finally {
+                              setIsRunningFaceMatch(false);
+                            }
+                          }}
+                          disabled={isRunningFaceMatch}
+                          data-testid="button-verify-identity"
+                        >
+                          {isRunningFaceMatch ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Analyzing Photos...
+                            </>
+                          ) : (
+                            <>
+                              <ShieldCheck className="h-4 w-4 mr-2" />
+                              Verify My Identity
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">

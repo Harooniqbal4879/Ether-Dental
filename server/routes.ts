@@ -2769,6 +2769,171 @@ export async function registerRoutes(
     }
   });
 
+  // AI Face Match - Compare ID photo to selfie
+  app.post("/api/professional/onboarding/face-match", async (req, res) => {
+    try {
+      const session = req.session as any;
+      if (!session.professionalId) {
+        return res.status(401).json({ error: "Not authenticated as professional" });
+      }
+
+      // Check for recent face match to prevent abuse (5-minute cooldown)
+      const lastFaceMatch = session.lastFaceMatchTime;
+      if (lastFaceMatch && Date.now() - lastFaceMatch < 5 * 60 * 1000) {
+        const waitTime = Math.ceil((5 * 60 * 1000 - (Date.now() - lastFaceMatch)) / 1000);
+        return res.status(429).json({ 
+          error: `Please wait ${waitTime} seconds before trying again`,
+          retryAfter: waitTime 
+        });
+      }
+
+      const { contractorDocuments } = await import("@shared/schema");
+      
+      // Get the ID front and selfie documents
+      const documents = await db.select()
+        .from(contractorDocuments)
+        .where(eq(contractorDocuments.professionalId, session.professionalId));
+
+      const idFrontDoc = documents.find(d => d.documentType === "id_front");
+      const selfieDoc = documents.find(d => d.documentType === "selfie");
+
+      if (!idFrontDoc || !idFrontDoc.documentUrl) {
+        return res.status(400).json({ error: "ID front photo not uploaded yet" });
+      }
+
+      if (!selfieDoc || !selfieDoc.documentUrl) {
+        return res.status(400).json({ error: "Selfie not uploaded yet" });
+      }
+
+      // Record the face match attempt time
+      session.lastFaceMatchTime = Date.now();
+
+      // Fetch images from object storage and convert to base64
+      const { objectStorageService } = await import("./replit_integrations/object_storage");
+      
+      const fetchImageAsBase64 = async (docUrl: string): Promise<{ data: string; mediaType: string }> => {
+        // Normalize the path - handle various URL formats
+        let objectPath = docUrl;
+        
+        // Handle full URLs (https://host/objects/path)
+        if (objectPath.startsWith('http://') || objectPath.startsWith('https://')) {
+          try {
+            const parsedUrl = new URL(objectPath);
+            objectPath = decodeURIComponent(parsedUrl.pathname);
+          } catch {
+            throw new Error(`Invalid image URL format: ${docUrl}`);
+          }
+        }
+        
+        // Remove /objects/ prefix if present
+        if (objectPath.startsWith('/objects/')) {
+          objectPath = objectPath.slice(9);
+        } else if (objectPath.startsWith('/objects')) {
+          objectPath = objectPath.slice(8);
+        } else if (objectPath.startsWith('/')) {
+          objectPath = objectPath.slice(1);
+        }
+        
+        // Decode any URI encoded characters
+        objectPath = decodeURIComponent(objectPath);
+        
+        // Try to find the file in object storage (public first, then private)
+        let file = await objectStorageService.searchPublicObject(objectPath);
+        
+        // If not found in public paths, try the private object directory
+        if (!file) {
+          try {
+            // Try with /objects/ prefix for getObjectEntityFile
+            const entityPath = objectPath.startsWith('/objects/') ? objectPath : `/objects/${objectPath}`;
+            file = await objectStorageService.getObjectEntityFile(entityPath);
+          } catch {
+            // Still not found
+            throw new Error(`Image not found in storage: ${objectPath}`);
+          }
+        }
+        
+        // Get file metadata for proper content type
+        let mediaType = 'image/jpeg';
+        try {
+          const [metadata] = await file.getMetadata();
+          if (metadata.contentType && metadata.contentType.startsWith('image/')) {
+            mediaType = metadata.contentType;
+          }
+        } catch {
+          // Fallback to extension-based detection
+          const ext = objectPath.split('.').pop()?.toLowerCase() || 'jpg';
+          const mediaTypes: Record<string, string> = {
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'png': 'image/png',
+            'gif': 'image/gif',
+            'webp': 'image/webp',
+          };
+          mediaType = mediaTypes[ext] || 'image/jpeg';
+        }
+        
+        // Validate media type
+        const supportedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        if (!supportedTypes.includes(mediaType)) {
+          throw new Error(`Unsupported image type: ${mediaType}. Please upload a JPEG, PNG, GIF, or WebP image.`);
+        }
+        
+        // Download the file content
+        const [buffer] = await file.download();
+        
+        // Check file size (max 20MB for OpenAI)
+        if (buffer.length > 20 * 1024 * 1024) {
+          throw new Error('Image file is too large. Maximum size is 20MB.');
+        }
+        
+        const base64 = buffer.toString('base64');
+        return { data: base64, mediaType };
+      };
+
+      const [idFrontImage, selfieImage] = await Promise.all([
+        fetchImageAsBase64(idFrontDoc.documentUrl),
+        fetchImageAsBase64(selfieDoc.documentUrl),
+      ]);
+
+      // Import and run face matching with base64 images
+      const { compareFaces } = await import("./services/face-match");
+      const result = await compareFaces(
+        { type: "base64", data: idFrontImage.data, mediaType: idFrontImage.mediaType },
+        { type: "base64", data: selfieImage.data, mediaType: selfieImage.mediaType }
+      );
+
+      // Merge face match result with existing metadata (preserve prior data)
+      let existingMetadata: Record<string, any> = {};
+      if (selfieDoc.metadata) {
+        try {
+          existingMetadata = typeof selfieDoc.metadata === 'string' 
+            ? JSON.parse(selfieDoc.metadata) 
+            : selfieDoc.metadata;
+        } catch {
+          existingMetadata = {};
+        }
+      }
+      
+      const updatedMetadata = {
+        ...existingMetadata,
+        faceMatchResult: result,
+        faceMatchDate: new Date().toISOString(),
+      };
+
+      await db.update(contractorDocuments)
+        .set({ metadata: JSON.stringify(updatedMetadata) })
+        .where(eq(contractorDocuments.id, selfieDoc.id));
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error running face match:", error);
+      res.status(500).json({ 
+        error: "Face matching failed", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
   // Submit W-9 tax form
   app.post("/api/professional/onboarding/w9", async (req, res) => {
     try {
