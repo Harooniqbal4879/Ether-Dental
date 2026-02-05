@@ -52,6 +52,7 @@ import {
   FileCheck,
   CreditCard,
   FileSignature,
+  Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -536,9 +537,22 @@ function VerificationModal({
                             </p>
                           </div>
                         </div>
-                        <Badge variant={doc.status === 'approved' ? 'default' : 'secondary'}>
-                          {doc.status}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          {doc.url && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => window.open(doc.url, "_blank")}
+                              data-testid={`button-view-doc-${doc.id}`}
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              View
+                            </Button>
+                          )}
+                          <Badge variant={doc.status === 'approved' ? 'default' : 'secondary'}>
+                            {doc.status}
+                          </Badge>
+                        </div>
                       </div>
                     ))}
                   </div>

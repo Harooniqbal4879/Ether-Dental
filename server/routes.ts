@@ -3899,10 +3899,10 @@ export async function registerRoutes(
         documents: documents.map(d => ({
           id: d.id,
           type: d.documentType,
-          name: d.originalFilename || d.documentType,
+          name: d.documentName || d.documentType,
           uploadedAt: d.createdAt,
           status: d.verificationStatus,
-          url: d.filePath,
+          url: d.documentUrl,
         })),
         taxForms: taxForms.map(tf => ({
           id: tf.id,
