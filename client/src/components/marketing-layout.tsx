@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Menu, X } from "lucide-react";
 import { useState } from "react";
-import logoPath from "@assets/just_logo_1770330410375.png";
+import logoPath from "@assets/just_logo_1770330927218.jpg";
 
 const navLinks = [
   { href: "/features", label: "Features", id: "features" },

@@ -1,5 +1,5 @@
 import { Link, useLocation as useWouterLocation } from "wouter";
-import logoPath from "@assets/just_logo_1770330410375.png";
+import logoPath from "@assets/just_logo_1770330927218.jpg";
 import {
   LayoutDashboard,
   Users,
