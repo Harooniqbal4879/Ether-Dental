@@ -228,13 +228,28 @@ export default function ProfessionalOnboarding() {
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [resendCountdown, setResendCountdown] = useState(0);
   
-  // Resend countdown timer effect
+  // Email OTP verification state
+  const [emailOtpSent, setEmailOtpSent] = useState(false);
+  const [emailOtpCode, setEmailOtpCode] = useState("");
+  const [isVerifyingEmail, setIsVerifyingEmail] = useState(false);
+  const [isSendingEmailOtp, setIsSendingEmailOtp] = useState(false);
+  const [emailResendCountdown, setEmailResendCountdown] = useState(0);
+  
+  // Resend countdown timer effect for phone
   useEffect(() => {
     if (resendCountdown > 0) {
       const timer = setTimeout(() => setResendCountdown(resendCountdown - 1), 1000);
       return () => clearTimeout(timer);
     }
   }, [resendCountdown]);
+
+  // Resend countdown timer effect for email
+  useEffect(() => {
+    if (emailResendCountdown > 0) {
+      const timer = setTimeout(() => setEmailResendCountdown(emailResendCountdown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [emailResendCountdown]);
 
   const w9Form = useForm<z.infer<typeof w9Schema>>({
     resolver: zodResolver(w9Schema),
@@ -546,6 +561,46 @@ export default function ProfessionalOnboarding() {
     }
   };
 
+  // Handle email OTP send
+  const handleSendEmailOtp = async () => {
+    const email = onboardingData?.professional?.email;
+    if (!email) {
+      toast({ title: "Error", description: "Email not found", variant: "destructive" });
+      return;
+    }
+    setIsSendingEmailOtp(true);
+    try {
+      await apiRequest("POST", "/api/professional/onboarding/send-email-otp", { email });
+      setEmailOtpSent(true);
+      setEmailResendCountdown(60); // 60 second cooldown before resend
+      toast({ title: "Verification code sent", description: "Check your email for the 6-digit code" });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to send verification code", variant: "destructive" });
+    } finally {
+      setIsSendingEmailOtp(false);
+    }
+  };
+
+  // Handle email OTP verification
+  const handleVerifyEmailOtp = async () => {
+    if (!emailOtpCode || emailOtpCode.length !== 6) {
+      toast({ title: "Error", description: "Please enter the 6-digit code", variant: "destructive" });
+      return;
+    }
+    setIsVerifyingEmail(true);
+    try {
+      await apiRequest("POST", "/api/professional/onboarding/verify-email-otp", { code: emailOtpCode });
+      toast({ title: "Email verified successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/professional/onboarding"] });
+      setEmailOtpSent(false);
+      setEmailOtpCode("");
+    } catch (error) {
+      toast({ title: "Error", description: "Invalid or expired verification code", variant: "destructive" });
+    } finally {
+      setIsVerifyingEmail(false);
+    }
+  };
+
   if (!isProfessionalAuthenticated) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -844,6 +899,86 @@ export default function ProfessionalOnboarding() {
                       </p>
                     </div>
                   </div>
+                </div>
+
+                <Separator />
+
+                {/* Email Verification Section */}
+                <div className="space-y-3">
+                  <FormLabel>Email Address</FormLabel>
+                  <div className="flex gap-2 items-center">
+                    <Input 
+                      value={onboardingData?.professional?.email || ""} 
+                      disabled 
+                      className="flex-1 bg-muted"
+                      data-testid="input-email"
+                    />
+                    {!onboardingData?.professional?.emailVerified && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="default"
+                        disabled={isSendingEmailOtp || emailOtpSent}
+                        onClick={handleSendEmailOtp}
+                        data-testid="button-send-email-otp"
+                      >
+                        {isSendingEmailOtp ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : emailOtpSent ? (
+                          "Code Sent"
+                        ) : (
+                          "Verify"
+                        )}
+                      </Button>
+                    )}
+                    {onboardingData?.professional?.emailVerified && (
+                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Verified
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  {/* Email OTP Input Section */}
+                  {emailOtpSent && !onboardingData?.professional?.emailVerified && (
+                    <div className="flex gap-2 items-center mt-2">
+                      <Input
+                        placeholder="Enter 6-digit code"
+                        value={emailOtpCode}
+                        onChange={(e) => setEmailOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                        maxLength={6}
+                        className="w-40"
+                        data-testid="input-email-otp-code"
+                      />
+                      <Button
+                        type="button"
+                        variant="default"
+                        size="default"
+                        disabled={isVerifyingEmail || emailOtpCode.length !== 6}
+                        onClick={handleVerifyEmailOtp}
+                        data-testid="button-verify-email-otp"
+                      >
+                        {isVerifyingEmail ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          "Verify Code"
+                        )}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={emailResendCountdown > 0 || isSendingEmailOtp}
+                        onClick={handleSendEmailOtp}
+                        data-testid="button-resend-email-otp"
+                      >
+                        {emailResendCountdown > 0 ? `Resend in ${emailResendCountdown}s` : "Resend"}
+                      </Button>
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Email from your registration. Verify to receive important notifications.
+                  </p>
                 </div>
 
                 <Separator />

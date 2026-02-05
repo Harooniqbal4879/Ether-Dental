@@ -648,6 +648,9 @@ export const professionals = pgTable("professionals", {
   addressState: text("address_state"),
   addressZip: text("address_zip"),
   countryOfResidence: text("country_of_residence").default("US"),
+  // Email OTP Verification
+  emailVerificationCode: text("email_verification_code"),
+  emailVerificationExpiry: timestamp("email_verification_expiry"),
   // Phone OTP Verification
   phoneVerificationCode: text("phone_verification_code"),
   phoneVerificationExpiry: timestamp("phone_verification_expiry"),

@@ -2416,8 +2416,17 @@ export async function registerRoutes(
     code: z.string().length(6, "Verification code must be 6 digits"),
   });
 
+  const sendEmailOtpSchema = z.object({
+    email: z.string().email("Invalid email address"),
+  });
+
+  const verifyEmailOtpSchema = z.object({
+    code: z.string().length(6, "Verification code must be 6 digits"),
+  });
+
   // Rate limiting map for OTP requests (in-memory, for production use Redis)
   const otpRateLimits = new Map<string, { lastSent: Date; attempts: number }>();
+  const emailOtpRateLimits = new Map<string, { lastSent: Date; attempts: number }>();
 
   app.patch("/api/professional/onboarding/personal-info", async (req, res) => {
     try {
@@ -2564,6 +2573,110 @@ export async function registerRoutes(
       res.json({ success: true, message: "Phone verified successfully" });
     } catch (error) {
       console.error("Error verifying OTP:", error);
+      res.status(500).json({ error: "Failed to verify code" });
+    }
+  });
+
+  // Send OTP for email verification
+  app.post("/api/professional/onboarding/send-email-otp", async (req, res) => {
+    try {
+      const session = req.session as any;
+      if (!session.professionalId) {
+        return res.status(401).json({ error: "Not authenticated as professional" });
+      }
+
+      // Validate request body
+      const validationResult = sendEmailOtpSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ error: "Valid email address is required" });
+      }
+      const { email } = validationResult.data;
+
+      // Check rate limiting (60 seconds between email OTP sends per professional)
+      const professionalId = session.professionalId;
+      const rateLimit = emailOtpRateLimits.get(professionalId);
+      if (rateLimit) {
+        const timeSinceLastSend = Date.now() - rateLimit.lastSent.getTime();
+        if (timeSinceLastSend < 60000) {
+          const secondsRemaining = Math.ceil((60000 - timeSinceLastSend) / 1000);
+          return res.status(429).json({ error: `Please wait ${secondsRemaining} seconds before requesting a new code` });
+        }
+      }
+
+      // Generate a 6-digit OTP
+      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiryTime = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
+
+      const { professionals } = await import("@shared/schema");
+
+      // Store OTP in database
+      await db.update(professionals)
+        .set({
+          emailVerificationCode: otpCode,
+          emailVerificationExpiry: expiryTime,
+          updatedAt: new Date(),
+        })
+        .where(eq(professionals.id, session.professionalId));
+
+      // Update rate limit tracking
+      emailOtpRateLimits.set(professionalId, { lastSent: new Date(), attempts: (rateLimit?.attempts || 0) + 1 });
+
+      // In production, send email via Resend or similar service
+      // For now, just store the code (check database for testing)
+      console.log(`Email OTP for ${email}: ${otpCode}`); // Remove in production
+
+      res.json({ success: true, message: "Verification code sent to your email" });
+    } catch (error) {
+      console.error("Error sending email OTP:", error);
+      res.status(500).json({ error: "Failed to send verification code" });
+    }
+  });
+
+  // Verify OTP for email verification
+  app.post("/api/professional/onboarding/verify-email-otp", async (req, res) => {
+    try {
+      const session = req.session as any;
+      if (!session.professionalId) {
+        return res.status(401).json({ error: "Not authenticated as professional" });
+      }
+
+      // Validate request body
+      const validationResult = verifyEmailOtpSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ error: "Verification code must be exactly 6 digits" });
+      }
+      const { code } = validationResult.data;
+
+      const { professionals } = await import("@shared/schema");
+      
+      // Get current professional data
+      const professional = await storage.getProfessional(session.professionalId);
+      if (!professional) {
+        return res.status(404).json({ error: "Professional not found" });
+      }
+
+      // Check if OTP matches and hasn't expired
+      if (professional.emailVerificationCode !== code) {
+        return res.status(400).json({ error: "Invalid verification code" });
+      }
+
+      if (professional.emailVerificationExpiry && new Date() > new Date(professional.emailVerificationExpiry)) {
+        return res.status(400).json({ error: "Verification code has expired" });
+      }
+
+      // Mark email as verified and clear OTP
+      await db.update(professionals)
+        .set({
+          emailVerified: true,
+          emailVerificationCode: null,
+          emailVerificationExpiry: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(professionals.id, session.professionalId));
+
+      res.json({ success: true, message: "Email verified successfully" });
+    } catch (error) {
+      console.error("Error verifying email OTP:", error);
       res.status(500).json({ error: "Failed to verify code" });
     }
   });
