@@ -2234,15 +2234,51 @@ By signing below, I acknowledge my understanding of and commitment to HIPAA comp
                 <div className="border rounded-lg p-4 bg-background">
                   <h5 className="font-medium mb-2 text-sm">Upload Completed W-9</h5>
                   {onboardingData?.documents?.some(d => d.documentType === "w9_form") ? (
-                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                        <span className="text-sm font-medium text-green-800 dark:text-green-200">W-9 Uploaded</span>
-                      </div>
-                      <p className="text-xs text-green-700 dark:text-green-300 mt-1">
-                        Your W-9 document has been uploaded and is pending review
-                      </p>
-                    </div>
+                    (() => {
+                      const w9Doc = onboardingData?.documents?.find(d => d.documentType === "w9_form");
+                      return (
+                        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle className="h-4 w-4 text-green-600" />
+                              <span className="text-sm font-medium text-green-800 dark:text-green-200">W-9 Uploaded</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-green-700 dark:text-green-300 hover:text-green-800 dark:hover:text-green-200"
+                                onClick={() => window.open(w9Doc?.documentUrl, "_blank")}
+                                data-testid="button-view-w9"
+                              >
+                                <Eye className="h-3 w-3 mr-1" />
+                                View
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-destructive hover:text-destructive"
+                                onClick={() => removeDocumentMutation.mutate("w9_form")}
+                                disabled={removeDocumentMutation.isPending}
+                                data-testid="button-remove-w9"
+                              >
+                                {removeDocumentMutation.isPending ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <>
+                                    <X className="h-3 w-3 mr-1" />
+                                    Remove
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                          <p className="text-xs text-green-700 dark:text-green-300 mt-1">
+                            {w9Doc?.documentName || "W-9 document"} - Pending review
+                          </p>
+                        </div>
+                      );
+                    })()
                   ) : (
                     <>
                       <p className="text-xs text-muted-foreground mb-3">
