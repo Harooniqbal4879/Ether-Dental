@@ -2696,18 +2696,34 @@ By signing below, I acknowledge my understanding of and commitment to HIPAA comp
                     {agreementModalOpen && agreementContent[agreementModalOpen]?.content}
                   </pre>
                 </div>
-                <div className="flex items-start gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                  <input
-                    type="checkbox"
-                    id="agreementCheckbox"
-                    checked={agreementCheckbox}
-                    onChange={(e) => setAgreementCheckbox(e.target.checked)}
-                    className="mt-1 h-4 w-4 rounded border-gray-300"
-                    data-testid="checkbox-agreement"
-                  />
-                  <label htmlFor="agreementCheckbox" className="text-sm">
-                    I have read and understood this agreement. By checking this box, I am providing my digital signature and agree to be legally bound by the terms above.
-                  </label>
+                {/* Pre-populated Signature Section */}
+                <div className="border rounded-lg p-4 bg-muted/20">
+                  <h4 className="text-sm font-medium mb-3">Digital Signature</h4>
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="text-xs text-muted-foreground">Full Name</label>
+                      <div className="font-medium">
+                        {onboardingData?.professional?.firstName} {onboardingData?.professional?.lastName}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Date</label>
+                      <div className="font-medium">{new Date().toLocaleDateString()}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <input
+                      type="checkbox"
+                      id="agreementCheckbox"
+                      checked={agreementCheckbox}
+                      onChange={(e) => setAgreementCheckbox(e.target.checked)}
+                      className="mt-1 h-4 w-4 rounded border-gray-300"
+                      data-testid="checkbox-agreement"
+                    />
+                    <label htmlFor="agreementCheckbox" className="text-sm">
+                      I, <strong>{onboardingData?.professional?.firstName} {onboardingData?.professional?.lastName}</strong>, have read and understood this agreement. By checking this box, I am providing my digital signature and agree to be legally bound by the terms above.
+                    </label>
+                  </div>
                 </div>
                 <DialogFooter className="mt-4">
                   <Button variant="outline" onClick={() => setAgreementModalOpen(null)}>
