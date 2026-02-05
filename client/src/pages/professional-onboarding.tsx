@@ -37,6 +37,7 @@ import {
   Globe,
   Banknote,
   Lock,
+  Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -2902,10 +2903,26 @@ export default function ProfessionalOnboarding() {
                       <span className="text-sm">Void Check (required for ACH verification)</span>
                     </div>
                     {onboardingData?.documents?.some(d => d.documentType === "void_check") ? (
-                      <Badge className="bg-green-500/10 text-green-700 border-green-500/20">
-                        <CheckCircle2 className="h-3 w-3 mr-1" />
-                        Uploaded
-                      </Badge>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Badge className="bg-green-500/10 text-green-700 border-green-500/20">
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          Uploaded
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const doc = onboardingData?.documents?.find(d => d.documentType === "void_check");
+                            if (doc?.documentUrl) {
+                              window.open(doc.documentUrl, "_blank");
+                            }
+                          }}
+                          data-testid="button-view-void-check"
+                        >
+                          <Eye className="h-3 w-3 mr-1" />
+                          View
+                        </Button>
+                      </div>
                     ) : (
                       <ComplianceUploadButton 
                         documentType="void_check" 
