@@ -318,6 +318,223 @@ export default function ProfessionalOnboarding() {
   const [paymentAccountEmail, setPaymentAccountEmail] = useState("");
   const [viewPaymentMethod, setViewPaymentMethod] = useState<any | null>(null);
   const [showSensitiveDetails, setShowSensitiveDetails] = useState(false);
+  const [agreementModalOpen, setAgreementModalOpen] = useState<string | null>(null);
+  const [agreementCheckbox, setAgreementCheckbox] = useState(false);
+  const [viewAgreement, setViewAgreement] = useState<string | null>(null);
+
+  // Agreement content for each agreement type
+  const agreementContent: Record<string, { title: string; content: string }> = {
+    contractor_agreement: {
+      title: "Independent Contractor Agreement",
+      content: `INDEPENDENT CONTRACTOR AGREEMENT
+
+This Independent Contractor Agreement ("Agreement") is entered into between EtherAI Dental Platform ("Company") and the undersigned professional ("Contractor").
+
+1. RELATIONSHIP OF PARTIES
+The Contractor is an independent contractor and not an employee, partner, or agent of the Company. The Contractor shall have no authority to bind the Company in any manner.
+
+2. SERVICES
+The Contractor agrees to provide dental hygiene or dental assistant services to dental practices through the Company's platform.
+
+3. COMPENSATION
+The Contractor shall be compensated at the agreed-upon rate for each shift completed. Payment shall be processed within 3-5 business days following shift completion.
+
+4. TAXES AND BENEFITS
+The Contractor is solely responsible for all federal, state, and local taxes. The Contractor shall not receive any employee benefits from the Company.
+
+5. INSURANCE
+The Contractor shall maintain appropriate professional liability insurance at all times.
+
+6. CONFIDENTIALITY
+The Contractor agrees to maintain the confidentiality of all patient and practice information.
+
+7. TERM AND TERMINATION
+Either party may terminate this Agreement at any time with written notice.
+
+By signing below, you acknowledge that you have read, understood, and agree to be bound by the terms of this Agreement.`
+    },
+    terms_of_service: {
+      title: "Marketplace Terms of Service",
+      content: `MARKETPLACE TERMS OF SERVICE
+
+Welcome to EtherAI Dental Platform. By using our services, you agree to these Terms of Service.
+
+1. ACCOUNT RESPONSIBILITIES
+- You are responsible for maintaining the security of your account
+- You must provide accurate and complete information
+- You may not share your account credentials with others
+
+2. PLATFORM USAGE
+- Use the platform only for legitimate dental staffing purposes
+- Do not engage in any fraudulent or illegal activities
+- Respect all dental practice policies and patient privacy
+
+3. SHIFT COMMITMENTS
+- Honor all accepted shift commitments
+- Provide adequate notice for cancellations (minimum 24 hours)
+- Repeated no-shows may result in account suspension
+
+4. PAYMENT TERMS
+- All payments are processed through the platform
+- Platform fees apply to each transaction
+- Disputes must be filed within 7 days of shift completion
+
+5. PROHIBITED CONDUCT
+- No harassment or discrimination
+- No circumventing the platform for direct arrangements
+- No misrepresentation of qualifications or credentials
+
+6. LIMITATION OF LIABILITY
+The Company is not liable for any damages arising from your use of the platform.
+
+By signing below, you acknowledge that you have read and agree to these Terms of Service.`
+    },
+    escrow_dispute_policy: {
+      title: "Escrow & Dispute Policies",
+      content: `ESCROW & DISPUTE RESOLUTION POLICIES
+
+1. PAYMENT ESCROW
+- Payments are held in escrow until shift completion is confirmed
+- Funds are released within 3-5 business days after confirmation
+- Practice must confirm completion within 48 hours or payment auto-releases
+
+2. DISPUTE FILING
+- Disputes must be filed within 7 days of shift completion
+- Include detailed description and supporting documentation
+- Both parties will have opportunity to respond
+
+3. DISPUTE RESOLUTION PROCESS
+Step 1: Initial review by platform support (2-3 business days)
+Step 2: Mediation between parties if needed
+Step 3: Final determination by platform if unresolved
+
+4. REFUND POLICIES
+- Full refund if shift cancelled 24+ hours in advance
+- Partial refund for cancellations with less than 24 hours notice
+- No refund for no-shows without valid emergency
+
+5. PAYMENT ADJUSTMENTS
+- Time discrepancies resolved based on check-in/out records
+- Rate disputes resolved per original shift posting terms
+
+By signing below, you agree to abide by these escrow and dispute policies.`
+    },
+    non_circumvention: {
+      title: "Non-Circumvention Agreement",
+      content: `NON-CIRCUMVENTION AGREEMENT
+
+1. PURPOSE
+This Agreement ensures all professional arrangements facilitated through the EtherAI platform remain within the platform ecosystem.
+
+2. NON-CIRCUMVENTION OBLIGATIONS
+The Contractor agrees NOT to:
+- Directly contact or solicit practices for work outside the platform
+- Accept direct employment offers from practices met through the platform without platform notification
+- Encourage practices to hire outside the platform
+- Share platform contact information for off-platform arrangements
+
+3. DURATION
+These obligations remain in effect for 12 months after last platform activity with any specific practice.
+
+4. PERMITTED ACTIVITIES
+- Direct hire is permitted after 12 months or with platform buyout fee
+- Emergency coverage arrangements must still be logged on platform
+- Existing relationships prior to platform use are exempt
+
+5. VIOLATIONS
+Violations may result in:
+- Account suspension or termination
+- Forfeiture of pending payments
+- Legal action for damages
+
+6. BUYOUT OPTION
+Practices may pay a buyout fee to hire contractors directly before the 12-month period.
+
+By signing below, you agree to honor the non-circumvention obligations outlined above.`
+    },
+    nda: {
+      title: "Confidentiality & Non-Disclosure Agreement",
+      content: `CONFIDENTIALITY & NON-DISCLOSURE AGREEMENT
+
+1. CONFIDENTIAL INFORMATION
+"Confidential Information" includes:
+- Patient health information and records
+- Practice business information and procedures
+- Platform proprietary data and systems
+- Financial information of any party
+
+2. OBLIGATIONS
+The Contractor agrees to:
+- Keep all Confidential Information strictly confidential
+- Use Confidential Information only for authorized purposes
+- Not disclose to any third party without written consent
+- Take reasonable measures to protect Confidential Information
+
+3. PATIENT PRIVACY
+- Comply with all HIPAA regulations
+- Never discuss patient information outside clinical necessity
+- Report any suspected breaches immediately
+
+4. RETURN OF INFORMATION
+Upon termination, the Contractor shall:
+- Return all physical documents containing Confidential Information
+- Delete all electronic copies
+- Certify compliance with this requirement
+
+5. DURATION
+Confidentiality obligations survive termination indefinitely for patient information and 3 years for business information.
+
+6. EXCEPTIONS
+This Agreement does not apply to information that:
+- Is publicly available through no fault of the Contractor
+- Was known prior to disclosure
+- Is required by law to be disclosed
+
+By signing below, you agree to maintain confidentiality as outlined above.`
+    },
+    hipaa_acknowledgment: {
+      title: "HIPAA Acknowledgment",
+      content: `HIPAA COMPLIANCE ACKNOWLEDGMENT
+
+1. UNDERSTANDING HIPAA
+I acknowledge that I have been informed about the Health Insurance Portability and Accountability Act (HIPAA) and its requirements for protecting patient health information.
+
+2. PROTECTED HEALTH INFORMATION (PHI)
+I understand that PHI includes:
+- Patient names, addresses, and contact information
+- Social Security numbers and insurance information
+- Medical records, diagnoses, and treatment plans
+- Any information that could identify a patient
+
+3. MY RESPONSIBILITIES
+I agree to:
+- Access only the minimum necessary PHI to perform my duties
+- Never share patient information inappropriately
+- Use secure methods for any PHI transmission
+- Log out of systems when not in use
+- Report any suspected breaches immediately
+
+4. PROHIBITED ACTIONS
+I will NOT:
+- Share login credentials
+- Access records of patients I am not treating
+- Discuss patient information in public areas
+- Take photos or screenshots of patient information
+- Use unsecured channels for PHI transmission
+
+5. BREACH NOTIFICATION
+I understand that breaches must be reported immediately and may result in:
+- Civil penalties up to $50,000 per violation
+- Criminal penalties including imprisonment
+- Professional license revocation
+- Platform account termination
+
+6. TRAINING
+I acknowledge that I have completed or will complete required HIPAA training.
+
+By signing below, I acknowledge my understanding of and commitment to HIPAA compliance.`
+    }
+  };
   const [faceMatchResult, setFaceMatchResult] = useState<{
     isMatch: boolean;
     confidence: number;
@@ -2294,22 +2511,24 @@ export default function ProfessionalOnboarding() {
                     Terms of engagement as an independent contractor including work scope, compensation, and relationship classification
                   </p>
                 </div>
-                {hasSignedAgreement("contractor_agreement") ? (
-                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                    Signed
-                  </Badge>
-                ) : (
-                  <Button
-                    size="sm"
-                    onClick={() => handleSignAgreement("contractor_agreement")}
-                    disabled={signAgreementMutation.isPending}
-                    data-testid="button-sign-contractor-agreement"
-                    className="flex-shrink-0"
-                  >
-                    Sign Agreement
-                  </Button>
-                )}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {hasSignedAgreement("contractor_agreement") ? (
+                    <>
+                      <Badge className="bg-green-500/10 text-green-700 border-green-500/20">
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        Signed
+                      </Badge>
+                      <Button variant="ghost" size="sm" onClick={() => setViewAgreement("contractor_agreement")} data-testid="button-view-contractor-agreement">
+                        <Eye className="h-3 w-3 mr-1" />
+                        View
+                      </Button>
+                    </>
+                  ) : (
+                    <Button size="sm" onClick={() => { setAgreementCheckbox(false); setAgreementModalOpen("contractor_agreement"); }} data-testid="button-sign-contractor-agreement">
+                      Review & Sign
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -2322,22 +2541,24 @@ export default function ProfessionalOnboarding() {
                     Platform usage terms, account responsibilities, and service guidelines
                   </p>
                 </div>
-                {hasSignedAgreement("terms_of_service") ? (
-                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                    Signed
-                  </Badge>
-                ) : (
-                  <Button
-                    size="sm"
-                    onClick={() => handleSignAgreement("terms_of_service")}
-                    disabled={signAgreementMutation.isPending}
-                    data-testid="button-sign-terms-of-service"
-                    className="flex-shrink-0"
-                  >
-                    Sign Agreement
-                  </Button>
-                )}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {hasSignedAgreement("terms_of_service") ? (
+                    <>
+                      <Badge className="bg-green-500/10 text-green-700 border-green-500/20">
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        Signed
+                      </Badge>
+                      <Button variant="ghost" size="sm" onClick={() => setViewAgreement("terms_of_service")} data-testid="button-view-terms-of-service">
+                        <Eye className="h-3 w-3 mr-1" />
+                        View
+                      </Button>
+                    </>
+                  ) : (
+                    <Button size="sm" onClick={() => { setAgreementCheckbox(false); setAgreementModalOpen("terms_of_service"); }} data-testid="button-sign-terms-of-service">
+                      Review & Sign
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -2350,22 +2571,24 @@ export default function ProfessionalOnboarding() {
                     Payment escrow terms, dispute resolution procedures, and refund policies
                   </p>
                 </div>
-                {hasSignedAgreement("escrow_dispute_policy") ? (
-                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                    Signed
-                  </Badge>
-                ) : (
-                  <Button
-                    size="sm"
-                    onClick={() => handleSignAgreement("escrow_dispute_policy")}
-                    disabled={signAgreementMutation.isPending}
-                    data-testid="button-sign-escrow-dispute"
-                    className="flex-shrink-0"
-                  >
-                    Sign Agreement
-                  </Button>
-                )}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {hasSignedAgreement("escrow_dispute_policy") ? (
+                    <>
+                      <Badge className="bg-green-500/10 text-green-700 border-green-500/20">
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        Signed
+                      </Badge>
+                      <Button variant="ghost" size="sm" onClick={() => setViewAgreement("escrow_dispute_policy")} data-testid="button-view-escrow-dispute">
+                        <Eye className="h-3 w-3 mr-1" />
+                        View
+                      </Button>
+                    </>
+                  ) : (
+                    <Button size="sm" onClick={() => { setAgreementCheckbox(false); setAgreementModalOpen("escrow_dispute_policy"); }} data-testid="button-sign-escrow-dispute">
+                      Review & Sign
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -2378,22 +2601,24 @@ export default function ProfessionalOnboarding() {
                     Commitment to conduct all transactions through the platform
                   </p>
                 </div>
-                {hasSignedAgreement("non_circumvention") ? (
-                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                    Signed
-                  </Badge>
-                ) : (
-                  <Button
-                    size="sm"
-                    onClick={() => handleSignAgreement("non_circumvention")}
-                    disabled={signAgreementMutation.isPending}
-                    data-testid="button-sign-non-circumvention"
-                    className="flex-shrink-0"
-                  >
-                    Sign Agreement
-                  </Button>
-                )}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {hasSignedAgreement("non_circumvention") ? (
+                    <>
+                      <Badge className="bg-green-500/10 text-green-700 border-green-500/20">
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        Signed
+                      </Badge>
+                      <Button variant="ghost" size="sm" onClick={() => setViewAgreement("non_circumvention")} data-testid="button-view-non-circumvention">
+                        <Eye className="h-3 w-3 mr-1" />
+                        View
+                      </Button>
+                    </>
+                  ) : (
+                    <Button size="sm" onClick={() => { setAgreementCheckbox(false); setAgreementModalOpen("non_circumvention"); }} data-testid="button-sign-non-circumvention">
+                      Review & Sign
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -2406,22 +2631,24 @@ export default function ProfessionalOnboarding() {
                     Non-disclosure agreement for protecting sensitive practice and patient information
                   </p>
                 </div>
-                {hasSignedAgreement("nda") ? (
-                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                    Signed
-                  </Badge>
-                ) : (
-                  <Button
-                    size="sm"
-                    onClick={() => handleSignAgreement("nda")}
-                    disabled={signAgreementMutation.isPending}
-                    data-testid="button-sign-nda"
-                    className="flex-shrink-0"
-                  >
-                    Sign Agreement
-                  </Button>
-                )}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {hasSignedAgreement("nda") ? (
+                    <>
+                      <Badge className="bg-green-500/10 text-green-700 border-green-500/20">
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        Signed
+                      </Badge>
+                      <Button variant="ghost" size="sm" onClick={() => setViewAgreement("nda")} data-testid="button-view-nda">
+                        <Eye className="h-3 w-3 mr-1" />
+                        View
+                      </Button>
+                    </>
+                  ) : (
+                    <Button size="sm" onClick={() => { setAgreementCheckbox(false); setAgreementModalOpen("nda"); }} data-testid="button-sign-nda">
+                      Review & Sign
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -2434,24 +2661,117 @@ export default function ProfessionalOnboarding() {
                     Acknowledge HIPAA compliance requirements for handling protected health information
                   </p>
                 </div>
-                {hasSignedAgreement("hipaa_acknowledgment") ? (
-                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                    Signed
-                  </Badge>
-                ) : (
-                  <Button
-                    size="sm"
-                    onClick={() => handleSignAgreement("hipaa_acknowledgment")}
-                    disabled={signAgreementMutation.isPending}
-                    data-testid="button-sign-hipaa"
-                    className="flex-shrink-0"
-                  >
-                    Sign Agreement
-                  </Button>
-                )}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {hasSignedAgreement("hipaa_acknowledgment") ? (
+                    <>
+                      <Badge className="bg-green-500/10 text-green-700 border-green-500/20">
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        Signed
+                      </Badge>
+                      <Button variant="ghost" size="sm" onClick={() => setViewAgreement("hipaa_acknowledgment")} data-testid="button-view-hipaa">
+                        <Eye className="h-3 w-3 mr-1" />
+                        View
+                      </Button>
+                    </>
+                  ) : (
+                    <Button size="sm" onClick={() => { setAgreementCheckbox(false); setAgreementModalOpen("hipaa_acknowledgment"); }} data-testid="button-sign-hipaa">
+                      Review & Sign
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
+
+            {/* Agreement Review & Sign Dialog */}
+            <Dialog open={agreementModalOpen !== null} onOpenChange={(open) => !open && setAgreementModalOpen(null)}>
+              <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+                <DialogHeader>
+                  <DialogTitle>{agreementModalOpen && agreementContent[agreementModalOpen]?.title}</DialogTitle>
+                  <DialogDescription>
+                    Please read the agreement carefully before signing
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="flex-1 overflow-y-auto border rounded-md p-4 bg-muted/30 my-4">
+                  <pre className="whitespace-pre-wrap text-sm font-sans">
+                    {agreementModalOpen && agreementContent[agreementModalOpen]?.content}
+                  </pre>
+                </div>
+                <div className="flex items-start gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <input
+                    type="checkbox"
+                    id="agreementCheckbox"
+                    checked={agreementCheckbox}
+                    onChange={(e) => setAgreementCheckbox(e.target.checked)}
+                    className="mt-1 h-4 w-4 rounded border-gray-300"
+                    data-testid="checkbox-agreement"
+                  />
+                  <label htmlFor="agreementCheckbox" className="text-sm">
+                    I have read and understood this agreement. By checking this box, I am providing my digital signature and agree to be legally bound by the terms above.
+                  </label>
+                </div>
+                <DialogFooter className="mt-4">
+                  <Button variant="outline" onClick={() => setAgreementModalOpen(null)}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      if (!agreementCheckbox) {
+                        toast({ title: "Please check the box to confirm you have read and agree to the terms", variant: "destructive" });
+                        return;
+                      }
+                      handleSignAgreement(agreementModalOpen!);
+                      setAgreementModalOpen(null);
+                    }}
+                    disabled={!agreementCheckbox || signAgreementMutation.isPending}
+                    data-testid="button-confirm-sign"
+                  >
+                    {signAgreementMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Signing...
+                      </>
+                    ) : (
+                      "Sign Agreement"
+                    )}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* View Signed Agreement Dialog */}
+            <Dialog open={viewAgreement !== null} onOpenChange={(open) => !open && setViewAgreement(null)}>
+              <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+                <DialogHeader>
+                  <DialogTitle>{viewAgreement && agreementContent[viewAgreement]?.title}</DialogTitle>
+                  <DialogDescription>
+                    Signed agreement - view only
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="flex-1 overflow-y-auto border rounded-md p-4 bg-muted/30 my-4">
+                  <pre className="whitespace-pre-wrap text-sm font-sans">
+                    {viewAgreement && agreementContent[viewAgreement]?.content}
+                  </pre>
+                </div>
+                <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    <span className="font-medium text-green-800 dark:text-green-200">Digitally Signed</span>
+                  </div>
+                  <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+                    Signed by {onboardingData?.professional?.firstName} {onboardingData?.professional?.lastName} on {
+                      onboardingData?.agreements?.find(a => a.agreementType === viewAgreement)?.signedAt 
+                        ? new Date(onboardingData.agreements.find(a => a.agreementType === viewAgreement)!.signedAt!).toLocaleDateString()
+                        : "N/A"
+                    }
+                  </p>
+                </div>
+                <DialogFooter className="mt-4">
+                  <Button variant="outline" onClick={() => setViewAgreement(null)} data-testid="button-close-agreement">
+                    Close
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
 
             {/* Progress indicator */}
             {(() => {
