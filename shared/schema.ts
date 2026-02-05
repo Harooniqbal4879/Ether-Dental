@@ -966,14 +966,25 @@ export type ProfessionalWithCredentials = Professional & {
 
 // Document types for contractor onboarding
 export const ContractorDocumentType = {
-  GOVERNMENT_ID: "government_id", // Driver's license or passport
-  SELFIE: "selfie", // Live photo verification
+  GOVERNMENT_ID: "government_id", // Generic government ID (backward compatibility)
+  ID_FRONT: "id_front", // Front side of government ID
+  ID_BACK: "id_back", // Back side of government ID
+  SELFIE: "selfie", // Live photo verification / liveness check
   W9_FORM: "w9_form", // W-9 tax form
   RESUME: "resume", // Resume/CV
   CONTRACTOR_AGREEMENT: "contractor_agreement",
   NDA: "nda",
   OTHER: "other",
 } as const;
+
+// ID Types for KYC verification
+export const GovernmentIdType = {
+  DRIVERS_LICENSE: "drivers_license",
+  PASSPORT: "passport",
+  NATIONAL_ID: "national_id",
+  RESIDENCE_PERMIT: "residence_permit",
+} as const;
+export type GovernmentIdTypeValue = typeof GovernmentIdType[keyof typeof GovernmentIdType];
 export type ContractorDocumentTypeValue = typeof ContractorDocumentType[keyof typeof ContractorDocumentType];
 
 // Document verification status
