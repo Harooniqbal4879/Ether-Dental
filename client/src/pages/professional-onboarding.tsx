@@ -317,6 +317,7 @@ export default function ProfessionalOnboarding() {
   const [paymentModalOpen, setPaymentModalOpen] = useState<string | null>(null);
   const [paymentAccountEmail, setPaymentAccountEmail] = useState("");
   const [viewPaymentMethod, setViewPaymentMethod] = useState<any | null>(null);
+  const [showSensitiveDetails, setShowSensitiveDetails] = useState(false);
   const [faceMatchResult, setFaceMatchResult] = useState<{
     isMatch: boolean;
     confidence: number;
@@ -3262,11 +3263,30 @@ export default function ProfessionalOnboarding() {
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-muted-foreground">Account Number</span>
-                        <span className="font-mono">••••{viewPaymentMethod?.accountNumberLast4 || "****"}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono">
+                            {showSensitiveDetails 
+                              ? (viewPaymentMethod?.accountNumber || `••••${viewPaymentMethod?.accountNumberLast4 || "****"}`)
+                              : `••••${viewPaymentMethod?.accountNumberLast4 || "****"}`}
+                          </span>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => setShowSensitiveDetails(!showSensitiveDetails)}
+                            data-testid="button-toggle-account"
+                          >
+                            {showSensitiveDetails ? <Eye className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                            <span className="ml-1 text-xs">{showSensitiveDetails ? "Hide" : "Show"}</span>
+                          </Button>
+                        </div>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-muted-foreground">Routing Number</span>
-                        <span className="font-mono">{viewPaymentMethod?.routingNumber || "•••••••••"}</span>
+                        <span className="font-mono">
+                          {showSensitiveDetails 
+                            ? (viewPaymentMethod?.routingNumber || "•••••••••")
+                            : "•••••••••"}
+                        </span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-muted-foreground">Status</span>
@@ -3274,6 +3294,13 @@ export default function ProfessionalOnboarding() {
                           {viewPaymentMethod?.verificationStatus === "verified" ? "Verified" : "Pending Verification"}
                         </Badge>
                       </div>
+                      {viewPaymentMethod?.verificationStatus !== "verified" && (
+                        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md p-3 mt-2">
+                          <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                            <strong>Pending Verification:</strong> Your bank account details have been submitted but need to be verified before payments can be processed. An admin will review and verify your account shortly.
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
                   {["paypal", "payoneer", "wise", "skrill"].includes(viewPaymentMethod?.methodType) && (
