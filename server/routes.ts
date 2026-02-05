@@ -2621,9 +2621,17 @@ export async function registerRoutes(
       // Update rate limit tracking
       emailOtpRateLimits.set(professionalId, { lastSent: new Date(), attempts: (rateLimit?.attempts || 0) + 1 });
 
-      // TODO: In production, send email via Resend or similar service
-      // OTP code is stored securely in database - do not log
-      // For development testing, query the database to get the code
+      // Send OTP email via Resend
+      const { sendOtpEmail } = await import("./services/email");
+      const emailSent = await sendOtpEmail({
+        toEmail: email,
+        otpCode,
+        expiryMinutes: 10,
+      });
+
+      if (!emailSent) {
+        return res.status(500).json({ error: "Failed to send verification email" });
+      }
 
       res.json({ success: true, message: "Verification code sent to your email" });
     } catch (error) {
