@@ -155,12 +155,20 @@ const ONBOARDING_STEPS = [
     action: "Complete your profile",
   },
   { 
-    key: "identity_w9", 
-    name: "Identity & W-9", 
-    shortName: "ID & Tax",
+    key: "identity", 
+    name: "Identity Verification", 
+    shortName: "Identity",
     icon: IdCard, 
-    description: "Government ID and tax information",
-    action: "Upload ID and complete W-9",
+    description: "Government ID and selfie verification",
+    action: "Upload ID and verify identity",
+  },
+  { 
+    key: "w9_tax", 
+    name: "W-9 Tax Form", 
+    shortName: "W-9",
+    icon: FileText, 
+    description: "Tax information for 1099 reporting",
+    action: "Complete W-9 form",
   },
   { 
     key: "agreements", 
@@ -315,7 +323,6 @@ export default function ProfessionalOnboarding() {
     const hasFullKyc = hasIdFront && (isPassport || hasIdBack) && hasSelfie;
     const hasGovernmentId = hasFullKyc || hasLegacyId;
     const hasW9 = taxForms.length > 0;
-    const hasIdentityAndW9 = hasGovernmentId && hasW9;
     const hasSignedContractor = agreements.some(a => a.agreementType === "contractor_agreement" && a.signedAt);
     const hasSignedHipaa = agreements.some(a => a.agreementType === "hipaa_acknowledgment" && a.signedAt);
     const hasAgreements = hasSignedContractor && hasSignedHipaa;
@@ -338,19 +345,26 @@ export default function ProfessionalOnboarding() {
         needsVerification: false,
       },
       { 
-        key: "identity_w9", 
-        complete: hasIdentityAndW9,
-        status: hasIdentityAndW9 ? "complete" : (hasGovernmentId || hasW9) ? "partial" : "pending" as const,
+        key: "identity", 
+        complete: hasGovernmentId,
+        status: hasGovernmentId ? "complete" : (hasIdFront || hasSelfie) ? "partial" : "pending" as const,
         hasId: hasGovernmentId,
         hasIdFront,
         hasIdBack,
         hasSelfie,
         isPassport,
         storedIdType,
+        needsVerification: hasGovernmentId && !identityVerified,
+        isVerified: identityVerified,
+      },
+      { 
+        key: "w9_tax", 
+        complete: hasW9,
+        status: hasW9 ? "complete" : "pending" as const,
         hasW9: hasW9,
         w9Status: taxForms[0]?.verificationStatus,
-        needsVerification: hasIdentityAndW9 && (!identityVerified || !w9Verified),
-        isVerified: identityVerified && w9Verified,
+        needsVerification: hasW9 && !w9Verified,
+        isVerified: w9Verified,
       },
       { 
         key: "agreements", 
@@ -1276,10 +1290,10 @@ export default function ProfessionalOnboarding() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <IdCard className="h-5 w-5" />
-              Identity Verification & Tax Information
+              Identity Verification
             </CardTitle>
             <CardDescription>
-              Upload your government ID and complete your W-9 tax form
+              Upload your government ID and take a selfie for identity verification
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -1324,17 +1338,6 @@ export default function ProfessionalOnboarding() {
                 )}
                 <span className={`text-sm ${stepStatus.steps[1]?.hasSelfie ? "text-green-700 font-medium" : ""}`}>
                   Selfie
-                </span>
-              </div>
-              <div className="h-px flex-1 bg-border min-w-[20px]" />
-              <div className="flex items-center gap-2">
-                {stepStatus.steps[1]?.hasW9 ? (
-                  <CheckCircle className="h-5 w-5 text-green-600" />
-                ) : (
-                  <Circle className="h-5 w-5 text-muted-foreground" />
-                )}
-                <span className={`text-sm ${stepStatus.steps[1]?.hasW9 ? "text-green-700 font-medium" : ""}`}>
-                  W-9 Form
                 </span>
               </div>
             </div>
@@ -1703,19 +1706,39 @@ export default function ProfessionalOnboarding() {
               )}
             </div>
 
-            <Separator className="my-6" />
+            {/* Continue button for identity step */}
+            {stepStatus.steps[1]?.complete && (
+              <div className="mt-6 pt-6 border-t">
+                <Button
+                  onClick={() => {
+                    setManualStepSelection(true);
+                    setActiveStep(2);
+                  }}
+                  className="w-full"
+                  data-testid="button-continue-to-w9"
+                >
+                  Continue to W-9 Form
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
-            {/* W-9 Form Section */}
-            <div>
-              <h4 className="text-base font-medium mb-2 flex items-center gap-2">
-                <span className="flex items-center justify-center h-6 w-6 rounded-full bg-primary/10 text-primary text-xs font-bold">3</span>
-                Complete W-9 Tax Form
-              </h4>
-              <p className="text-sm text-muted-foreground mb-4">
-                Your tax information for 1099 reporting
-              </p>
-            </div>
-
+      {/* Step 2: W-9 Tax Form */}
+      {activeStep === 2 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              W-9 Tax Form
+            </CardTitle>
+            <CardDescription>
+              Complete your W-9 tax form for 1099 reporting
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
             {onboardingData?.taxForms?.[0]?.verificationStatus === "pending" && (
               <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-6">
                 <div className="flex items-center gap-2">
@@ -1965,7 +1988,8 @@ export default function ProfessionalOnboarding() {
         </Card>
       )}
 
-      {activeStep === 2 && (
+      {/* Step 3: Agreements */}
+      {activeStep === 3 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -2037,7 +2061,8 @@ export default function ProfessionalOnboarding() {
         </Card>
       )}
 
-      {activeStep === 3 && (
+      {/* Step 4: Payment Setup */}
+      {activeStep === 4 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
