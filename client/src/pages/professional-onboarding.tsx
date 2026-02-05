@@ -186,7 +186,10 @@ export default function ProfessionalOnboarding() {
   const { professional, isProfessionalAuthenticated } = useAuth();
   const [activeStep, setActiveStep] = useState<number | null>(null);
   const [manualStepSelection, setManualStepSelection] = useState(false);
-  const [isUploadingId, setIsUploadingId] = useState(false);
+  const [isUploadingIdFront, setIsUploadingIdFront] = useState(false);
+  const [isUploadingIdBack, setIsUploadingIdBack] = useState(false);
+  const [isUploadingSelfie, setIsUploadingSelfie] = useState(false);
+  const [selectedIdType, setSelectedIdType] = useState<string>("drivers_license");
 
   const { data: onboardingData, isLoading, refetch } = useQuery<{
     professional: any;
@@ -280,7 +283,25 @@ export default function ProfessionalOnboarding() {
     const paymentMethods = onboardingData.paymentMethods || [];
     
     const hasPersonalInfo = !!(p?.dateOfBirth && p?.phone && p?.addressStreet);
-    const hasGovernmentId = docs.some(d => d.documentType === "government_id" || d.documentType === "identity");
+    // KYC document checks - require ID front, ID back (unless passport), and selfie
+    const hasIdFront = docs.some(d => d.documentType === "id_front");
+    const hasIdBack = docs.some(d => d.documentType === "id_back");
+    const hasSelfie = docs.some(d => d.documentType === "selfie");
+    const hasLegacyId = docs.some(d => d.documentType === "government_id" || d.documentType === "identity");
+    
+    // Get stored ID type from metadata with safe JSON parsing
+    const idTypeDoc = docs.find(d => d.documentType === "id_front");
+    let storedIdType: string | null = null;
+    try {
+      storedIdType = idTypeDoc?.metadata ? JSON.parse(idTypeDoc.metadata).idType : null;
+    } catch {
+      storedIdType = null;
+    }
+    const isPassport = storedIdType === "passport";
+    
+    // For passport, back is not required; otherwise all three are needed
+    const hasFullKyc = hasIdFront && (isPassport || hasIdBack) && hasSelfie;
+    const hasGovernmentId = hasFullKyc || hasLegacyId;
     const hasW9 = taxForms.length > 0;
     const hasIdentityAndW9 = hasGovernmentId && hasW9;
     const hasSignedContractor = agreements.some(a => a.agreementType === "contractor_agreement" && a.signedAt);
@@ -288,9 +309,10 @@ export default function ProfessionalOnboarding() {
     const hasAgreements = hasSignedContractor && hasSignedHipaa;
     const hasPayment = paymentMethods.some(pm => pm.stripeOnboardingComplete || pm.verificationStatus === "verified");
     
-    // Check verification statuses from backend
+    // Check verification statuses from backend - include new KYC document types
     const identityVerified = onboardingData?.documents?.some((d: any) => 
-      (d.documentType === "government_id" || d.documentType === "identity") && 
+      (d.documentType === "government_id" || d.documentType === "identity" || 
+       d.documentType === "id_front" || d.documentType === "selfie") && 
       d.verificationStatus === "approved"
     ) || false;
     const w9Verified = taxForms[0]?.verificationStatus === "approved";
@@ -308,6 +330,11 @@ export default function ProfessionalOnboarding() {
         complete: hasIdentityAndW9,
         status: hasIdentityAndW9 ? "complete" : (hasGovernmentId || hasW9) ? "partial" : "pending" as const,
         hasId: hasGovernmentId,
+        hasIdFront,
+        hasIdBack,
+        hasSelfie,
+        isPassport,
+        storedIdType,
         hasW9: hasW9,
         w9Status: taxForms[0]?.verificationStatus,
         needsVerification: hasIdentityAndW9 && (!identityVerified || !w9Verified),
@@ -348,6 +375,14 @@ export default function ProfessionalOnboarding() {
       setActiveStep(stepStatus.firstIncomplete);
     }
   }, [stepStatus, manualStepSelection, activeStep]);
+
+  // Sync selectedIdType from stored metadata when data loads
+  useEffect(() => {
+    const storedType = stepStatus.steps[1]?.storedIdType;
+    if (storedType && storedType !== selectedIdType) {
+      setSelectedIdType(storedType);
+    }
+  }, [stepStatus.steps]);
 
   // Handle manual step selection
   const handleStepClick = (stepIndex: number) => {
@@ -1217,19 +1252,50 @@ export default function ProfessionalOnboarding() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {/* Step progress for this section */}
-            <div className="flex items-center gap-4 mb-6 p-4 bg-muted/50 rounded-lg">
+            {/* KYC Progress Tracker - use consistent ID type source */}
+            {(() => {
+              // Determine effective ID type - prefer stored type, fall back to selected
+              const effectiveIdType = stepStatus.steps[1]?.storedIdType || selectedIdType;
+              const showIdBack = effectiveIdType !== "passport";
+              return (
+            <div className="flex items-center gap-2 mb-6 p-4 bg-muted/50 rounded-lg flex-wrap">
               <div className="flex items-center gap-2">
-                {stepStatus.steps[1]?.hasId ? (
+                {stepStatus.steps[1]?.hasIdFront ? (
                   <CheckCircle className="h-5 w-5 text-green-600" />
                 ) : (
                   <Circle className="h-5 w-5 text-muted-foreground" />
                 )}
-                <span className={`text-sm ${stepStatus.steps[1]?.hasId ? "text-green-700 font-medium" : ""}`}>
-                  Government ID
+                <span className={`text-sm ${stepStatus.steps[1]?.hasIdFront ? "text-green-700 font-medium" : ""}`}>
+                  ID Front
                 </span>
               </div>
-              <div className="h-px flex-1 bg-border" />
+              <div className="h-px flex-1 bg-border min-w-[20px]" />
+              {showIdBack && (
+                <>
+                  <div className="flex items-center gap-2">
+                    {stepStatus.steps[1]?.hasIdBack ? (
+                      <CheckCircle className="h-5 w-5 text-green-600" />
+                    ) : (
+                      <Circle className="h-5 w-5 text-muted-foreground" />
+                    )}
+                    <span className={`text-sm ${stepStatus.steps[1]?.hasIdBack ? "text-green-700 font-medium" : ""}`}>
+                      ID Back
+                    </span>
+                  </div>
+                  <div className="h-px flex-1 bg-border min-w-[20px]" />
+                </>
+              )}
+              <div className="flex items-center gap-2">
+                {stepStatus.steps[1]?.hasSelfie ? (
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                ) : (
+                  <Circle className="h-5 w-5 text-muted-foreground" />
+                )}
+                <span className={`text-sm ${stepStatus.steps[1]?.hasSelfie ? "text-green-700 font-medium" : ""}`}>
+                  Selfie
+                </span>
+              </div>
+              <div className="h-px flex-1 bg-border min-w-[20px]" />
               <div className="flex items-center gap-2">
                 {stepStatus.steps[1]?.hasW9 ? (
                   <CheckCircle className="h-5 w-5 text-green-600" />
@@ -1241,120 +1307,269 @@ export default function ProfessionalOnboarding() {
                 </span>
               </div>
             </div>
+              );
+            })()}
 
-            {/* Government ID Upload Section */}
+            {/* Government ID Upload Section - KYC Compliant */}
             <div className="mb-8">
               <h4 className="text-base font-medium mb-2 flex items-center gap-2">
                 <span className="flex items-center justify-center h-6 w-6 rounded-full bg-primary/10 text-primary text-xs font-bold">1</span>
-                Upload Government ID
+                Government ID Verification
               </h4>
               <p className="text-sm text-muted-foreground mb-4">
-                Upload a clear photo of your government-issued ID (driver's license, passport, or state ID)
+                Upload clear photos of your government-issued ID for identity verification (KYC)
               </p>
-              
-              {onboardingData?.documents?.some(d => d.documentType === "government_id" || d.documentType === "identity") ? (
+
+              {/* ID Type Selection */}
+              <div className="mb-4">
+                <label className="text-sm font-medium mb-2 block">Select ID Type</label>
+                <Select value={selectedIdType} onValueChange={setSelectedIdType}>
+                  <SelectTrigger className="w-full max-w-xs" data-testid="select-id-type">
+                    <SelectValue placeholder="Select ID type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="drivers_license">Driver's License</SelectItem>
+                    <SelectItem value="passport">Passport</SelectItem>
+                    <SelectItem value="national_id">National ID Card</SelectItem>
+                    <SelectItem value="residence_permit">Residence Permit</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                {/* ID Front Upload */}
+                <div className="border rounded-lg p-4">
+                  <h5 className="font-medium mb-2 flex items-center gap-2">
+                    <IdCard className="h-4 w-4" />
+                    {selectedIdType === "passport" ? "Photo Page" : "Front Side"}
+                  </h5>
+                  {onboardingData?.documents?.some(d => d.documentType === "id_front") ? (
+                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                        <span className="text-sm font-medium text-green-800 dark:text-green-200">Uploaded</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 text-center">
+                      {isUploadingIdFront ? (
+                        <Loader2 className="h-8 w-8 text-primary mx-auto mb-2 animate-spin" />
+                      ) : (
+                        <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*,.pdf"
+                        className="hidden"
+                        id="id-front-upload"
+                        disabled={isUploadingIdFront}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          setIsUploadingIdFront(true);
+                          try {
+                            const urlResponse = await fetch("/api/uploads/request-url", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+                              credentials: "include",
+                            });
+                            if (!urlResponse.ok) throw new Error("Failed to get upload URL");
+                            const { uploadURL, objectPath } = await urlResponse.json();
+                            const uploadResponse = await fetch(uploadURL, {
+                              method: "PUT",
+                              body: file,
+                              headers: { "Content-Type": file.type },
+                            });
+                            if (!uploadResponse.ok) throw new Error("Failed to upload file");
+                            uploadDocumentMutation.mutate({
+                              documentType: "id_front",
+                              documentUrl: objectPath,
+                              documentName: file.name,
+                              metadata: JSON.stringify({ idType: selectedIdType }),
+                            });
+                          } catch (error) {
+                            toast({ title: "Upload failed", description: error instanceof Error ? error.message : "Unknown error", variant: "destructive" });
+                          } finally {
+                            setIsUploadingIdFront(false);
+                          }
+                        }}
+                        data-testid="input-id-front-upload"
+                      />
+                      <label htmlFor="id-front-upload">
+                        <Button variant="outline" size="sm" asChild disabled={isUploadingIdFront}>
+                          <span>{isUploadingIdFront ? "Uploading..." : "Upload Front"}</span>
+                        </Button>
+                      </label>
+                    </div>
+                  )}
+                </div>
+
+                {/* ID Back Upload - Not required for passport */}
+                {selectedIdType !== "passport" && (
+                  <div className="border rounded-lg p-4">
+                    <h5 className="font-medium mb-2 flex items-center gap-2">
+                      <IdCard className="h-4 w-4" />
+                      Back Side
+                    </h5>
+                    {onboardingData?.documents?.some(d => d.documentType === "id_back") ? (
+                      <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                          <span className="text-sm font-medium text-green-800 dark:text-green-200">Uploaded</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 text-center">
+                        {isUploadingIdBack ? (
+                          <Loader2 className="h-8 w-8 text-primary mx-auto mb-2 animate-spin" />
+                        ) : (
+                          <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*,.pdf"
+                          className="hidden"
+                          id="id-back-upload"
+                          disabled={isUploadingIdBack}
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            setIsUploadingIdBack(true);
+                            try {
+                              const urlResponse = await fetch("/api/uploads/request-url", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+                                credentials: "include",
+                              });
+                              if (!urlResponse.ok) throw new Error("Failed to get upload URL");
+                              const { uploadURL, objectPath } = await urlResponse.json();
+                              const uploadResponse = await fetch(uploadURL, {
+                                method: "PUT",
+                                body: file,
+                                headers: { "Content-Type": file.type },
+                              });
+                              if (!uploadResponse.ok) throw new Error("Failed to upload file");
+                              uploadDocumentMutation.mutate({
+                                documentType: "id_back",
+                                documentUrl: objectPath,
+                                documentName: file.name,
+                                metadata: JSON.stringify({ idType: selectedIdType }),
+                              });
+                            } catch (error) {
+                              toast({ title: "Upload failed", description: error instanceof Error ? error.message : "Unknown error", variant: "destructive" });
+                            } finally {
+                              setIsUploadingIdBack(false);
+                            }
+                          }}
+                          data-testid="input-id-back-upload"
+                        />
+                        <label htmlFor="id-back-upload">
+                          <Button variant="outline" size="sm" asChild disabled={isUploadingIdBack}>
+                            <span>{isUploadingIdBack ? "Uploading..." : "Upload Back"}</span>
+                          </Button>
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Passport notice */}
+              {selectedIdType === "passport" && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  For passports, only the photo page is required.
+                </p>
+              )}
+            </div>
+
+            <Separator className="my-6" />
+
+            {/* Selfie / Liveness Check Section */}
+            <div className="mb-8">
+              <h4 className="text-base font-medium mb-2 flex items-center gap-2">
+                <span className="flex items-center justify-center h-6 w-6 rounded-full bg-primary/10 text-primary text-xs font-bold">2</span>
+                Selfie Verification
+              </h4>
+              <p className="text-sm text-muted-foreground mb-4">
+                Take or upload a clear selfie for identity verification. This helps us confirm that you are the person on the ID document.
+              </p>
+
+              {onboardingData?.documents?.some(d => d.documentType === "selfie") ? (
                 <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
                   <div className="flex items-center gap-2">
                     <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="font-medium text-green-800 dark:text-green-200">ID Document Uploaded</span>
+                    <span className="font-medium text-green-800 dark:text-green-200">Selfie Uploaded</span>
                   </div>
                   <p className="text-sm text-green-700 dark:text-green-300 mt-1">
-                    Your government ID has been uploaded and is pending verification.
+                    Your selfie has been uploaded and is pending verification.
                   </p>
                 </div>
               ) : (
                 <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
-                  {isUploadingId ? (
+                  {isUploadingSelfie ? (
                     <>
                       <Loader2 className="h-10 w-10 text-primary mx-auto mb-3 animate-spin" />
-                      <p className="text-sm text-muted-foreground mb-3">
-                        Uploading your ID document...
-                      </p>
+                      <p className="text-sm text-muted-foreground mb-3">Uploading your selfie...</p>
                     </>
                   ) : (
                     <>
-                      <Upload className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                      <Camera className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
                       <p className="text-sm text-muted-foreground mb-3">
-                        Upload a clear photo of your government-issued ID
+                        Upload a clear photo of your face
                       </p>
                     </>
                   )}
                   <input
                     type="file"
-                    accept="image/*,.pdf"
+                    accept="image/*"
+                    capture="user"
                     className="hidden"
-                    id="id-upload"
-                    disabled={isUploadingId}
+                    id="selfie-upload"
+                    disabled={isUploadingSelfie}
                     onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
-                      
-                      setIsUploadingId(true);
+                      setIsUploadingSelfie(true);
                       try {
-                        // Step 1: Get presigned URL for upload
                         const urlResponse = await fetch("/api/uploads/request-url", {
                           method: "POST",
                           headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            name: file.name,
-                            size: file.size,
-                            contentType: file.type,
-                          }),
+                          body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
                           credentials: "include",
                         });
-                        
-                        if (!urlResponse.ok) {
-                          throw new Error("Failed to get upload URL");
-                        }
-                        
+                        if (!urlResponse.ok) throw new Error("Failed to get upload URL");
                         const { uploadURL, objectPath } = await urlResponse.json();
-                        
-                        // Step 2: Upload file directly to object storage
                         const uploadResponse = await fetch(uploadURL, {
                           method: "PUT",
                           body: file,
-                          headers: {
-                            "Content-Type": file.type,
-                          },
+                          headers: { "Content-Type": file.type },
                         });
-                        
-                        if (!uploadResponse.ok) {
-                          throw new Error("Failed to upload file");
-                        }
-                        
-                        // Step 3: Register the document in the database
+                        if (!uploadResponse.ok) throw new Error("Failed to upload file");
                         uploadDocumentMutation.mutate({
-                          documentType: "government_id",
+                          documentType: "selfie",
                           documentUrl: objectPath,
                           documentName: file.name,
                         });
                       } catch (error) {
                         toast({ title: "Upload failed", description: error instanceof Error ? error.message : "Unknown error", variant: "destructive" });
                       } finally {
-                        setIsUploadingId(false);
+                        setIsUploadingSelfie(false);
                       }
                     }}
-                    data-testid="input-id-upload"
+                    data-testid="input-selfie-upload"
                   />
-                  <label htmlFor="id-upload">
-                    <Button variant="outline" asChild disabled={isUploadingId}>
+                  <label htmlFor="selfie-upload">
+                    <Button variant="outline" asChild disabled={isUploadingSelfie}>
                       <span>
-                        {isUploadingId ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Uploading...
-                          </>
-                        ) : (
-                          <>
-                            <Upload className="h-4 w-4 mr-2" />
-                            Select File
-                          </>
-                        )}
+                        <Camera className="h-4 w-4 mr-2" />
+                        {isUploadingSelfie ? "Uploading..." : "Take or Upload Selfie"}
                       </span>
                     </Button>
                   </label>
                   <p className="text-xs text-muted-foreground mt-2">
-                    Accepted formats: JPEG, PNG, PDF (max 10MB)
+                    For best results: good lighting, face clearly visible, no sunglasses or hats
                   </p>
                 </div>
               )}
@@ -1365,7 +1580,7 @@ export default function ProfessionalOnboarding() {
             {/* W-9 Form Section */}
             <div>
               <h4 className="text-base font-medium mb-2 flex items-center gap-2">
-                <span className="flex items-center justify-center h-6 w-6 rounded-full bg-primary/10 text-primary text-xs font-bold">2</span>
+                <span className="flex items-center justify-center h-6 w-6 rounded-full bg-primary/10 text-primary text-xs font-bold">3</span>
                 Complete W-9 Tax Form
               </h4>
               <p className="text-sm text-muted-foreground mb-4">
