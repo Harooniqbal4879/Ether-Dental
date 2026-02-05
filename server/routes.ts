@@ -3451,6 +3451,7 @@ export async function registerRoutes(
   });
 
   // Delete/remove an uploaded document
+  // Supports both "documentType" and "documentType:documentId" formats
   app.delete("/api/professional/onboarding/documents/:documentType", async (req, res) => {
     try {
       const session = req.session as any;
@@ -3458,16 +3459,30 @@ export async function registerRoutes(
         return res.status(401).json({ error: "Not authenticated as professional" });
       }
 
-      const { documentType } = req.params;
+      const { documentType: param } = req.params;
       const { professionalDocuments, onboardingAuditLog } = await import("@shared/schema");
 
-      // Find and delete the document
-      const [deleted] = await db.delete(professionalDocuments)
-        .where(and(
-          eq(professionalDocuments.professionalId, session.professionalId),
-          eq(professionalDocuments.documentType, documentType)
-        ))
-        .returning();
+      let deleted;
+      
+      // Check if param contains a document ID (format: "documentType:documentId")
+      if (param.includes(":")) {
+        const [documentType, documentId] = param.split(":");
+        // Delete specific document by ID
+        [deleted] = await db.delete(professionalDocuments)
+          .where(and(
+            eq(professionalDocuments.professionalId, session.professionalId),
+            eq(professionalDocuments.id, parseInt(documentId))
+          ))
+          .returning();
+      } else {
+        // Delete all documents of this type (legacy behavior)
+        [deleted] = await db.delete(professionalDocuments)
+          .where(and(
+            eq(professionalDocuments.professionalId, session.professionalId),
+            eq(professionalDocuments.documentType, param)
+          ))
+          .returning();
+      }
 
       if (!deleted) {
         return res.status(404).json({ error: "Document not found" });
@@ -3479,7 +3494,7 @@ export async function registerRoutes(
         action: "document_removed",
         actorType: "professional",
         actorId: session.professionalId,
-        previousValue: JSON.stringify({ documentType }),
+        previousValue: JSON.stringify({ documentType: deleted.documentType, documentId: deleted.id }),
         ipAddress: req.ip,
         userAgent: req.headers["user-agent"],
       });

@@ -2515,19 +2515,46 @@ export default function ProfessionalOnboarding() {
                     </p>
                   </div>
                 </div>
-                {onboardingData?.documents?.some(d => d.documentType === "professional_license") ? (
-                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                    Uploaded
-                  </Badge>
-                ) : (
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {onboardingData?.documents?.some(d => d.documentType === "professional_license") && (
+                    <Badge className="bg-green-500/10 text-green-700 border-green-500/20">
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      {onboardingData?.documents?.filter(d => d.documentType === "professional_license").length} uploaded
+                    </Badge>
+                  )}
                   <ComplianceUploadButton 
                     documentType="professional_license" 
-                    label="Upload License"
+                    label={onboardingData?.documents?.some(d => d.documentType === "professional_license") ? "Add More" : "Upload License"}
                     uploadDocumentMutation={uploadDocumentMutation}
                   />
-                )}
+                </div>
               </div>
+              {/* List uploaded documents */}
+              {onboardingData?.documents?.filter(d => d.documentType === "professional_license").map((doc, idx) => (
+                <div key={doc.id} className="flex items-center justify-between gap-2 mt-2 pl-12 py-1 border-t">
+                  <span className="text-sm truncate">{doc.documentName || `Document ${idx + 1}`}</span>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => window.open(doc.documentUrl, "_blank")}
+                      data-testid={`button-view-license-${idx}`}
+                    >
+                      <Eye className="h-3 w-3 mr-1" />
+                      View
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeDocumentMutation.mutate(`professional_license:${doc.id}`)}
+                      disabled={removeDocumentMutation.isPending}
+                      data-testid={`button-remove-license-${idx}`}
+                    >
+                      {removeDocumentMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Remove"}
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
 
             {/* NPI Number */}
@@ -2544,19 +2571,34 @@ export default function ProfessionalOnboarding() {
                     </p>
                   </div>
                 </div>
-                {onboardingData?.documents?.some(d => d.documentType === "npi_number") ? (
-                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                    Uploaded
-                  </Badge>
-                ) : (
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {onboardingData?.documents?.some(d => d.documentType === "npi_number") && (
+                    <Badge className="bg-green-500/10 text-green-700 border-green-500/20">
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      {onboardingData?.documents?.filter(d => d.documentType === "npi_number").length} uploaded
+                    </Badge>
+                  )}
                   <ComplianceUploadButton 
                     documentType="npi_number" 
-                    label="Upload NPI"
+                    label={onboardingData?.documents?.some(d => d.documentType === "npi_number") ? "Add More" : "Upload NPI"}
                     uploadDocumentMutation={uploadDocumentMutation}
                   />
-                )}
+                </div>
               </div>
+              {onboardingData?.documents?.filter(d => d.documentType === "npi_number").map((doc, idx) => (
+                <div key={doc.id} className="flex items-center justify-between gap-2 mt-2 pl-12 py-1 border-t">
+                  <span className="text-sm truncate">{doc.documentName || `Document ${idx + 1}`}</span>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="sm" onClick={() => window.open(doc.documentUrl, "_blank")} data-testid={`button-view-npi-${idx}`}>
+                      <Eye className="h-3 w-3 mr-1" />
+                      View
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => removeDocumentMutation.mutate(`npi_number:${doc.id}`)} disabled={removeDocumentMutation.isPending} data-testid={`button-remove-npi-${idx}`}>
+                      {removeDocumentMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Remove"}
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
 
             {/* Malpractice Insurance */}
@@ -2573,19 +2615,34 @@ export default function ProfessionalOnboarding() {
                     </p>
                   </div>
                 </div>
-                {onboardingData?.documents?.some(d => d.documentType === "malpractice_insurance") ? (
-                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                    Uploaded
-                  </Badge>
-                ) : (
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {onboardingData?.documents?.some(d => d.documentType === "malpractice_insurance") && (
+                    <Badge className="bg-green-500/10 text-green-700 border-green-500/20">
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      {onboardingData?.documents?.filter(d => d.documentType === "malpractice_insurance").length} uploaded
+                    </Badge>
+                  )}
                   <ComplianceUploadButton 
                     documentType="malpractice_insurance" 
-                    label="Upload Insurance"
+                    label={onboardingData?.documents?.some(d => d.documentType === "malpractice_insurance") ? "Add More" : "Upload Insurance"}
                     uploadDocumentMutation={uploadDocumentMutation}
                   />
-                )}
+                </div>
               </div>
+              {onboardingData?.documents?.filter(d => d.documentType === "malpractice_insurance").map((doc, idx) => (
+                <div key={doc.id} className="flex items-center justify-between gap-2 mt-2 pl-12 py-1 border-t">
+                  <span className="text-sm truncate">{doc.documentName || `Document ${idx + 1}`}</span>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="sm" onClick={() => window.open(doc.documentUrl, "_blank")} data-testid={`button-view-insurance-${idx}`}>
+                      <Eye className="h-3 w-3 mr-1" />
+                      View
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => removeDocumentMutation.mutate(`malpractice_insurance:${doc.id}`)} disabled={removeDocumentMutation.isPending} data-testid={`button-remove-insurance-${idx}`}>
+                      {removeDocumentMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Remove"}
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
 
             {/* Background Check */}
@@ -2602,19 +2659,34 @@ export default function ProfessionalOnboarding() {
                     </p>
                   </div>
                 </div>
-                {onboardingData?.documents?.some(d => d.documentType === "background_check") ? (
-                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                    Uploaded
-                  </Badge>
-                ) : (
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {onboardingData?.documents?.some(d => d.documentType === "background_check") && (
+                    <Badge className="bg-green-500/10 text-green-700 border-green-500/20">
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      {onboardingData?.documents?.filter(d => d.documentType === "background_check").length} uploaded
+                    </Badge>
+                  )}
                   <ComplianceUploadButton 
                     documentType="background_check" 
-                    label="Upload Authorization"
+                    label={onboardingData?.documents?.some(d => d.documentType === "background_check") ? "Add More" : "Upload Authorization"}
                     uploadDocumentMutation={uploadDocumentMutation}
                   />
-                )}
+                </div>
               </div>
+              {onboardingData?.documents?.filter(d => d.documentType === "background_check").map((doc, idx) => (
+                <div key={doc.id} className="flex items-center justify-between gap-2 mt-2 pl-12 py-1 border-t">
+                  <span className="text-sm truncate">{doc.documentName || `Document ${idx + 1}`}</span>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="sm" onClick={() => window.open(doc.documentUrl, "_blank")} data-testid={`button-view-bgcheck-${idx}`}>
+                      <Eye className="h-3 w-3 mr-1" />
+                      View
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => removeDocumentMutation.mutate(`background_check:${doc.id}`)} disabled={removeDocumentMutation.isPending} data-testid={`button-remove-bgcheck-${idx}`}>
+                      {removeDocumentMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Remove"}
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
 
             {/* Immunization Records */}
@@ -2631,19 +2703,34 @@ export default function ProfessionalOnboarding() {
                     </p>
                   </div>
                 </div>
-                {onboardingData?.documents?.some(d => d.documentType === "immunization_records") ? (
-                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                    Uploaded
-                  </Badge>
-                ) : (
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {onboardingData?.documents?.some(d => d.documentType === "immunization_records") && (
+                    <Badge className="bg-green-500/10 text-green-700 border-green-500/20">
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      {onboardingData?.documents?.filter(d => d.documentType === "immunization_records").length} uploaded
+                    </Badge>
+                  )}
                   <ComplianceUploadButton 
                     documentType="immunization_records" 
-                    label="Upload Records"
+                    label={onboardingData?.documents?.some(d => d.documentType === "immunization_records") ? "Add More" : "Upload Records"}
                     uploadDocumentMutation={uploadDocumentMutation}
                   />
-                )}
+                </div>
               </div>
+              {onboardingData?.documents?.filter(d => d.documentType === "immunization_records").map((doc, idx) => (
+                <div key={doc.id} className="flex items-center justify-between gap-2 mt-2 pl-12 py-1 border-t">
+                  <span className="text-sm truncate">{doc.documentName || `Document ${idx + 1}`}</span>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="sm" onClick={() => window.open(doc.documentUrl, "_blank")} data-testid={`button-view-immunization-${idx}`}>
+                      <Eye className="h-3 w-3 mr-1" />
+                      View
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => removeDocumentMutation.mutate(`immunization_records:${doc.id}`)} disabled={removeDocumentMutation.isPending} data-testid={`button-remove-immunization-${idx}`}>
+                      {removeDocumentMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Remove"}
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
 
             {/* CPR/BLS Certification */}
@@ -2660,19 +2747,34 @@ export default function ProfessionalOnboarding() {
                     </p>
                   </div>
                 </div>
-                {onboardingData?.documents?.some(d => d.documentType === "cpr_bls_certification") ? (
-                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                    Uploaded
-                  </Badge>
-                ) : (
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {onboardingData?.documents?.some(d => d.documentType === "cpr_bls_certification") && (
+                    <Badge className="bg-green-500/10 text-green-700 border-green-500/20">
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      {onboardingData?.documents?.filter(d => d.documentType === "cpr_bls_certification").length} uploaded
+                    </Badge>
+                  )}
                   <ComplianceUploadButton 
                     documentType="cpr_bls_certification" 
-                    label="Upload Certification"
+                    label={onboardingData?.documents?.some(d => d.documentType === "cpr_bls_certification") ? "Add More" : "Upload Certification"}
                     uploadDocumentMutation={uploadDocumentMutation}
                   />
-                )}
+                </div>
               </div>
+              {onboardingData?.documents?.filter(d => d.documentType === "cpr_bls_certification").map((doc, idx) => (
+                <div key={doc.id} className="flex items-center justify-between gap-2 mt-2 pl-12 py-1 border-t">
+                  <span className="text-sm truncate">{doc.documentName || `Document ${idx + 1}`}</span>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="sm" onClick={() => window.open(doc.documentUrl, "_blank")} data-testid={`button-view-cpr-${idx}`}>
+                      <Eye className="h-3 w-3 mr-1" />
+                      View
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => removeDocumentMutation.mutate(`cpr_bls_certification:${doc.id}`)} disabled={removeDocumentMutation.isPending} data-testid={`button-remove-cpr-${idx}`}>
+                      {removeDocumentMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Remove"}
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
 
             {/* Progress indicator */}
