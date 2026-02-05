@@ -2237,43 +2237,39 @@ By signing below, I acknowledge my understanding of and commitment to HIPAA comp
                     (() => {
                       const w9Doc = onboardingData?.documents?.find(d => d.documentType === "w9_form");
                       return (
-                        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
+                        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3 group">
                           <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <CheckCircle className="h-4 w-4 text-green-600" />
-                              <span className="text-sm font-medium text-green-800 dark:text-green-200">W-9 Uploaded</span>
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
+                              <span className="text-sm font-medium text-green-800 dark:text-green-200 truncate">W-9 Uploaded</span>
                             </div>
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
                               <Button
                                 variant="ghost"
-                                size="sm"
-                                className="h-7 px-2 text-green-700 dark:text-green-300 hover:text-green-800 dark:hover:text-green-200"
+                                size="icon"
+                                className="h-6 w-6 text-green-700 dark:text-green-300"
                                 onClick={() => window.open(w9Doc?.documentUrl, "_blank")}
                                 data-testid="button-view-w9"
                               >
-                                <Eye className="h-3 w-3 mr-1" />
-                                View
+                                <Eye className="h-3.5 w-3.5" />
                               </Button>
                               <Button
                                 variant="ghost"
-                                size="sm"
-                                className="h-7 px-2 text-destructive hover:text-destructive"
+                                size="icon"
+                                className="h-6 w-6 text-destructive"
                                 onClick={() => removeDocumentMutation.mutate("w9_form")}
                                 disabled={removeDocumentMutation.isPending}
                                 data-testid="button-remove-w9"
                               >
                                 {removeDocumentMutation.isPending ? (
-                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                 ) : (
-                                  <>
-                                    <X className="h-3 w-3 mr-1" />
-                                    Remove
-                                  </>
+                                  <X className="h-3.5 w-3.5" />
                                 )}
                               </Button>
                             </div>
                           </div>
-                          <p className="text-xs text-green-700 dark:text-green-300 mt-1">
+                          <p className="text-xs text-green-700 dark:text-green-300 mt-1 truncate">
                             {w9Doc?.documentName || "W-9 document"} - Pending review
                           </p>
                         </div>
