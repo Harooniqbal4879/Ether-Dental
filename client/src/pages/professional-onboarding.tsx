@@ -38,6 +38,7 @@ import {
   Banknote,
   Lock,
   Eye,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -1770,35 +1771,23 @@ By signing below, I acknowledge my understanding of and commitment to HIPAA comp
                     {selectedIdType === "passport" ? "Photo Page" : "Front Side"}
                   </h5>
                   {onboardingData?.documents?.some(d => d.documentType === "id_front") ? (
-                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                          <span className="text-sm font-medium text-green-800 dark:text-green-200">Uploaded</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              const doc = onboardingData?.documents?.find(d => d.documentType === "id_front");
-                              if (doc?.documentUrl) window.open(doc.documentUrl, "_blank");
-                            }}
-                            data-testid="button-view-id-front"
-                          >
-                            <Eye className="h-3 w-3 mr-1" />
-                            View
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeDocumentMutation.mutate("id_front")}
-                            disabled={removeDocumentMutation.isPending}
-                            data-testid="button-remove-id-front"
-                          >
-                            {removeDocumentMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Remove"}
-                          </Button>
-                        </div>
+                    <div className="aspect-[4/3] rounded-lg overflow-hidden relative group border">
+                      <img
+                        src={onboardingData?.documents?.find(d => d.documentType === "id_front")?.documentUrl}
+                        alt="ID Front"
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        onClick={() => removeDocumentMutation.mutate("id_front")}
+                        disabled={removeDocumentMutation.isPending}
+                        className="absolute top-2 right-2 p-1.5 bg-destructive text-destructive-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                        data-testid="button-remove-id-front"
+                      >
+                        {removeDocumentMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+                      </button>
+                      <div className="absolute bottom-0 left-0 right-0 bg-green-600/90 text-white text-xs py-1 px-2 flex items-center gap-1">
+                        <CheckCircle className="h-3 w-3" />
+                        Uploaded
                       </div>
                     </div>
                   ) : (
@@ -1864,35 +1853,23 @@ By signing below, I acknowledge my understanding of and commitment to HIPAA comp
                       Back Side
                     </h5>
                     {onboardingData?.documents?.some(d => d.documentType === "id_back") ? (
-                      <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <CheckCircle className="h-4 w-4 text-green-600" />
-                            <span className="text-sm font-medium text-green-800 dark:text-green-200">Uploaded</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                const doc = onboardingData?.documents?.find(d => d.documentType === "id_back");
-                                if (doc?.documentUrl) window.open(doc.documentUrl, "_blank");
-                              }}
-                              data-testid="button-view-id-back"
-                            >
-                              <Eye className="h-3 w-3 mr-1" />
-                              View
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeDocumentMutation.mutate("id_back")}
-                              disabled={removeDocumentMutation.isPending}
-                              data-testid="button-remove-id-back"
-                            >
-                              {removeDocumentMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Remove"}
-                            </Button>
-                          </div>
+                      <div className="aspect-[4/3] rounded-lg overflow-hidden relative group border">
+                        <img
+                          src={onboardingData?.documents?.find(d => d.documentType === "id_back")?.documentUrl}
+                          alt="ID Back"
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          onClick={() => removeDocumentMutation.mutate("id_back")}
+                          disabled={removeDocumentMutation.isPending}
+                          className="absolute top-2 right-2 p-1.5 bg-destructive text-destructive-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                          data-testid="button-remove-id-back"
+                        >
+                          {removeDocumentMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+                        </button>
+                        <div className="absolute bottom-0 left-0 right-0 bg-green-600/90 text-white text-xs py-1 px-2 flex items-center gap-1">
+                          <CheckCircle className="h-3 w-3" />
+                          Uploaded
                         </div>
                       </div>
                     ) : (
@@ -1974,37 +1951,27 @@ By signing below, I acknowledge my understanding of and commitment to HIPAA comp
 
               {onboardingData?.documents?.some(d => d.documentType === "selfie") ? (
                 <div className="space-y-4">
-                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                        <span className="font-medium text-green-800 dark:text-green-200">Selfie Uploaded</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            const doc = onboardingData?.documents?.find(d => d.documentType === "selfie");
-                            if (doc?.documentUrl) window.open(doc.documentUrl, "_blank");
-                          }}
-                          data-testid="button-view-selfie"
-                        >
-                          <Eye className="h-3 w-3 mr-1" />
-                          View
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeDocumentMutation.mutate("selfie")}
-                          disabled={removeDocumentMutation.isPending}
-                          data-testid="button-remove-selfie"
-                        >
-                          {removeDocumentMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Remove"}
-                        </Button>
+                  <div className="max-w-xs">
+                    <div className="aspect-square rounded-lg overflow-hidden relative group border">
+                      <img
+                        src={onboardingData?.documents?.find(d => d.documentType === "selfie")?.documentUrl}
+                        alt="Selfie"
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        onClick={() => removeDocumentMutation.mutate("selfie")}
+                        disabled={removeDocumentMutation.isPending}
+                        className="absolute top-2 right-2 p-1.5 bg-destructive text-destructive-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                        data-testid="button-remove-selfie"
+                      >
+                        {removeDocumentMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+                      </button>
+                      <div className="absolute bottom-0 left-0 right-0 bg-green-600/90 text-white text-xs py-1 px-2 flex items-center gap-1">
+                        <CheckCircle className="h-3 w-3" />
+                        Selfie Uploaded
                       </div>
                     </div>
-                    <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+                    <p className="text-sm text-muted-foreground mt-2">
                       Your selfie has been uploaded. Now verify your identity.
                     </p>
                   </div>
