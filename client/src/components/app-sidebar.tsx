@@ -1,4 +1,5 @@
 import { Link, useLocation as useWouterLocation } from "wouter";
+import logoPath from "@assets/just_logo_1770330410375.png";
 import {
   LayoutDashboard,
   Users,
@@ -132,9 +133,7 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border px-6 py-4">
         <Link href="/app" className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary">
-            <Shield className="h-5 w-5 text-primary-foreground" />
-          </div>
+          <img src={logoPath} alt="EtherAI-Dental" className="h-9 w-9 object-contain" />
           <div className="flex flex-col">
             <span className="text-base font-semibold text-sidebar-foreground">
               EtherAI-Dental

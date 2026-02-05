@@ -2,7 +2,8 @@ import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Stethoscope, Building2, UserCircle, ArrowRight, Shield, Zap, Clock } from "lucide-react";
+import { Building2, UserCircle, ArrowRight, Shield, Zap, Clock } from "lucide-react";
+import logoPath from "@assets/just_logo_1770330410375.png";
 
 const features = [
   {
@@ -38,9 +39,7 @@ export default function Landing() {
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60" data-testid="header-landing">
         <div className="container mx-auto flex h-16 items-center justify-between px-4 gap-4">
           <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary">
-              <Stethoscope className="h-5 w-5 text-primary-foreground" />
-            </div>
+            <img src={logoPath} alt="EtherAI-Dental" className="h-9 w-9 object-contain" />
             <span className="text-xl font-bold" data-testid="text-logo">EtherAI-Dental</span>
           </div>
 

@@ -1,8 +1,9 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Stethoscope, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { useState } from "react";
+import logoPath from "@assets/just_logo_1770330410375.png";
 
 const navLinks = [
   { href: "/features", label: "Features", id: "features" },
@@ -22,9 +23,7 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
         <div className="container mx-auto flex h-16 items-center justify-between px-4 gap-4">
           <Link href="/" data-testid="link-logo">
             <span className="flex items-center gap-2">
-              <span className="flex h-9 w-9 items-center justify-center rounded-md bg-primary">
-                <Stethoscope className="h-5 w-5 text-primary-foreground" />
-              </span>
+              <img src={logoPath} alt="EtherAI-Dental" className="h-9 w-9 object-contain" />
               <span className="text-xl font-bold" data-testid="text-logo">EtherAI-Dental</span>
             </span>
           </Link>
@@ -107,9 +106,7 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
           <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary">
-                  <Stethoscope className="h-4 w-4 text-primary-foreground" />
-                </div>
+                <img src={logoPath} alt="EtherAI-Dental" className="h-8 w-8 object-contain" />
                 <span className="font-bold" data-testid="text-footer-logo">EtherAI-Dental</span>
               </div>
               <p className="text-sm text-muted-foreground" data-testid="text-footer-tagline">
