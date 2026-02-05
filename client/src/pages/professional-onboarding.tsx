@@ -683,7 +683,7 @@ export default function ProfessionalOnboarding() {
   });
 
   const addPaymentMethodMutation = useMutation({
-    mutationFn: async (data: { methodType: string }) => {
+    mutationFn: async (data: { methodType: string; paymentEmail?: string }) => {
       const res = await apiRequest("POST", "/api/professional/onboarding/payment-methods", data);
       return res.json();
     },
@@ -694,6 +694,20 @@ export default function ProfessionalOnboarding() {
         toast({ title: "Payment method added" });
         queryClient.invalidateQueries({ queryKey: ["/api/professional/onboarding"] });
       }
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const removePaymentMethodMutation = useMutation({
+    mutationFn: async (methodType: string) => {
+      const res = await apiRequest("DELETE", `/api/professional/onboarding/payment-methods/${methodType}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Payment method removed" });
+      queryClient.invalidateQueries({ queryKey: ["/api/professional/onboarding"] });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -2724,10 +2738,21 @@ export default function ProfessionalOnboarding() {
                   </div>
                 </div>
                 {onboardingData?.paymentMethods?.some(pm => pm.methodType === "stripe_connect" && pm.stripeOnboardingComplete) ? (
-                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                    Connected
-                  </Badge>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Badge className="bg-green-500/10 text-green-700 border-green-500/20">
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      Connected
+                    </Badge>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => removePaymentMethodMutation.mutate("stripe_connect")}
+                      disabled={removePaymentMethodMutation.isPending}
+                      data-testid="button-reset-stripe"
+                    >
+                      {removePaymentMethodMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Reset"}
+                    </Button>
+                  </div>
                 ) : (
                   <Button 
                     variant="outline" 
@@ -2757,10 +2782,21 @@ export default function ProfessionalOnboarding() {
                   </div>
                 </div>
                 {onboardingData?.paymentMethods?.some(pm => pm.methodType === "ach_bank_transfer") ? (
-                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                    {onboardingData?.paymentMethods?.find(pm => pm.methodType === "ach_bank_transfer")?.verificationStatus === "pending" ? "Pending" : "Added"}
-                  </Badge>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Badge className="bg-green-500/10 text-green-700 border-green-500/20">
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      {onboardingData?.paymentMethods?.find(pm => pm.methodType === "ach_bank_transfer")?.verificationStatus === "pending" ? "Pending" : "Added"}
+                    </Badge>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => removePaymentMethodMutation.mutate("ach_bank_transfer")}
+                      disabled={removePaymentMethodMutation.isPending}
+                      data-testid="button-reset-ach"
+                    >
+                      {removePaymentMethodMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Reset"}
+                    </Button>
+                  </div>
                 ) : (
                   <Button 
                     variant="outline" 
@@ -2897,10 +2933,21 @@ export default function ProfessionalOnboarding() {
                   </div>
                 </div>
                 {onboardingData?.paymentMethods?.some(pm => pm.methodType === "paypal") ? (
-                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                    Connected
-                  </Badge>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Badge className="bg-green-500/10 text-green-700 border-green-500/20">
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      Connected
+                    </Badge>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => removePaymentMethodMutation.mutate("paypal")}
+                      disabled={removePaymentMethodMutation.isPending}
+                      data-testid="button-reset-paypal"
+                    >
+                      {removePaymentMethodMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Reset"}
+                    </Button>
+                  </div>
                 ) : (
                   <Button 
                     variant="outline" 
@@ -2929,10 +2976,21 @@ export default function ProfessionalOnboarding() {
                   </div>
                 </div>
                 {onboardingData?.paymentMethods?.some(pm => pm.methodType === "payoneer") ? (
-                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                    Connected
-                  </Badge>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Badge className="bg-green-500/10 text-green-700 border-green-500/20">
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      Connected
+                    </Badge>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => removePaymentMethodMutation.mutate("payoneer")}
+                      disabled={removePaymentMethodMutation.isPending}
+                      data-testid="button-reset-payoneer"
+                    >
+                      {removePaymentMethodMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Reset"}
+                    </Button>
+                  </div>
                 ) : (
                   <Button 
                     variant="outline" 
@@ -2961,10 +3019,21 @@ export default function ProfessionalOnboarding() {
                   </div>
                 </div>
                 {onboardingData?.paymentMethods?.some(pm => pm.methodType === "wise") ? (
-                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                    Connected
-                  </Badge>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Badge className="bg-green-500/10 text-green-700 border-green-500/20">
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      Connected
+                    </Badge>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => removePaymentMethodMutation.mutate("wise")}
+                      disabled={removePaymentMethodMutation.isPending}
+                      data-testid="button-reset-wise"
+                    >
+                      {removePaymentMethodMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Reset"}
+                    </Button>
+                  </div>
                 ) : (
                   <Button 
                     variant="outline" 
@@ -2993,10 +3062,21 @@ export default function ProfessionalOnboarding() {
                   </div>
                 </div>
                 {onboardingData?.paymentMethods?.some(pm => pm.methodType === "skrill") ? (
-                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                    Connected
-                  </Badge>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Badge className="bg-green-500/10 text-green-700 border-green-500/20">
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      Connected
+                    </Badge>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => removePaymentMethodMutation.mutate("skrill")}
+                      disabled={removePaymentMethodMutation.isPending}
+                      data-testid="button-reset-skrill"
+                    >
+                      {removePaymentMethodMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Reset"}
+                    </Button>
+                  </div>
                 ) : (
                   <Button 
                     variant="outline" 

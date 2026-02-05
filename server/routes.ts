@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { 
   insertPatientSchema, 
   insertInsuranceCarrierSchema, 
@@ -3406,6 +3406,47 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching payment methods:", error);
       res.status(500).json({ error: "Failed to fetch payment methods" });
+    }
+  });
+
+  // Delete/reset a payment method
+  app.delete("/api/professional/onboarding/payment-methods/:methodType", async (req, res) => {
+    try {
+      const session = req.session as any;
+      if (!session.professionalId) {
+        return res.status(401).json({ error: "Not authenticated as professional" });
+      }
+
+      const { methodType } = req.params;
+      const { professionalPaymentMethods, onboardingAuditLog } = await import("@shared/schema");
+
+      // Find and delete the payment method
+      const [deleted] = await db.delete(professionalPaymentMethods)
+        .where(and(
+          eq(professionalPaymentMethods.professionalId, session.professionalId),
+          eq(professionalPaymentMethods.methodType, methodType)
+        ))
+        .returning();
+
+      if (!deleted) {
+        return res.status(404).json({ error: "Payment method not found" });
+      }
+
+      // Audit log
+      await db.insert(onboardingAuditLog).values({
+        professionalId: session.professionalId,
+        action: "payment_method_removed",
+        actorType: "professional",
+        actorId: session.professionalId,
+        previousValue: JSON.stringify({ methodType }),
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+      });
+
+      res.json({ success: true, message: "Payment method removed" });
+    } catch (error) {
+      console.error("Error removing payment method:", error);
+      res.status(500).json({ error: "Failed to remove payment method" });
     }
   });
 
