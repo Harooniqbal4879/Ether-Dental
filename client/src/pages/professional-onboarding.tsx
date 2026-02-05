@@ -24,6 +24,8 @@ import {
   ChevronRight,
   Camera,
   Smartphone,
+  Download,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -196,6 +198,7 @@ export default function ProfessionalOnboarding() {
   const [manualStepSelection, setManualStepSelection] = useState(false);
   const [isUploadingIdFront, setIsUploadingIdFront] = useState(false);
   const [isUploadingIdBack, setIsUploadingIdBack] = useState(false);
+  const [isUploadingW9, setIsUploadingW9] = useState(false);
   const [isUploadingSelfie, setIsUploadingSelfie] = useState(false);
   const [selectedIdType, setSelectedIdType] = useState<string>("drivers_license");
   const [isRunningFaceMatch, setIsRunningFaceMatch] = useState(false);
@@ -322,7 +325,8 @@ export default function ProfessionalOnboarding() {
     // For passport, back is not required; otherwise all three are needed
     const hasFullKyc = hasIdFront && (isPassport || hasIdBack) && hasSelfie;
     const hasGovernmentId = hasFullKyc || hasLegacyId;
-    const hasW9 = taxForms.length > 0;
+    const hasUploadedW9Document = onboardingData?.documents?.some(d => d.documentType === "w9_form") || false;
+    const hasW9 = taxForms.length > 0 || hasUploadedW9Document;
     const hasSignedContractor = agreements.some(a => a.agreementType === "contractor_agreement" && a.signedAt);
     const hasSignedHipaa = agreements.some(a => a.agreementType === "hipaa_acknowledgment" && a.signedAt);
     const hasAgreements = hasSignedContractor && hasSignedHipaa;
@@ -334,7 +338,8 @@ export default function ProfessionalOnboarding() {
        d.documentType === "id_front" || d.documentType === "selfie") && 
       d.verificationStatus === "approved"
     ) || false;
-    const w9Verified = taxForms[0]?.verificationStatus === "approved";
+    const uploadedW9Doc = onboardingData?.documents?.find(d => d.documentType === "w9_form");
+    const w9Verified = taxForms[0]?.verificationStatus === "approved" || uploadedW9Doc?.verificationStatus === "approved";
     const paymentVerified = paymentMethods.some(pm => pm.verificationStatus === "verified");
     
     const steps = [
@@ -1750,6 +1755,115 @@ export default function ProfessionalOnboarding() {
                 </p>
               </div>
             )}
+
+            {/* Download Blank W-9 and Upload Filled Form Section */}
+            <div className="border rounded-lg p-4 mb-6 bg-muted/30">
+              <h4 className="font-medium mb-3 flex items-center gap-2">
+                <Download className="h-4 w-4" />
+                Download & Upload W-9 Form
+              </h4>
+              <p className="text-sm text-muted-foreground mb-4">
+                You can either fill out the form below digitally, or download a blank W-9, fill it out, and upload the completed form.
+              </p>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Download Blank W-9 */}
+                <div className="border rounded-lg p-4 bg-background">
+                  <h5 className="font-medium mb-2 text-sm">Download Blank W-9</h5>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Get the official IRS W-9 form to fill out manually
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => window.open("https://www.irs.gov/pub/irs-pdf/fw9.pdf", "_blank")}
+                    data-testid="button-download-w9"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download W-9 (PDF)
+                    <ExternalLink className="h-3 w-3 ml-2" />
+                  </Button>
+                </div>
+
+                {/* Upload Filled W-9 */}
+                <div className="border rounded-lg p-4 bg-background">
+                  <h5 className="font-medium mb-2 text-sm">Upload Completed W-9</h5>
+                  {onboardingData?.documents?.some(d => d.documentType === "w9_form") ? (
+                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                        <span className="text-sm font-medium text-green-800 dark:text-green-200">W-9 Uploaded</span>
+                      </div>
+                      <p className="text-xs text-green-700 dark:text-green-300 mt-1">
+                        Your W-9 document has been uploaded and is pending review
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        Upload your completed W-9 form (PDF or image)
+                      </p>
+                      <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-3 text-center">
+                        {isUploadingW9 ? (
+                          <Loader2 className="h-6 w-6 text-primary mx-auto mb-2 animate-spin" />
+                        ) : (
+                          <Upload className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*,.pdf"
+                          className="hidden"
+                          id="w9-upload"
+                          disabled={isUploadingW9}
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            setIsUploadingW9(true);
+                            try {
+                              const urlResponse = await fetch("/api/uploads/request-url", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+                                credentials: "include",
+                              });
+                              if (!urlResponse.ok) throw new Error("Failed to get upload URL");
+                              const { uploadURL, objectPath } = await urlResponse.json();
+                              const uploadResponse = await fetch(uploadURL, {
+                                method: "PUT",
+                                body: file,
+                                headers: { "Content-Type": file.type },
+                              });
+                              if (!uploadResponse.ok) throw new Error("Failed to upload file");
+                              uploadDocumentMutation.mutate({
+                                documentType: "w9_form",
+                                documentUrl: objectPath,
+                                documentName: file.name,
+                              });
+                              toast({ title: "W-9 document uploaded successfully" });
+                            } catch (error) {
+                              toast({ title: "Upload failed", description: error instanceof Error ? error.message : "Unknown error", variant: "destructive" });
+                            } finally {
+                              setIsUploadingW9(false);
+                            }
+                          }}
+                          data-testid="input-w9-upload"
+                        />
+                        <label htmlFor="w9-upload">
+                          <Button variant="outline" size="sm" asChild disabled={isUploadingW9}>
+                            <span>{isUploadingW9 ? "Uploading..." : "Upload W-9"}</span>
+                          </Button>
+                        </label>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <Separator className="my-6" />
+            
+            <h4 className="font-medium mb-4">Or Complete the Digital W-9 Form</h4>
 
             <Form {...w9Form}>
               <form onSubmit={w9Form.handleSubmit((data) => submitW9Mutation.mutate(data))} className="space-y-6">
