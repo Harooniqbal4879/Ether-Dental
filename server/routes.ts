@@ -7122,7 +7122,7 @@ export async function registerRoutes(
       // ============== SUPER ADMIN SEEDING ==============
       // Platform-level super admin with hardcoded credentials
       const superAdminEmail = "superadmin@etherai.com";
-      const superAdminPassword = "EtherAI@2024!"; // Strong default password
+      const superAdminPassword = "EtherAI-Dental@2024!"; // Strong default password
       
       const existingSuperAdmin = await storage.getPracticeAdminByEmail(superAdminEmail);
       if (existingSuperAdmin) {
@@ -7137,11 +7137,11 @@ export async function registerRoutes(
         }
       } else {
         // Need a practice for the super admin - create Platform practice if doesn't exist
-        let platformPractice = await storage.getPracticeByName("EtherAI Platform");
+        let platformPractice = await storage.getPracticeByName("EtherAI-Dental Platform");
         
         if (!platformPractice) {
           platformPractice = await storage.createPractice({
-            name: "EtherAI Platform",
+            name: "EtherAI-Dental Platform",
             email: "platform@etherai.com",
             phone: "(555) 000-0000",
             address: "Platform Administration",
@@ -7150,7 +7150,7 @@ export async function registerRoutes(
             zipCode: "94102",
             registrationStatus: "approved",
           });
-          results.push("Created EtherAI Platform practice for super admins");
+          results.push("Created EtherAI-Dental Platform practice for super admins");
         }
         
         const superAdminPasswordHash = await hashPassword(superAdminPassword);
@@ -7176,7 +7176,7 @@ export async function registerRoutes(
         // Create a test practice
         const existingPractices = await storage.getPractices();
         // Filter out the platform practice
-        const regularPractices = existingPractices.filter(p => p.name !== "EtherAI Platform");
+        const regularPractices = existingPractices.filter(p => p.name !== "EtherAI-Dental Platform");
         let practiceId: string;
         
         if (regularPractices.length > 0) {

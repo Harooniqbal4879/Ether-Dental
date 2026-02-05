@@ -14,12 +14,12 @@ const faqCategories = [
     category: "Getting Started",
     questions: [
       {
-        question: "How long does it take to set up EtherAI?",
+        question: "How long does it take to set up EtherAI-Dental?",
         answer: "Most practices are up and running within 24-48 hours. The initial setup involves registering your practice, configuring your settings, and optionally connecting your Dentrix Ascend account. Our onboarding team guides you through every step.",
       },
       {
         question: "Do I need to install any software?",
-        answer: "No installation required. EtherAI is a cloud-based platform accessible from any modern web browser. This means your team can access it from any device, anywhere with an internet connection.",
+        answer: "No installation required. EtherAI-Dental is a cloud-based platform accessible from any modern web browser. This means your team can access it from any device, anywhere with an internet connection.",
       },
       {
         question: "Can I import my existing patient data?",
@@ -40,7 +40,7 @@ const faqCategories = [
       },
       {
         question: "Can I verify both dental and medical insurance?",
-        answer: "Yes, EtherAI supports dual-insurance verification. This is especially useful for procedures that may have medical coverage components, like TMJ treatment or oral surgery.",
+        answer: "Yes, EtherAI-Dental supports dual-insurance verification. This is especially useful for procedures that may have medical coverage components, like TMJ treatment or oral surgery.",
       },
     ],
   },
@@ -65,8 +65,8 @@ const faqCategories = [
     category: "Security & Compliance",
     questions: [
       {
-        question: "Is EtherAI HIPAA compliant?",
-        answer: "Yes, EtherAI is fully HIPAA compliant. We implement all required administrative, physical, and technical safeguards. We also sign Business Associate Agreements (BAAs) with all customers.",
+        question: "Is EtherAI-Dental HIPAA compliant?",
+        answer: "Yes, EtherAI-Dental is fully HIPAA compliant. We implement all required administrative, physical, and technical safeguards. We also sign Business Associate Agreements (BAAs) with all customers.",
       },
       {
         question: "How is my data protected?",
@@ -107,7 +107,7 @@ export default function FAQ() {
               Frequently Asked Questions
             </h1>
             <p className="text-xl text-muted-foreground" data-testid="text-faq-description">
-              Find answers to common questions about EtherAI. Can't find what you're 
+              Find answers to common questions about EtherAI-Dental. Can't find what you're 
               looking for? Contact our support team.
             </p>
           </div>

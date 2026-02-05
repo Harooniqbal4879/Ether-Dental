@@ -1405,7 +1405,7 @@ export const platformSettings = pgTable("platform_settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   serviceFeeRate: decimal("service_fee_rate", { precision: 5, scale: 4 }).notNull().default("0.2250"), // 22.5%
   convenienceFeeRate: decimal("convenience_fee_rate", { precision: 5, scale: 4 }).notNull().default("0.0350"), // 3.5%
-  platformFeeRate: decimal("platform_fee_rate", { precision: 5, scale: 4 }).notNull().default("0.1200"), // 12% EtherAI fee
+  platformFeeRate: decimal("platform_fee_rate", { precision: 5, scale: 4 }).notNull().default("0.1200"), // 12% EtherAI-Dental fee
   payrollTaxRate: decimal("payroll_tax_rate", { precision: 5, scale: 4 }).notNull().default("0.0765"), // 7.65% (Social Security + Medicare)
   federalUnemploymentRate: decimal("federal_unemployment_rate", { precision: 5, scale: 4 }).notNull().default("0.0060"), // 0.6% FUTA
   workersCompRate: decimal("workers_comp_rate", { precision: 5, scale: 4 }).notNull().default("0.0100"), // 1% default

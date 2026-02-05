@@ -167,7 +167,7 @@ export default function InvitationPage() {
                     You've successfully joined <span className="font-medium">{invitation.practice?.name}</span>'s professional network.
                   </p>
                   <p className="text-sm text-muted-foreground mb-6">
-                    You can now view and claim shifts from this practice using the EtherAI mobile app.
+                    You can now view and claim shifts from this practice using the EtherAI-Dental mobile app.
                   </p>
                   <Button 
                     onClick={() => setLocation("/login/admin")}
@@ -205,7 +205,7 @@ export default function InvitationPage() {
     <div className="min-h-screen bg-background">
       <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-14 items-center justify-between px-4 max-w-3xl mx-auto">
-          <span className="text-xl font-bold text-primary">EtherAI</span>
+          <span className="text-xl font-bold text-primary">EtherAI-Dental</span>
           <ThemeToggle />
         </div>
       </header>

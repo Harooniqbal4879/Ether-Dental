@@ -25,7 +25,7 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
               <span className="flex h-9 w-9 items-center justify-center rounded-md bg-primary">
                 <Stethoscope className="h-5 w-5 text-primary-foreground" />
               </span>
-              <span className="text-xl font-bold" data-testid="text-logo">EtherAI</span>
+              <span className="text-xl font-bold" data-testid="text-logo">EtherAI-Dental</span>
             </span>
           </Link>
 
@@ -110,7 +110,7 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
                 <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary">
                   <Stethoscope className="h-4 w-4 text-primary-foreground" />
                 </div>
-                <span className="font-bold" data-testid="text-footer-logo">EtherAI</span>
+                <span className="font-bold" data-testid="text-footer-logo">EtherAI-Dental</span>
               </div>
               <p className="text-sm text-muted-foreground" data-testid="text-footer-tagline">
                 Streamlining dental practice management with intelligent automation.
@@ -146,7 +146,7 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="mt-8 pt-8 border-t text-center text-sm text-muted-foreground" data-testid="footer-copyright">
-            <p>&copy; {new Date().getFullYear()} EtherAI. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} EtherAI-Dental. All rights reserved.</p>
           </div>
         </div>
       </footer>

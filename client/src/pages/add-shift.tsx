@@ -788,7 +788,7 @@ export default function AddShiftPage() {
               </Button>
               
               <p className="text-xs text-muted-foreground text-center">
-                It's always free to post shifts on EtherAI. Free cancellation up to 24 hours before a confirmed shift begins. By clicking "Post shifts" you agree to the EtherAI{" "}
+                It's always free to post shifts on EtherAI-Dental. Free cancellation up to 24 hours before a confirmed shift begins. By clicking "Post shifts" you agree to the EtherAI-Dental{" "}
                 <a href="#" className="underline" data-testid="link-terms-of-service">Terms of Service</a> and <a href="#" className="underline" data-testid="link-privacy-policy">Privacy Policy</a>.
               </p>
             </div>
@@ -860,7 +860,7 @@ export default function AddShiftPage() {
                 </Collapsible>
                 
                 <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">EtherAI fee ({(pricing.etherAIFeeRate * 100).toFixed(0)}%)</span>
+                  <span className="text-sm text-muted-foreground">EtherAI-Dental fee ({(pricing.etherAIFeeRate * 100).toFixed(0)}%)</span>
                   <span className="text-sm" data-testid="text-etherai-fee">
                     ${pricing.etherAIFee.toFixed(2)}
                   </span>

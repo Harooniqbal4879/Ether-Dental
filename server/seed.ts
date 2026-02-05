@@ -109,7 +109,7 @@ async function seed() {
   const [platformSettingsCreated] = await db.insert(platformSettings).values({
     serviceFeeRate: "0.2250",      // 22.5%
     convenienceFeeRate: "0.0350",  // 3.5%
-    platformFeeRate: "0.1200",     // 12% EtherAI fee
+    platformFeeRate: "0.1200",     // 12% EtherAI-Dental fee
     payrollTaxRate: "0.0765",      // 7.65% (Social Security + Medicare)
     federalUnemploymentRate: "0.0060", // 0.6% FUTA
     workersCompRate: "0.0100",     // 1% default

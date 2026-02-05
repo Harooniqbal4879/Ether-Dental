@@ -71,7 +71,7 @@ export default function Benefits() {
               Transform Your Practice Operations
             </h1>
             <p className="text-xl text-muted-foreground" data-testid="text-benefits-description">
-              See how EtherAI helps dental practices save time, reduce errors, 
+              See how EtherAI-Dental helps dental practices save time, reduce errors, 
               and improve patient satisfaction.
             </p>
           </div>
@@ -96,7 +96,7 @@ export default function Benefits() {
 
           <div className="max-w-4xl mx-auto" data-testid="comparison-section">
             <h2 className="text-3xl font-bold text-center mb-8">
-              Before vs. After EtherAI
+              Before vs. After EtherAI-Dental
             </h2>
             <Card>
               <CardContent className="p-0">

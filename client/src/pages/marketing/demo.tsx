@@ -42,7 +42,7 @@ const benefits = [
   {
     icon: Calendar,
     title: "Personalized Demo",
-    description: "See how EtherAI fits your specific practice needs",
+    description: "See how EtherAI-Dental fits your specific practice needs",
   },
   {
     icon: Users,
@@ -125,11 +125,11 @@ export default function Demo() {
           <div className="grid lg:grid-cols-2 gap-12 max-w-6xl mx-auto">
             <div>
               <h1 className="text-4xl lg:text-5xl font-bold mb-6" data-testid="text-demo-title">
-                See EtherAI in Action
+                See EtherAI-Dental in Action
               </h1>
               <p className="text-xl text-muted-foreground mb-8" data-testid="text-demo-description">
                 Schedule a personalized demo with our team. We'll show you how 
-                EtherAI can transform your practice's insurance verification 
+                EtherAI-Dental can transform your practice's insurance verification 
                 and patient management workflows.
               </p>
 
@@ -150,7 +150,7 @@ export default function Demo() {
               <div className="mt-12 p-6 bg-muted/30 rounded-lg" data-testid="box-trial-info">
                 <p className="text-sm text-muted-foreground">
                   <strong className="text-foreground">Prefer to explore on your own?</strong>
-                  {" "}You can also sign up for a 14-day free trial and test EtherAI 
+                  {" "}You can also sign up for a 14-day free trial and test EtherAI-Dental 
                   with your own practice data.
                 </p>
               </div>
@@ -306,7 +306,7 @@ export default function Demo() {
                     </Button>
 
                     <p className="text-xs text-muted-foreground text-center" data-testid="text-privacy-notice">
-                      By submitting this form, you agree to receive communications from EtherAI. 
+                      By submitting this form, you agree to receive communications from EtherAI-Dental. 
                       We respect your privacy and will never share your information.
                     </p>
                   </form>

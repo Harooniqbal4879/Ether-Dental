@@ -225,7 +225,7 @@ function PlatformFeesForm({ settings }: { settings: PlatformSettings }) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="platformFeeRate">Platform Fee Rate (EtherAI Fee) (%)</Label>
+            <Label htmlFor="platformFeeRate">Platform Fee Rate (EtherAI-Dental Fee) (%)</Label>
             <div className="flex items-center gap-2">
               <Input
                 id="platformFeeRate"
@@ -239,7 +239,7 @@ function PlatformFeesForm({ settings }: { settings: PlatformSettings }) {
               />
               <span className="text-sm text-muted-foreground w-8">%</span>
             </div>
-            <p className="text-xs text-muted-foreground">EtherAI platform fee shown in shift pricing</p>
+            <p className="text-xs text-muted-foreground">EtherAI-Dental platform fee shown in shift pricing</p>
           </div>
         </CardContent>
       </Card>

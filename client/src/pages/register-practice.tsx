@@ -63,7 +63,7 @@ export default function RegisterPracticePage() {
             </div>
             <CardTitle className="text-2xl">Registration Submitted!</CardTitle>
             <CardDescription className="text-base">
-              Thank you for registering your practice with EtherAI.
+              Thank you for registering your practice with EtherAI-Dental.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -96,7 +96,7 @@ export default function RegisterPracticePage() {
           <Link href="/">
             <Button variant="ghost" data-testid="link-back-home">
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to EtherAI
+              Back to EtherAI-Dental
             </Button>
           </Link>
         </div>
@@ -108,7 +108,7 @@ export default function RegisterPracticePage() {
             </div>
             <h1 className="text-3xl font-bold mb-2" data-testid="text-register-title">Register Your Practice</h1>
             <p className="text-muted-foreground text-lg">
-              Join EtherAI and streamline your dental practice management
+              Join EtherAI-Dental and streamline your dental practice management
             </p>
           </div>
 

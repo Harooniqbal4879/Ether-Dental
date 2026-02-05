@@ -116,7 +116,7 @@ export default function ProfessionalRegister() {
               <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary">
                 <Stethoscope className="h-5 w-5 text-primary-foreground" />
               </div>
-              <span className="text-xl font-bold">EtherAI</span>
+              <span className="text-xl font-bold">EtherAI-Dental</span>
             </Link>
             <ThemeToggle />
           </div>
@@ -132,7 +132,7 @@ export default function ProfessionalRegister() {
                 Registration Successful!
               </CardTitle>
               <CardDescription className="text-base">
-                Welcome to EtherAI, {submittedName}!
+                Welcome to EtherAI-Dental, {submittedName}!
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -167,7 +167,7 @@ export default function ProfessionalRegister() {
             <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary">
               <Stethoscope className="h-5 w-5 text-primary-foreground" />
             </div>
-            <span className="text-xl font-bold">EtherAI</span>
+            <span className="text-xl font-bold">EtherAI-Dental</span>
           </Link>
           <ThemeToggle />
         </div>

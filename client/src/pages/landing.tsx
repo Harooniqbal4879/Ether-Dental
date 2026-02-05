@@ -41,7 +41,7 @@ export default function Landing() {
             <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary">
               <Stethoscope className="h-5 w-5 text-primary-foreground" />
             </div>
-            <span className="text-xl font-bold" data-testid="text-logo">EtherAI</span>
+            <span className="text-xl font-bold" data-testid="text-logo">EtherAI-Dental</span>
           </div>
 
           <nav className="hidden md:flex items-center gap-1" data-testid="nav-landing">
@@ -160,7 +160,7 @@ export default function Landing() {
 
       <footer className="border-t py-6" data-testid="footer-landing">
         <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          <p>&copy; {new Date().getFullYear()} EtherAI. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} EtherAI-Dental. All rights reserved.</p>
           <div className="flex justify-center gap-4 mt-2">
             <Link href="/features" className="hover:text-foreground" data-testid="link-footer-features">Features</Link>
             <Link href="/pricing" className="hover:text-foreground" data-testid="link-footer-pricing">Pricing</Link>

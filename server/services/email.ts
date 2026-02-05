@@ -41,7 +41,7 @@ async function getResendClient() {
   const personalDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com', 'icloud.com'];
   const emailDomain = fromEmail?.split('@')[1]?.toLowerCase();
   const safeFromEmail = personalDomains.includes(emailDomain) 
-    ? 'EtherAI <onboarding@resend.dev>' 
+    ? 'EtherAI-Dental <onboarding@resend.dev>' 
     : fromEmail;
   
   return {
@@ -83,7 +83,7 @@ export async function sendInvitationEmail(params: InvitationEmailParams): Promis
   
   <div style="background-color: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
     <p style="font-size: 16px; margin-bottom: 20px;">
-      <strong>${practiceName}</strong> has invited you to join their professional network on EtherAI as a <strong>${role}</strong>.
+      <strong>${practiceName}</strong> has invited you to join their professional network on EtherAI-Dental as a <strong>${role}</strong>.
     </p>
     
     ${personalMessage}
@@ -105,7 +105,7 @@ export async function sendInvitationEmail(params: InvitationEmailParams): Promis
     <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 25px 0;">
     
     <p style="font-size: 12px; color: #9ca3af; text-align: center; margin: 0;">
-      This email was sent by EtherAI on behalf of ${practiceName}.<br>
+      This email was sent by EtherAI-Dental on behalf of ${practiceName}.<br>
       If you didn't expect this invitation, you can safely ignore this email.
     </p>
   </div>
@@ -116,7 +116,7 @@ export async function sendInvitationEmail(params: InvitationEmailParams): Promis
     const result = await client.emails.send({
       from: fromEmail,
       to: toEmail,
-      subject: `${practiceName} has invited you to join their network on EtherAI`,
+      subject: `${practiceName} has invited you to join their network on EtherAI-Dental`,
       html: htmlContent,
     });
 
@@ -174,7 +174,7 @@ export async function sendOtpEmail(params: OtpEmailParams): Promise<boolean> {
     <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 25px 0;">
     
     <p style="font-size: 12px; color: #9ca3af; text-align: center; margin: 0;">
-      This email was sent by EtherAI.<br>
+      This email was sent by EtherAI-Dental.<br>
       Please do not reply to this email.
     </p>
   </div>
@@ -185,7 +185,7 @@ export async function sendOtpEmail(params: OtpEmailParams): Promise<boolean> {
     const result = await client.emails.send({
       from: fromEmail,
       to: toEmail,
-      subject: `Your EtherAI verification code: ${otpCode}`,
+      subject: `Your EtherAI-Dental verification code: ${otpCode}`,
       html: htmlContent,
     });
 

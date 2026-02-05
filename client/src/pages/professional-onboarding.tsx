@@ -329,7 +329,7 @@ export default function ProfessionalOnboarding() {
       title: "Independent Contractor Agreement",
       content: `INDEPENDENT CONTRACTOR AGREEMENT
 
-This Independent Contractor Agreement ("Agreement") is entered into between EtherAI Dental Platform ("Company") and the undersigned professional ("Contractor").
+This Independent Contractor Agreement ("Agreement") is entered into between EtherAI-Dental Dental Platform ("Company") and the undersigned professional ("Contractor").
 
 1. RELATIONSHIP OF PARTIES
 The Contractor is an independent contractor and not an employee, partner, or agent of the Company. The Contractor shall have no authority to bind the Company in any manner.
@@ -358,7 +358,7 @@ By signing below, you acknowledge that you have read, understood, and agree to b
       title: "Marketplace Terms of Service",
       content: `MARKETPLACE TERMS OF SERVICE
 
-Welcome to EtherAI Dental Platform. By using our services, you agree to these Terms of Service.
+Welcome to EtherAI-Dental Dental Platform. By using our services, you agree to these Terms of Service.
 
 1. ACCOUNT RESPONSIBILITIES
 - You are responsible for maintaining the security of your account
@@ -425,7 +425,7 @@ By signing below, you agree to abide by these escrow and dispute policies.`
       content: `NON-CIRCUMVENTION AGREEMENT
 
 1. PURPOSE
-This Agreement ensures all professional arrangements facilitated through the EtherAI platform remain within the platform ecosystem.
+This Agreement ensures all professional arrangements facilitated through the EtherAI-Dental platform remain within the platform ecosystem.
 
 2. NON-CIRCUMVENTION OBLIGATIONS
 The Contractor agrees NOT to:

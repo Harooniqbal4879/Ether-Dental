@@ -54,7 +54,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-6 p-6">
       <PageHeader
-        title="Welcome to EtherAI"
+        title="Welcome to EtherAI-Dental"
         description="Your dental practice management hub - track verifications, manage patients, and streamline operations"
         actions={
           <Button asChild data-testid="button-view-all-verifications">

@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-This document compares EtherAI's current contractor onboarding implementation against industry standards from leading platforms (Upwork, Fiverr, Toptal, GoTu, Freelancer.com). The analysis identifies gaps, strengths, and recommendations for achieving payment readiness and compliance.
+This document compares EtherAI-Dental's current contractor onboarding implementation against industry standards from leading platforms (Upwork, Fiverr, Toptal, GoTu, Freelancer.com). The analysis identifies gaps, strengths, and recommendations for achieving payment readiness and compliance.
 
 ---
 
@@ -18,7 +18,7 @@ This document compares EtherAI's current contractor onboarding implementation ag
 | Profile photo | Identity confirmation |
 | Physical address | Tax documentation |
 
-### Current Implementation (EtherAI)
+### Current Implementation (EtherAI-Dental)
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Full legal name | ✅ Implemented | firstName, lastName fields |
@@ -50,7 +50,7 @@ This document compares EtherAI's current contractor onboarding implementation ag
 | Video verification | Upwork (flagged accounts) |
 | AI facial match against ID | Toptal, GoTu |
 
-### Current Implementation (EtherAI)
+### Current Implementation (EtherAI-Dental)
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Government ID upload | ✅ Implemented | Passport, Driver's License, National ID |
@@ -86,7 +86,7 @@ This document compares EtherAI's current contractor onboarding implementation ag
 | Address | 1099 mailing |
 | Signature & date | Legal attestation |
 
-### Current Implementation (EtherAI)
+### Current Implementation (EtherAI-Dental)
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Legal name | ✅ Implemented | legalName field |
@@ -123,7 +123,7 @@ This document compares EtherAI's current contractor onboarding implementation ag
 | Platform escrow | Upwork, Freelancer |
 | Micro-deposits verification | Standard practice |
 
-### Current Implementation (EtherAI)
+### Current Implementation (EtherAI-Dental)
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Stripe Connect | ✅ Implemented | Primary payment method |
@@ -163,7 +163,7 @@ This document compares EtherAI's current contractor onboarding implementation ag
 | CPR/BLS certifications | Emergency readiness |
 | I-9 work authorization | Employment eligibility |
 
-### Current Implementation (EtherAI)
+### Current Implementation (EtherAI-Dental)
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Professional license | ⚠️ Partial | License number stored, not verified |
@@ -205,7 +205,7 @@ This document compares EtherAI's current contractor onboarding implementation ag
 | Confidentiality / NDA | Data protection |
 | HIPAA acknowledgment | Healthcare compliance |
 
-### Current Implementation (EtherAI)
+### Current Implementation (EtherAI-Dental)
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Independent Contractor Agreement | ✅ Implemented | Typed signature |
@@ -241,7 +241,7 @@ This document compares EtherAI's current contractor onboarding implementation ag
 | Sanctions / OFAC screening | Legal compliance |
 | Account holds for flagged activity | Risk management |
 
-### Current Implementation (EtherAI)
+### Current Implementation (EtherAI-Dental)
 | Feature | Status | Notes |
 |---------|--------|-------|
 | IP address logging | ✅ Implemented | Captured in audit log |
@@ -270,7 +270,7 @@ This document compares EtherAI's current contractor onboarding implementation ag
 ### Industry Standard Checklist
 Before a contractor can receive payment:
 
-| Requirement | EtherAI Status |
+| Requirement | EtherAI-Dental Status |
 |-------------|----------------|
 | ✅ Identity verified (KYC complete) | ✅ identityVerified flag |
 | ✅ Tax forms submitted (W-9 / W-8) | ✅ w9Completed flag |
@@ -348,7 +348,7 @@ INVITED → IN_PROGRESS → UNDER_REVIEW → VERIFIED → PAYMENT_ELIGIBLE
 
 ## Conclusion
 
-EtherAI has a solid foundation for contractor onboarding with:
+EtherAI-Dental has a solid foundation for contractor onboarding with:
 - ✅ Comprehensive W-9 collection with encryption
 - ✅ Multi-step onboarding wizard
 - ✅ Stripe Connect integration
@@ -361,4 +361,4 @@ Key areas requiring attention:
 3. **International contractor support** - W-8BEN forms
 4. **Automated compliance** - OFAC screening, expiration alerts
 
-Addressing these gaps will bring EtherAI in line with industry-leading platforms like GoTu and Upwork.
+Addressing these gaps will bring EtherAI-Dental in line with industry-leading platforms like GoTu and Upwork.
