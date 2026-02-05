@@ -327,9 +327,15 @@ export default function ProfessionalOnboarding() {
     const hasGovernmentId = hasFullKyc || hasLegacyId;
     const hasUploadedW9Document = onboardingData?.documents?.some(d => d.documentType === "w9_form") || false;
     const hasW9 = taxForms.length > 0 || hasUploadedW9Document;
-    const hasSignedContractor = agreements.some(a => a.agreementType === "contractor_agreement" && a.signedAt);
-    const hasSignedHipaa = agreements.some(a => a.agreementType === "hipaa_acknowledgment" && a.signedAt);
-    const hasAgreements = hasSignedContractor && hasSignedHipaa;
+    
+    // Check all required agreements
+    const requiredAgreements = ["contractor_agreement", "terms_of_service", "escrow_dispute_policy", "non_circumvention", "nda", "hipaa_acknowledgment"];
+    const signedAgreementsCount = requiredAgreements.filter(
+      type => agreements.some(a => a.agreementType === type && a.signedAt)
+    ).length;
+    const hasAgreements = signedAgreementsCount === requiredAgreements.length;
+    const agreementsPartial = signedAgreementsCount > 0 && signedAgreementsCount < requiredAgreements.length;
+    
     const hasPayment = paymentMethods.some(pm => pm.stripeOnboardingComplete || pm.verificationStatus === "verified");
     
     // Check verification statuses from backend - include new KYC document types
@@ -374,9 +380,9 @@ export default function ProfessionalOnboarding() {
       { 
         key: "agreements", 
         complete: hasAgreements,
-        status: hasAgreements ? "complete" : (hasSignedContractor || hasSignedHipaa) ? "partial" : "pending" as const,
-        hasContractor: hasSignedContractor,
-        hasHipaa: hasSignedHipaa,
+        status: hasAgreements ? "complete" : agreementsPartial ? "partial" : "pending" as const,
+        signedCount: signedAgreementsCount,
+        totalRequired: requiredAgreements.length,
         needsVerification: false,
       },
       { 
@@ -2108,21 +2114,24 @@ export default function ProfessionalOnboarding() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <ShieldCheck className="h-5 w-5" />
-              Agreements
+              Contractual Agreements
             </CardTitle>
-            <CardDescription>Review and sign the required agreements</CardDescription>
+            <CardDescription>
+              Review and sign the required agreements before payment eligibility
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Independent Contractor Agreement */}
             <div className="border rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex-1 min-w-0">
                   <h4 className="font-medium">Independent Contractor Agreement</h4>
                   <p className="text-sm text-muted-foreground">
-                    Terms of engagement as an independent contractor
+                    Terms of engagement as an independent contractor including work scope, compensation, and relationship classification
                   </p>
                 </div>
                 {hasSignedAgreement("contractor_agreement") ? (
-                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20">
+                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
                     <CheckCircle2 className="h-3 w-3 mr-1" />
                     Signed
                   </Badge>
@@ -2132,6 +2141,7 @@ export default function ProfessionalOnboarding() {
                     onClick={() => handleSignAgreement("contractor_agreement")}
                     disabled={signAgreementMutation.isPending}
                     data-testid="button-sign-contractor-agreement"
+                    className="flex-shrink-0"
                   >
                     Sign Agreement
                   </Button>
@@ -2139,16 +2149,129 @@ export default function ProfessionalOnboarding() {
               </div>
             </div>
 
+            {/* Marketplace Terms of Service */}
             <div className="border rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-medium">Marketplace Terms of Service</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Platform usage terms, account responsibilities, and service guidelines
+                  </p>
+                </div>
+                {hasSignedAgreement("terms_of_service") ? (
+                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Signed
+                  </Badge>
+                ) : (
+                  <Button
+                    size="sm"
+                    onClick={() => handleSignAgreement("terms_of_service")}
+                    disabled={signAgreementMutation.isPending}
+                    data-testid="button-sign-terms-of-service"
+                    className="flex-shrink-0"
+                  >
+                    Sign Agreement
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Escrow & Dispute Policies */}
+            <div className="border rounded-lg p-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-medium">Escrow & Dispute Policies</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Payment escrow terms, dispute resolution procedures, and refund policies
+                  </p>
+                </div>
+                {hasSignedAgreement("escrow_dispute_policy") ? (
+                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Signed
+                  </Badge>
+                ) : (
+                  <Button
+                    size="sm"
+                    onClick={() => handleSignAgreement("escrow_dispute_policy")}
+                    disabled={signAgreementMutation.isPending}
+                    data-testid="button-sign-escrow-dispute"
+                    className="flex-shrink-0"
+                  >
+                    Sign Agreement
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Non-Circumvention Agreement */}
+            <div className="border rounded-lg p-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-medium">Non-Circumvention Agreement</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Commitment to conduct all transactions through the platform
+                  </p>
+                </div>
+                {hasSignedAgreement("non_circumvention") ? (
+                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Signed
+                  </Badge>
+                ) : (
+                  <Button
+                    size="sm"
+                    onClick={() => handleSignAgreement("non_circumvention")}
+                    disabled={signAgreementMutation.isPending}
+                    data-testid="button-sign-non-circumvention"
+                    className="flex-shrink-0"
+                  >
+                    Sign Agreement
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Confidentiality / NDA */}
+            <div className="border rounded-lg p-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-medium">Confidentiality & NDA</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Non-disclosure agreement for protecting sensitive practice and patient information
+                  </p>
+                </div>
+                {hasSignedAgreement("nda") ? (
+                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Signed
+                  </Badge>
+                ) : (
+                  <Button
+                    size="sm"
+                    onClick={() => handleSignAgreement("nda")}
+                    disabled={signAgreementMutation.isPending}
+                    data-testid="button-sign-nda"
+                    className="flex-shrink-0"
+                  >
+                    Sign Agreement
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* HIPAA Acknowledgment */}
+            <div className="border rounded-lg p-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex-1 min-w-0">
                   <h4 className="font-medium">HIPAA Acknowledgment</h4>
                   <p className="text-sm text-muted-foreground">
-                    Acknowledge HIPAA compliance requirements
+                    Acknowledge HIPAA compliance requirements for handling protected health information
                   </p>
                 </div>
                 {hasSignedAgreement("hipaa_acknowledgment") ? (
-                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20">
+                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
                     <CheckCircle2 className="h-3 w-3 mr-1" />
                     Signed
                   </Badge>
@@ -2158,6 +2281,7 @@ export default function ProfessionalOnboarding() {
                     onClick={() => handleSignAgreement("hipaa_acknowledgment")}
                     disabled={signAgreementMutation.isPending}
                     data-testid="button-sign-hipaa"
+                    className="flex-shrink-0"
                   >
                     Sign Agreement
                   </Button>
@@ -2165,12 +2289,31 @@ export default function ProfessionalOnboarding() {
               </div>
             </div>
 
-            {hasSignedAgreement("contractor_agreement") && hasSignedAgreement("hipaa_acknowledgment") && (
-              <Button className="w-full" onClick={goToNextStep} data-testid="button-continue-to-payment">
-                Continue to Payment Setup
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            )}
+            {/* Progress indicator */}
+            {(() => {
+              const allAgreements = ["contractor_agreement", "terms_of_service", "escrow_dispute_policy", "non_circumvention", "nda", "hipaa_acknowledgment"];
+              const signedCount = allAgreements.filter(a => hasSignedAgreement(a)).length;
+              const allSigned = signedCount === allAgreements.length;
+              
+              return (
+                <>
+                  <div className="bg-muted/30 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium">Agreement Progress</span>
+                      <span className="text-sm text-muted-foreground">{signedCount} of {allAgreements.length} signed</span>
+                    </div>
+                    <Progress value={(signedCount / allAgreements.length) * 100} className="h-2" />
+                  </div>
+
+                  {allSigned && (
+                    <Button className="w-full" onClick={goToNextStep} data-testid="button-continue-to-payment">
+                      Continue to Payment Setup
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  )}
+                </>
+              );
+            })()}
           </CardContent>
         </Card>
       )}
