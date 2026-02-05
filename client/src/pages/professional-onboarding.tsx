@@ -51,6 +51,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { AddressAutocomplete } from "@/components/ui/address-autocomplete";
 import { PageHeader } from "@/components/page-header";
 import { useAuth } from "@/lib/auth-context";
 import { queryClient } from "@/lib/queryClient";
@@ -1092,8 +1093,22 @@ export default function ProfessionalOnboarding() {
                     <FormItem>
                       <FormLabel>Street Address</FormLabel>
                       <FormControl>
-                        <Input placeholder="123 Main St" {...field} data-testid="input-street" />
+                        <AddressAutocomplete 
+                          value={field.value}
+                          onChange={field.onChange}
+                          onAddressSelect={(components) => {
+                            personalInfoForm.setValue("addressCity", components.city);
+                            personalInfoForm.setValue("addressState", components.state);
+                            personalInfoForm.setValue("addressZip", components.zip);
+                            personalInfoForm.setValue("countryOfResidence", components.country);
+                          }}
+                          placeholder="Start typing your address..."
+                          data-testid="input-street"
+                        />
                       </FormControl>
+                      <FormDescription className="text-xs">
+                        Start typing to see address suggestions
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

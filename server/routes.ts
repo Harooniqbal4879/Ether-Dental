@@ -39,6 +39,19 @@ export async function registerRoutes(
   registerMobileOnboardingRoutes(app);
 
   // ============================================================
+  // Config Endpoints
+  // ============================================================
+
+  // Provide Google Maps API key for frontend address autocomplete
+  app.get("/api/config/google-maps-key", (_req, res) => {
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      return res.status(404).json({ error: "Google Maps API key not configured" });
+    }
+    res.json({ apiKey });
+  });
+
+  // ============================================================
   // Practice Admin Authentication API
   // ============================================================
 
