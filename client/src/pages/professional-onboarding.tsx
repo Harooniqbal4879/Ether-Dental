@@ -33,6 +33,10 @@ import {
   Award,
   Syringe,
   FileCheck,
+  Wallet,
+  Globe,
+  Banknote,
+  Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -2660,45 +2664,296 @@ export default function ProfessionalOnboarding() {
               <CreditCard className="h-5 w-5" />
               Payment Setup
             </CardTitle>
-            <CardDescription>Set up how you'd like to receive payments for completed shifts</CardDescription>
+            <CardDescription>Configure your preferred withdrawal method for receiving payments</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {onboardingData?.paymentMethods?.some((pm) => pm.stripeOnboardingComplete) ? (
-              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5 text-green-600" />
-                  <span className="font-medium text-green-800 dark:text-green-200">Payment Method Connected</span>
-                </div>
-                <p className="text-sm text-green-700 dark:text-green-300 mt-1">
-                  Your Stripe account is set up and ready to receive payments.
-                </p>
-              </div>
-            ) : (
-              <>
-                <div className="border rounded-lg p-4 hover-elevate cursor-pointer" onClick={() => addPaymentMethodMutation.mutate({ methodType: "stripe_connect" })} data-testid="button-stripe-connect">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
-                      <CreditCard className="h-6 w-6 text-purple-600" />
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-medium">Connect with Stripe</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Receive payments directly to your bank account via Stripe Connect
-                      </p>
-                    </div>
-                    <ArrowRight className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                </div>
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
+              <p className="text-sm text-blue-800 dark:text-blue-200">
+                Select at least one payout method to receive payments for completed shifts. You can add multiple methods and set a primary one later.
+              </p>
+            </div>
 
-                {addPaymentMethodMutation.isPending && (
-                  <div className="flex items-center justify-center p-4">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                    <span className="ml-2">Setting up payment...</span>
-                  </div>
-                )}
-              </>
+            {/* Connected Payment Methods Summary */}
+            {onboardingData?.paymentMethods?.some((pm) => pm.stripeOnboardingComplete || pm.verificationStatus === "verified" || pm.verificationStatus === "pending") && (
+              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  <span className="font-medium text-green-800 dark:text-green-200">Payment Methods Configured</span>
+                </div>
+                <div className="space-y-1">
+                  {onboardingData.paymentMethods.filter(pm => pm.stripeOnboardingComplete || pm.verificationStatus === "verified" || pm.verificationStatus === "pending").map((pm, idx) => (
+                    <div key={idx} className="flex items-center gap-2 text-sm text-green-700 dark:text-green-300">
+                      <CheckCircle2 className="h-3 w-3" />
+                      <span className="capitalize">{pm.methodType?.replace(/_/g, ' ')}</span>
+                      {pm.verificationStatus === "pending" && <Badge variant="outline" className="text-xs">Pending Verification</Badge>}
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
 
+            {/* Stripe Connect */}
+            <div className="border rounded-lg p-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <CreditCard className="h-5 w-5 text-purple-600" />
+                  </div>
+                  <div>
+                    <h4 className="font-medium">Stripe Connect</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Fast payouts via Stripe's secure platform
+                    </p>
+                  </div>
+                </div>
+                {onboardingData?.paymentMethods?.some(pm => pm.methodType === "stripe_connect" && pm.stripeOnboardingComplete) ? (
+                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Connected
+                  </Badge>
+                ) : (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => addPaymentMethodMutation.mutate({ methodType: "stripe_connect" })}
+                    disabled={addPaymentMethodMutation.isPending}
+                    data-testid="button-stripe-connect"
+                  >
+                    {addPaymentMethodMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Connect"}
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* ACH / Direct Bank Transfer */}
+            <div className="border rounded-lg p-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="w-10 h-10 bg-teal-100 dark:bg-teal-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Building2 className="h-5 w-5 text-teal-600" />
+                  </div>
+                  <div>
+                    <h4 className="font-medium">Direct Bank Transfer (ACH/SEPA/Wire)</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Transfer directly to your bank account
+                    </p>
+                  </div>
+                </div>
+                {onboardingData?.paymentMethods?.some(pm => pm.methodType === "ach_bank_transfer") ? (
+                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    {onboardingData.paymentMethods.find(pm => pm.methodType === "ach_bank_transfer")?.verificationStatus === "pending" ? "Pending" : "Added"}
+                  </Badge>
+                ) : (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => addPaymentMethodMutation.mutate({ methodType: "ach_bank_transfer" })}
+                    disabled={addPaymentMethodMutation.isPending}
+                    data-testid="button-ach-transfer"
+                  >
+                    Add Bank
+                  </Button>
+                )}
+              </div>
+              {/* Void Check Upload for ACH */}
+              {onboardingData?.paymentMethods?.some(pm => pm.methodType === "ach_bank_transfer") && (
+                <div className="mt-4 pt-4 border-t">
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm">Void Check (required for ACH verification)</span>
+                    </div>
+                    {onboardingData?.documents?.some(d => d.documentType === "void_check") ? (
+                      <Badge className="bg-green-500/10 text-green-700 border-green-500/20">
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        Uploaded
+                      </Badge>
+                    ) : (
+                      <ComplianceUploadButton 
+                        documentType="void_check" 
+                        label="Upload Void Check"
+                        uploadDocumentMutation={uploadDocumentMutation}
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* PayPal */}
+            <div className="border rounded-lg p-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Wallet className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <h4 className="font-medium">PayPal</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Receive payments to your PayPal account
+                    </p>
+                  </div>
+                </div>
+                {onboardingData?.paymentMethods?.some(pm => pm.methodType === "paypal") ? (
+                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Connected
+                  </Badge>
+                ) : (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => addPaymentMethodMutation.mutate({ methodType: "paypal" })}
+                    disabled={addPaymentMethodMutation.isPending}
+                    data-testid="button-paypal"
+                  >
+                    Connect
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Payoneer */}
+            <div className="border rounded-lg p-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Globe className="h-5 w-5 text-orange-600" />
+                  </div>
+                  <div>
+                    <h4 className="font-medium">Payoneer</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Global payments with local receiving accounts
+                    </p>
+                  </div>
+                </div>
+                {onboardingData?.paymentMethods?.some(pm => pm.methodType === "payoneer") ? (
+                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Connected
+                  </Badge>
+                ) : (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => addPaymentMethodMutation.mutate({ methodType: "payoneer" })}
+                    disabled={addPaymentMethodMutation.isPending}
+                    data-testid="button-payoneer"
+                  >
+                    Connect
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Wise (TransferWise) */}
+            <div className="border rounded-lg p-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Banknote className="h-5 w-5 text-green-600" />
+                  </div>
+                  <div>
+                    <h4 className="font-medium">Wise (TransferWise)</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Low-fee international transfers
+                    </p>
+                  </div>
+                </div>
+                {onboardingData?.paymentMethods?.some(pm => pm.methodType === "wise") ? (
+                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Connected
+                  </Badge>
+                ) : (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => addPaymentMethodMutation.mutate({ methodType: "wise" })}
+                    disabled={addPaymentMethodMutation.isPending}
+                    data-testid="button-wise"
+                  >
+                    Connect
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Skrill */}
+            <div className="border rounded-lg p-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="w-10 h-10 bg-pink-100 dark:bg-pink-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Wallet className="h-5 w-5 text-pink-600" />
+                  </div>
+                  <div>
+                    <h4 className="font-medium">Skrill</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Digital wallet with worldwide reach
+                    </p>
+                  </div>
+                </div>
+                {onboardingData?.paymentMethods?.some(pm => pm.methodType === "skrill") ? (
+                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Connected
+                  </Badge>
+                ) : (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => addPaymentMethodMutation.mutate({ methodType: "skrill" })}
+                    disabled={addPaymentMethodMutation.isPending}
+                    data-testid="button-skrill"
+                  >
+                    Connect
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Platform Escrow Release */}
+            <div className="border rounded-lg p-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="w-10 h-10 bg-slate-100 dark:bg-slate-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Lock className="h-5 w-5 text-slate-600" />
+                  </div>
+                  <div>
+                    <h4 className="font-medium">Platform Escrow</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Hold funds in platform escrow until manual release
+                    </p>
+                  </div>
+                </div>
+                {onboardingData?.paymentMethods?.some(pm => pm.methodType === "platform_escrow") ? (
+                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Enabled
+                  </Badge>
+                ) : (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => addPaymentMethodMutation.mutate({ methodType: "platform_escrow" })}
+                    disabled={addPaymentMethodMutation.isPending}
+                    data-testid="button-escrow"
+                  >
+                    Enable
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {addPaymentMethodMutation.isPending && (
+              <div className="flex items-center justify-center p-4">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <span className="ml-2">Setting up payment method...</span>
+              </div>
+            )}
+
+            {/* Onboarding Complete */}
             {onboardingData?.professional?.paymentMethodVerified && (
               <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-6 text-center mt-6">
                 <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-4" />
