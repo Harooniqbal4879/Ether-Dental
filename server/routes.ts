@@ -3450,6 +3450,47 @@ export async function registerRoutes(
     }
   });
 
+  // Delete/remove an uploaded document
+  app.delete("/api/professional/onboarding/documents/:documentType", async (req, res) => {
+    try {
+      const session = req.session as any;
+      if (!session.professionalId) {
+        return res.status(401).json({ error: "Not authenticated as professional" });
+      }
+
+      const { documentType } = req.params;
+      const { professionalDocuments, onboardingAuditLog } = await import("@shared/schema");
+
+      // Find and delete the document
+      const [deleted] = await db.delete(professionalDocuments)
+        .where(and(
+          eq(professionalDocuments.professionalId, session.professionalId),
+          eq(professionalDocuments.documentType, documentType)
+        ))
+        .returning();
+
+      if (!deleted) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+
+      // Audit log
+      await db.insert(onboardingAuditLog).values({
+        professionalId: session.professionalId,
+        action: "document_removed",
+        actorType: "professional",
+        actorId: session.professionalId,
+        previousValue: JSON.stringify({ documentType }),
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+      });
+
+      res.json({ success: true, message: "Document removed" });
+    } catch (error) {
+      console.error("Error removing document:", error);
+      res.status(500).json({ error: "Failed to remove document" });
+    }
+  });
+
   // Stripe Connect webhook callback to update onboarding status
   app.get("/api/professional/onboarding/stripe-status", async (req, res) => {
     try {

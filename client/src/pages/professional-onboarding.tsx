@@ -731,6 +731,20 @@ export default function ProfessionalOnboarding() {
     },
   });
 
+  const removeDocumentMutation = useMutation({
+    mutationFn: async (documentType: string) => {
+      const res = await apiRequest("DELETE", `/api/professional/onboarding/documents/${documentType}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Document removed" });
+      queryClient.invalidateQueries({ queryKey: ["/api/professional/onboarding"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   // Handle profile photo upload
   const handleProfilePhotoUpload = async (file: File) => {
     setIsUploadingPhoto(true);
@@ -2941,6 +2955,15 @@ export default function ProfessionalOnboarding() {
                         >
                           <Eye className="h-3 w-3 mr-1" />
                           View
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeDocumentMutation.mutate("void_check")}
+                          disabled={removeDocumentMutation.isPending}
+                          data-testid="button-remove-void-check"
+                        >
+                          {removeDocumentMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Remove"}
                         </Button>
                       </div>
                     ) : (
