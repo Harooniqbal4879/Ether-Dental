@@ -479,13 +479,13 @@ export default function ProfessionalOnboarding() {
     setIsUploadingPhoto(true);
     try {
       const res = await apiRequest("POST", "/api/uploads/request-url", {
-        filename: file.name,
+        name: file.name,
         contentType: file.type,
-        directory: ".private/profile-photos",
+        size: file.size,
       });
-      const { uploadUrl, objectPath } = await res.json();
+      const { uploadURL, objectPath } = await res.json();
       
-      await fetch(uploadUrl, {
+      await fetch(uploadURL, {
         method: "PUT",
         body: file,
         headers: { "Content-Type": file.type },
