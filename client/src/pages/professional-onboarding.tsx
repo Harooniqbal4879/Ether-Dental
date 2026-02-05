@@ -26,6 +26,13 @@ import {
   Smartphone,
   Download,
   ExternalLink,
+  ClipboardCheck,
+  Stethoscope,
+  Shield,
+  Heart,
+  Award,
+  Syringe,
+  FileCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -146,6 +153,83 @@ const w9Schema = z.object({
   path: ["ssn"],
 });
 
+// Compliance document upload button component
+function ComplianceUploadButton({ 
+  documentType, 
+  label, 
+  uploadDocumentMutation 
+}: { 
+  documentType: string; 
+  label: string; 
+  uploadDocumentMutation: any;
+}) {
+  const [isUploading, setIsUploading] = useState(false);
+  const { toast } = useToast();
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploading(true);
+    try {
+      const urlResponse = await fetch("/api/uploads/request-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+        credentials: "include",
+      });
+      if (!urlResponse.ok) throw new Error("Failed to get upload URL");
+      const { uploadURL, objectPath } = await urlResponse.json();
+      const uploadResponse = await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
+      if (!uploadResponse.ok) throw new Error("Failed to upload file");
+      uploadDocumentMutation.mutate({
+        documentType,
+        documentUrl: objectPath,
+        documentName: file.name,
+      });
+      toast({ title: `${label.replace("Upload ", "")} uploaded successfully` });
+    } catch (error) {
+      toast({ title: "Upload failed", description: error instanceof Error ? error.message : "Unknown error", variant: "destructive" });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  return (
+    <>
+      <input
+        type="file"
+        accept="image/*,.pdf"
+        className="hidden"
+        id={`compliance-${documentType}`}
+        disabled={isUploading}
+        onChange={handleUpload}
+        data-testid={`input-${documentType}`}
+      />
+      <label htmlFor={`compliance-${documentType}`}>
+        <Button variant="outline" size="sm" asChild disabled={isUploading} className="flex-shrink-0">
+          <span>
+            {isUploading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Uploading...
+              </>
+            ) : (
+              <>
+                <Upload className="h-4 w-4 mr-2" />
+                {label}
+              </>
+            )}
+          </span>
+        </Button>
+      </label>
+    </>
+  );
+}
+
 // Step configuration with detailed info
 const ONBOARDING_STEPS = [
   { 
@@ -179,6 +263,14 @@ const ONBOARDING_STEPS = [
     icon: ShieldCheck, 
     description: "Sign required legal agreements",
     action: "Review and sign agreements",
+  },
+  { 
+    key: "compliance", 
+    name: "Work Eligibility", 
+    shortName: "Compliance",
+    icon: ClipboardCheck, 
+    description: "Professional credentials and compliance",
+    action: "Submit required credentials",
   },
   { 
     key: "payment_setup", 
@@ -336,6 +428,17 @@ export default function ProfessionalOnboarding() {
     const hasAgreements = signedAgreementsCount === requiredAgreements.length;
     const agreementsPartial = signedAgreementsCount > 0 && signedAgreementsCount < requiredAgreements.length;
     
+    // Check compliance documents (professional credentials)
+    const requiredComplianceDocs = ["professional_license", "npi_number", "malpractice_insurance", "background_check", "immunization_records", "cpr_bls_certification"];
+    const complianceDocsCount = requiredComplianceDocs.filter(
+      type => onboardingData?.documents?.some((d: any) => d.documentType === type)
+    ).length;
+    const hasCompliance = complianceDocsCount === requiredComplianceDocs.length;
+    const compliancePartial = complianceDocsCount > 0 && complianceDocsCount < requiredComplianceDocs.length;
+    const complianceVerified = requiredComplianceDocs.every(
+      type => onboardingData?.documents?.some((d: any) => d.documentType === type && d.verificationStatus === "approved")
+    );
+    
     const hasPayment = paymentMethods.some(pm => pm.stripeOnboardingComplete || pm.verificationStatus === "verified");
     
     // Check verification statuses from backend - include new KYC document types
@@ -384,6 +487,15 @@ export default function ProfessionalOnboarding() {
         signedCount: signedAgreementsCount,
         totalRequired: requiredAgreements.length,
         needsVerification: false,
+      },
+      { 
+        key: "compliance", 
+        complete: hasCompliance,
+        status: hasCompliance ? "complete" : compliancePartial ? "partial" : "pending" as const,
+        documentsCount: complianceDocsCount,
+        totalRequired: requiredComplianceDocs.length,
+        needsVerification: hasCompliance && !complianceVerified,
+        isVerified: complianceVerified,
       },
       { 
         key: "payment_setup", 
@@ -2306,6 +2418,228 @@ export default function ProfessionalOnboarding() {
                   </div>
 
                   {allSigned && (
+                    <Button className="w-full" onClick={goToNextStep} data-testid="button-continue-to-compliance">
+                      Continue to Work Eligibility
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  )}
+                </>
+              );
+            })()}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Step 4: Work Eligibility & Compliance */}
+      {activeStep === 4 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ClipboardCheck className="h-5 w-5" />
+              Work Eligibility & Compliance
+            </CardTitle>
+            <CardDescription>
+              Submit your professional credentials and compliance documents for verification
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
+              <p className="text-sm text-blue-800 dark:text-blue-200">
+                Healthcare professionals must provide valid credentials. Documents will be verified by our compliance team before you can receive payments.
+              </p>
+            </div>
+
+            {/* Professional License */}
+            <div className="border rounded-lg p-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="w-10 h-10 bg-teal-100 dark:bg-teal-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Award className="h-5 w-5 text-teal-600" />
+                  </div>
+                  <div>
+                    <h4 className="font-medium">Professional License</h4>
+                    <p className="text-sm text-muted-foreground">
+                      State dental hygienist or dental assistant license
+                    </p>
+                  </div>
+                </div>
+                {onboardingData?.documents?.some(d => d.documentType === "professional_license") ? (
+                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Uploaded
+                  </Badge>
+                ) : (
+                  <ComplianceUploadButton 
+                    documentType="professional_license" 
+                    label="Upload License"
+                    uploadDocumentMutation={uploadDocumentMutation}
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* NPI Number */}
+            <div className="border rounded-lg p-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <FileCheck className="h-5 w-5 text-purple-600" />
+                  </div>
+                  <div>
+                    <h4 className="font-medium">NPI Number Verification</h4>
+                    <p className="text-sm text-muted-foreground">
+                      National Provider Identifier for U.S. clinicians
+                    </p>
+                  </div>
+                </div>
+                {onboardingData?.documents?.some(d => d.documentType === "npi_number") ? (
+                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Uploaded
+                  </Badge>
+                ) : (
+                  <ComplianceUploadButton 
+                    documentType="npi_number" 
+                    label="Upload NPI"
+                    uploadDocumentMutation={uploadDocumentMutation}
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Malpractice Insurance */}
+            <div className="border rounded-lg p-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Shield className="h-5 w-5 text-orange-600" />
+                  </div>
+                  <div>
+                    <h4 className="font-medium">Malpractice Insurance</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Proof of professional liability coverage
+                    </p>
+                  </div>
+                </div>
+                {onboardingData?.documents?.some(d => d.documentType === "malpractice_insurance") ? (
+                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Uploaded
+                  </Badge>
+                ) : (
+                  <ComplianceUploadButton 
+                    documentType="malpractice_insurance" 
+                    label="Upload Insurance"
+                    uploadDocumentMutation={uploadDocumentMutation}
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Background Check */}
+            <div className="border rounded-lg p-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="w-10 h-10 bg-slate-100 dark:bg-slate-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <ShieldCheck className="h-5 w-5 text-slate-600" />
+                  </div>
+                  <div>
+                    <h4 className="font-medium">Background Check Authorization</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Consent for criminal background verification
+                    </p>
+                  </div>
+                </div>
+                {onboardingData?.documents?.some(d => d.documentType === "background_check") ? (
+                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Uploaded
+                  </Badge>
+                ) : (
+                  <ComplianceUploadButton 
+                    documentType="background_check" 
+                    label="Upload Authorization"
+                    uploadDocumentMutation={uploadDocumentMutation}
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Immunization Records */}
+            <div className="border rounded-lg p-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Syringe className="h-5 w-5 text-green-600" />
+                  </div>
+                  <div>
+                    <h4 className="font-medium">Immunization Records</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Hepatitis B, Flu, COVID-19, and other required vaccines
+                    </p>
+                  </div>
+                </div>
+                {onboardingData?.documents?.some(d => d.documentType === "immunization_records") ? (
+                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Uploaded
+                  </Badge>
+                ) : (
+                  <ComplianceUploadButton 
+                    documentType="immunization_records" 
+                    label="Upload Records"
+                    uploadDocumentMutation={uploadDocumentMutation}
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* CPR/BLS Certification */}
+            <div className="border rounded-lg p-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Heart className="h-5 w-5 text-red-600" />
+                  </div>
+                  <div>
+                    <h4 className="font-medium">CPR/BLS Certification</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Current CPR and Basic Life Support certification
+                    </p>
+                  </div>
+                </div>
+                {onboardingData?.documents?.some(d => d.documentType === "cpr_bls_certification") ? (
+                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Uploaded
+                  </Badge>
+                ) : (
+                  <ComplianceUploadButton 
+                    documentType="cpr_bls_certification" 
+                    label="Upload Certification"
+                    uploadDocumentMutation={uploadDocumentMutation}
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Progress indicator */}
+            {(() => {
+              const allComplianceDocs = ["professional_license", "npi_number", "malpractice_insurance", "background_check", "immunization_records", "cpr_bls_certification"];
+              const uploadedCount = allComplianceDocs.filter(type => onboardingData?.documents?.some(d => d.documentType === type)).length;
+              const allUploaded = uploadedCount === allComplianceDocs.length;
+              
+              return (
+                <>
+                  <div className="bg-muted/30 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium">Compliance Progress</span>
+                      <span className="text-sm text-muted-foreground">{uploadedCount} of {allComplianceDocs.length} uploaded</span>
+                    </div>
+                    <Progress value={(uploadedCount / allComplianceDocs.length) * 100} className="h-2" />
+                  </div>
+
+                  {allUploaded && (
                     <Button className="w-full" onClick={goToNextStep} data-testid="button-continue-to-payment">
                       Continue to Payment Setup
                       <ArrowRight className="ml-2 h-4 w-4" />
@@ -2318,8 +2652,8 @@ export default function ProfessionalOnboarding() {
         </Card>
       )}
 
-      {/* Step 4: Payment Setup */}
-      {activeStep === 4 && (
+      {/* Step 5: Payment Setup */}
+      {activeStep === 5 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
