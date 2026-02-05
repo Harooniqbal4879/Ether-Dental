@@ -3453,14 +3453,18 @@ export async function registerRoutes(
   // Delete/remove an uploaded document
   // Supports both "documentType" and "documentType:documentId" formats
   app.delete("/api/professional/onboarding/documents/:documentType", async (req, res) => {
+    const { professionalDocuments, onboardingAuditLog } = await import("@shared/schema");
+    
     try {
       const session = req.session as any;
+      console.log("Delete document - session:", session?.professionalId ? "authenticated" : "not authenticated");
+      
       if (!session || !session.professionalId) {
         return res.status(401).json({ error: "Not authenticated as professional" });
       }
 
+      const professionalId = session.professionalId;
       const { documentType: param } = req.params;
-      const { professionalDocuments, onboardingAuditLog } = await import("@shared/schema");
 
       let deleted;
       
@@ -3470,15 +3474,15 @@ export async function registerRoutes(
         // Delete specific document by ID
         [deleted] = await db.delete(professionalDocuments)
           .where(and(
-            eq(professionalDocuments.professionalId, session.professionalId),
-            eq(professionalDocuments.id, parseInt(documentId))
+            eq(professionalDocuments.professionalId, professionalId),
+            eq(professionalDocuments.id, documentId)
           ))
           .returning();
       } else {
         // Delete all documents of this type (legacy behavior)
         [deleted] = await db.delete(professionalDocuments)
           .where(and(
-            eq(professionalDocuments.professionalId, session.professionalId),
+            eq(professionalDocuments.professionalId, professionalId),
             eq(professionalDocuments.documentType, param)
           ))
           .returning();
@@ -3490,10 +3494,10 @@ export async function registerRoutes(
 
       // Audit log
       await db.insert(onboardingAuditLog).values({
-        professionalId: session.professionalId,
+        professionalId: professionalId,
         action: "document_removed",
         actorType: "professional",
-        actorId: session.professionalId,
+        actorId: professionalId,
         previousValue: JSON.stringify({ documentType: deleted.documentType, documentId: deleted.id }),
         ipAddress: req.ip,
         userAgent: req.headers["user-agent"],

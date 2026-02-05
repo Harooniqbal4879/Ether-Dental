@@ -1750,7 +1750,22 @@ By signing below, I acknowledge my understanding of and commitment to HIPAA comp
               {/* ID Type Selection */}
               <div className="mb-4">
                 <label className="text-sm font-medium mb-2 block">Select ID Type</label>
-                <Select value={selectedIdType} onValueChange={setSelectedIdType}>
+                <Select 
+                  value={selectedIdType} 
+                  onValueChange={(newType) => {
+                    if (newType !== selectedIdType) {
+                      // Delete existing ID documents when changing ID type
+                      const hasIdFront = onboardingData?.documents?.some(d => d.documentType === "id_front");
+                      const hasIdBack = onboardingData?.documents?.some(d => d.documentType === "id_back");
+                      const hasSelfie = onboardingData?.documents?.some(d => d.documentType === "selfie");
+                      
+                      if (hasIdFront) removeDocumentMutation.mutate("id_front");
+                      if (hasIdBack) removeDocumentMutation.mutate("id_back");
+                      if (hasSelfie) removeDocumentMutation.mutate("selfie");
+                    }
+                    setSelectedIdType(newType);
+                  }}
+                >
                   <SelectTrigger className="w-full max-w-xs" data-testid="select-id-type">
                     <SelectValue placeholder="Select ID type" />
                   </SelectTrigger>
