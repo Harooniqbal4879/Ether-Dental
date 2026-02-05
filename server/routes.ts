@@ -3455,7 +3455,7 @@ export async function registerRoutes(
   app.delete("/api/professional/onboarding/documents/:documentType", async (req, res) => {
     try {
       const session = req.session as any;
-      if (!session.professionalId) {
+      if (!session || !session.professionalId) {
         return res.status(401).json({ error: "Not authenticated as professional" });
       }
 
