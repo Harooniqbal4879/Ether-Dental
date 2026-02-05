@@ -3253,8 +3253,10 @@ export async function registerRoutes(
         });
       }
 
-      // For bank account (ACH)
-      if (methodType === "bank_account") {
+      // For bank account (ACH/SEPA/Wire)
+      if (methodType === "bank_account" || methodType === "ach_bank_transfer") {
+        const { accountHolderName } = req.body;
+        
         if (!accountNumber || !routingNumber) {
           return res.status(400).json({ error: "Account and routing numbers are required for bank account" });
         }
@@ -3274,7 +3276,7 @@ export async function registerRoutes(
         const [paymentMethod] = await db.insert(professionalPaymentMethods)
           .values({
             professionalId: session.professionalId,
-            methodType: "bank_account",
+            methodType: methodType === "ach_bank_transfer" ? "ach_bank_transfer" : "bank_account",
             bankName,
             accountType,
             accountLast4,
@@ -3306,6 +3308,67 @@ export async function registerRoutes(
           encryptedAccountNumber: undefined,
           encryptedRoutingNumber: undefined,
         });
+      }
+
+      // For digital wallet/payment processors (PayPal, Payoneer, Wise, Skrill)
+      const digitalWalletTypes = ["paypal", "payoneer", "wise", "skrill"];
+      if (digitalWalletTypes.includes(methodType)) {
+        // Set any existing methods to not default
+        await db.update(professionalPaymentMethods)
+          .set({ isDefault: false })
+          .where(eq(professionalPaymentMethods.professionalId, session.professionalId));
+
+        const [paymentMethod] = await db.insert(professionalPaymentMethods)
+          .values({
+            professionalId: session.professionalId,
+            methodType,
+            isDefault: true,
+            verificationStatus: "pending",
+          })
+          .returning();
+
+        // Audit log
+        await db.insert(onboardingAuditLog).values({
+          professionalId: session.professionalId,
+          action: "payment_method_added",
+          actorType: "professional",
+          actorId: session.professionalId,
+          newValue: JSON.stringify({ methodType }),
+          ipAddress: req.ip,
+          userAgent: req.headers["user-agent"],
+        });
+
+        return res.status(201).json(paymentMethod);
+      }
+
+      // For platform escrow
+      if (methodType === "platform_escrow") {
+        // Set any existing methods to not default
+        await db.update(professionalPaymentMethods)
+          .set({ isDefault: false })
+          .where(eq(professionalPaymentMethods.professionalId, session.professionalId));
+
+        const [paymentMethod] = await db.insert(professionalPaymentMethods)
+          .values({
+            professionalId: session.professionalId,
+            methodType: "platform_escrow",
+            isDefault: false,
+            verificationStatus: "verified", // Escrow doesn't need external verification
+          })
+          .returning();
+
+        // Audit log
+        await db.insert(onboardingAuditLog).values({
+          professionalId: session.professionalId,
+          action: "payment_method_added",
+          actorType: "professional",
+          actorId: session.professionalId,
+          newValue: JSON.stringify({ methodType: "platform_escrow" }),
+          ipAddress: req.ip,
+          userAgent: req.headers["user-agent"],
+        });
+
+        return res.status(201).json(paymentMethod);
       }
 
       res.status(400).json({ error: "Unsupported payment method type" });

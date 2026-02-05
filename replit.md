@@ -20,12 +20,17 @@ The platform is built on a modern web stack designed for scalability and maintai
     - **Professional Hub**: Personalized portal for professionals to manage profiles, view shifts, track earnings, and manage credentials.
     - **Professional Self-Registration**: Professionals can register their own accounts via `/register-professional` with email/password authentication, then login via `/login/professional`. Passwords are hashed using bcrypt.
     - **Contractor Onboarding & Verification Module**: 1099-compliant onboarding system for independent contractors including:
-        - **Intuitive 5-step onboarding wizard** at `/app/onboarding` with auto-navigation to first incomplete step:
+        - **Intuitive 6-step onboarding wizard** at `/app/onboarding` with auto-navigation to first incomplete step:
           1. **Personal Info**: Profile photo upload, date of birth, phone with OTP verification, country of residence, and full address
           2. **Identity Verification**: Government ID upload (front/back based on ID type), selfie photo, and AI-powered facial matching
-          3. **W-9 Tax Form**: Tax information with encrypted SSN/EIN (only last-4 stored)
-          4. **Agreements**: Electronic signature for Independent Contractor Agreement and HIPAA Acknowledgment
-          5. **Payment Setup**: Stripe Connect Express account onboarding
+          3. **W-9 Tax Form**: Tax information with encrypted SSN/EIN (only last-4 stored), option to upload completed IRS W-9 form
+          4. **Agreements**: Electronic signature for 6 required agreements (Independent Contractor, Marketplace ToS, Escrow & Dispute, Non-Circumvention, NDA, HIPAA)
+          5. **Work Eligibility & Compliance**: Healthcare credentials verification (Professional License, NPI, Malpractice Insurance, Background Check, Immunization Records, CPR/BLS Certification)
+          6. **Payment Setup**: Multiple payout method options:
+             - Stripe Connect Express
+             - Direct Bank Transfer (ACH/SEPA/Wire) with bank details form and void check upload
+             - PayPal, Payoneer, Wise (TransferWise), Skrill
+             - Platform Escrow
         - **Phone OTP Verification**: Server-side rate-limited OTP (60-second cooldown), 10-minute expiry, Zod validation on all endpoints
         - **Self-navigating UI**: Vertical stepper sidebar with completion indicators, "What's Next" guidance banner, and step-by-step progress tracking
         - Onboarding status tracking: INVITED → IN_PROGRESS → UNDER_REVIEW → VERIFIED → PAYMENT_ELIGIBLE

@@ -298,6 +298,13 @@ export default function ProfessionalOnboarding() {
   const [isUploadingSelfie, setIsUploadingSelfie] = useState(false);
   const [selectedIdType, setSelectedIdType] = useState<string>("drivers_license");
   const [isRunningFaceMatch, setIsRunningFaceMatch] = useState(false);
+  const [showBankForm, setShowBankForm] = useState(false);
+  const [bankDetails, setBankDetails] = useState({
+    bankName: "",
+    accountNumber: "",
+    routingNumber: "",
+    accountHolderName: "",
+  });
   const [faceMatchResult, setFaceMatchResult] = useState<{
     isMatch: boolean;
     confidence: number;
@@ -2742,20 +2749,104 @@ export default function ProfessionalOnboarding() {
                 {onboardingData?.paymentMethods?.some(pm => pm.methodType === "ach_bank_transfer") ? (
                   <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex-shrink-0">
                     <CheckCircle2 className="h-3 w-3 mr-1" />
-                    {onboardingData.paymentMethods.find(pm => pm.methodType === "ach_bank_transfer")?.verificationStatus === "pending" ? "Pending" : "Added"}
+                    {onboardingData?.paymentMethods?.find(pm => pm.methodType === "ach_bank_transfer")?.verificationStatus === "pending" ? "Pending" : "Added"}
                   </Badge>
                 ) : (
                   <Button 
                     variant="outline" 
                     size="sm"
-                    onClick={() => addPaymentMethodMutation.mutate({ methodType: "ach_bank_transfer" })}
-                    disabled={addPaymentMethodMutation.isPending}
+                    onClick={() => setShowBankForm(!showBankForm)}
                     data-testid="button-ach-transfer"
                   >
-                    Add Bank
+                    {showBankForm ? "Cancel" : "Add Bank"}
                   </Button>
                 )}
               </div>
+
+              {/* Bank Details Form */}
+              {showBankForm && !onboardingData?.paymentMethods?.some(pm => pm.methodType === "ach_bank_transfer") && (
+                <div className="mt-4 pt-4 border-t space-y-4">
+                  <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                    <p className="text-sm text-amber-800 dark:text-amber-200">
+                      Account holder name must match your verified identity (KYC) for successful payouts.
+                    </p>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="bankName">Bank Name</Label>
+                      <Input
+                        id="bankName"
+                        placeholder="e.g., Chase Bank, Bank of America"
+                        value={bankDetails.bankName}
+                        onChange={(e) => setBankDetails(prev => ({ ...prev, bankName: e.target.value }))}
+                        data-testid="input-bank-name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="accountHolderName">Account Holder Name</Label>
+                      <Input
+                        id="accountHolderName"
+                        placeholder="Must match KYC verification"
+                        value={bankDetails.accountHolderName || (onboardingData?.professional?.firstName && onboardingData?.professional?.lastName ? `${onboardingData.professional.firstName} ${onboardingData.professional.lastName}` : "")}
+                        onChange={(e) => setBankDetails(prev => ({ ...prev, accountHolderName: e.target.value }))}
+                        data-testid="input-account-holder"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="accountNumber">Account Number / IBAN</Label>
+                      <Input
+                        id="accountNumber"
+                        placeholder="Enter account number or IBAN"
+                        value={bankDetails.accountNumber}
+                        onChange={(e) => setBankDetails(prev => ({ ...prev, accountNumber: e.target.value }))}
+                        data-testid="input-account-number"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="routingNumber">Routing Number / SWIFT Code</Label>
+                      <Input
+                        id="routingNumber"
+                        placeholder="Enter routing or SWIFT code"
+                        value={bankDetails.routingNumber}
+                        onChange={(e) => setBankDetails(prev => ({ ...prev, routingNumber: e.target.value }))}
+                        data-testid="input-routing-number"
+                      />
+                    </div>
+                  </div>
+                  
+                  <Button 
+                    onClick={() => {
+                      const holderName = bankDetails.accountHolderName || (onboardingData?.professional?.firstName && onboardingData?.professional?.lastName ? `${onboardingData.professional.firstName} ${onboardingData.professional.lastName}` : "");
+                      if (!bankDetails.bankName || !bankDetails.accountNumber || !bankDetails.routingNumber || !holderName) {
+                        toast({ title: "Please fill in all bank details", variant: "destructive" });
+                        return;
+                      }
+                      addPaymentMethodMutation.mutate({ 
+                        methodType: "ach_bank_transfer",
+                        bankName: bankDetails.bankName,
+                        accountNumber: bankDetails.accountNumber,
+                        routingNumber: bankDetails.routingNumber,
+                        accountHolderName: holderName,
+                      });
+                      setShowBankForm(false);
+                    }}
+                    disabled={addPaymentMethodMutation.isPending}
+                    className="w-full"
+                    data-testid="button-submit-bank"
+                  >
+                    {addPaymentMethodMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Adding Bank Account...
+                      </>
+                    ) : (
+                      "Add Bank Account"
+                    )}
+                  </Button>
+                </div>
+              )}
+
               {/* Void Check Upload for ACH */}
               {onboardingData?.paymentMethods?.some(pm => pm.methodType === "ach_bank_transfer") && (
                 <div className="mt-4 pt-4 border-t">
