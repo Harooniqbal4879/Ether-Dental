@@ -316,6 +316,7 @@ export default function ProfessionalOnboarding() {
   });
   const [paymentModalOpen, setPaymentModalOpen] = useState<string | null>(null);
   const [paymentAccountEmail, setPaymentAccountEmail] = useState("");
+  const [viewPaymentMethod, setViewPaymentMethod] = useState<any | null>(null);
   const [faceMatchResult, setFaceMatchResult] = useState<{
     isMatch: boolean;
     confidence: number;
@@ -2747,6 +2748,15 @@ export default function ProfessionalOnboarding() {
                     <Button 
                       variant="ghost" 
                       size="sm"
+                      onClick={() => setViewPaymentMethod(onboardingData?.paymentMethods?.find(pm => pm.methodType === "stripe_connect"))}
+                      data-testid="button-view-stripe"
+                    >
+                      <Eye className="h-3 w-3 mr-1" />
+                      View
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
                       onClick={() => removePaymentMethodMutation.mutate("stripe_connect")}
                       disabled={removePaymentMethodMutation.isPending}
                       data-testid="button-reset-stripe"
@@ -2788,6 +2798,15 @@ export default function ProfessionalOnboarding() {
                       <CheckCircle2 className="h-3 w-3 mr-1" />
                       {onboardingData?.paymentMethods?.find(pm => pm.methodType === "ach_bank_transfer")?.verificationStatus === "pending" ? "Pending" : "Added"}
                     </Badge>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => setViewPaymentMethod(onboardingData?.paymentMethods?.find(pm => pm.methodType === "ach_bank_transfer"))}
+                      data-testid="button-view-ach"
+                    >
+                      <Eye className="h-3 w-3 mr-1" />
+                      View
+                    </Button>
                     <Button 
                       variant="ghost" 
                       size="sm"
@@ -2958,6 +2977,15 @@ export default function ProfessionalOnboarding() {
                     <Button 
                       variant="ghost" 
                       size="sm"
+                      onClick={() => setViewPaymentMethod(onboardingData?.paymentMethods?.find(pm => pm.methodType === "paypal"))}
+                      data-testid="button-view-paypal"
+                    >
+                      <Eye className="h-3 w-3 mr-1" />
+                      View
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
                       onClick={() => removePaymentMethodMutation.mutate("paypal")}
                       disabled={removePaymentMethodMutation.isPending}
                       data-testid="button-reset-paypal"
@@ -2998,6 +3026,15 @@ export default function ProfessionalOnboarding() {
                       <CheckCircle2 className="h-3 w-3 mr-1" />
                       Connected
                     </Badge>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => setViewPaymentMethod(onboardingData?.paymentMethods?.find(pm => pm.methodType === "payoneer"))}
+                      data-testid="button-view-payoneer"
+                    >
+                      <Eye className="h-3 w-3 mr-1" />
+                      View
+                    </Button>
                     <Button 
                       variant="ghost" 
                       size="sm"
@@ -3044,6 +3081,15 @@ export default function ProfessionalOnboarding() {
                     <Button 
                       variant="ghost" 
                       size="sm"
+                      onClick={() => setViewPaymentMethod(onboardingData?.paymentMethods?.find(pm => pm.methodType === "wise"))}
+                      data-testid="button-view-wise"
+                    >
+                      <Eye className="h-3 w-3 mr-1" />
+                      View
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
                       onClick={() => removePaymentMethodMutation.mutate("wise")}
                       disabled={removePaymentMethodMutation.isPending}
                       data-testid="button-reset-wise"
@@ -3084,6 +3130,15 @@ export default function ProfessionalOnboarding() {
                       <CheckCircle2 className="h-3 w-3 mr-1" />
                       Connected
                     </Badge>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => setViewPaymentMethod(onboardingData?.paymentMethods?.find(pm => pm.methodType === "skrill"))}
+                      data-testid="button-view-skrill"
+                    >
+                      <Eye className="h-3 w-3 mr-1" />
+                      View
+                    </Button>
                     <Button 
                       variant="ghost" 
                       size="sm"
@@ -3163,6 +3218,87 @@ export default function ProfessionalOnboarding() {
                     ) : (
                       "Connect Account"
                     )}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* View Payment Method Details Dialog */}
+            <Dialog open={viewPaymentMethod !== null} onOpenChange={(open) => !open && setViewPaymentMethod(null)}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Payment Method Details</DialogTitle>
+                  <DialogDescription>
+                    Your connected {viewPaymentMethod?.methodType?.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())} account details
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  {viewPaymentMethod?.methodType === "stripe_connect" && (
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Status</span>
+                        <Badge className="bg-green-500/10 text-green-700">
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          {viewPaymentMethod?.stripeOnboardingComplete ? "Connected" : "Pending"}
+                        </Badge>
+                      </div>
+                      {viewPaymentMethod?.stripeAccountId && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-muted-foreground">Account ID</span>
+                          <span className="font-mono text-sm">{viewPaymentMethod.stripeAccountId}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {viewPaymentMethod?.methodType === "ach_bank_transfer" && (
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Account Holder</span>
+                        <span className="font-medium">{viewPaymentMethod?.accountHolderName || "N/A"}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Bank Name</span>
+                        <span className="font-medium">{viewPaymentMethod?.bankName || "N/A"}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Account Number</span>
+                        <span className="font-mono">••••{viewPaymentMethod?.accountNumberLast4 || "****"}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Routing Number</span>
+                        <span className="font-mono">{viewPaymentMethod?.routingNumber || "•••••••••"}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Status</span>
+                        <Badge className={viewPaymentMethod?.verificationStatus === "verified" ? "bg-green-500/10 text-green-700" : "bg-yellow-500/10 text-yellow-700"}>
+                          {viewPaymentMethod?.verificationStatus === "verified" ? "Verified" : "Pending Verification"}
+                        </Badge>
+                      </div>
+                    </div>
+                  )}
+                  {["paypal", "payoneer", "wise", "skrill"].includes(viewPaymentMethod?.methodType) && (
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Account Email</span>
+                        <span className="font-medium">{viewPaymentMethod?.paymentEmail || "N/A"}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Status</span>
+                        <Badge className="bg-green-500/10 text-green-700">
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          Connected
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Connected On</span>
+                        <span className="text-sm">{viewPaymentMethod?.createdAt ? new Date(viewPaymentMethod.createdAt).toLocaleDateString() : "N/A"}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setViewPaymentMethod(null)} data-testid="button-close-view">
+                    Close
                   </Button>
                 </DialogFooter>
               </DialogContent>
