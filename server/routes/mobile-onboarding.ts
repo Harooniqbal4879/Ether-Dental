@@ -407,6 +407,66 @@ export function registerMobileOnboardingRoutes(app: Express) {
     }
   });
 
+  // Delete a document by type or by ID
+  app.delete("/api/mobile/onboarding/documents/:documentTypeOrId", mobileAuthMiddleware, async (req, res) => {
+    try {
+      const professionalId = req.mobileAuth!.professionalId;
+      const { documentTypeOrId } = req.params;
+
+      // Check if it's a UUID (document ID) or a document type
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(documentTypeOrId);
+
+      let deletedDocs;
+
+      if (isUuid) {
+        // Delete by document ID
+        const { and } = await import("drizzle-orm");
+        deletedDocs = await db.delete(contractorDocuments)
+          .where(and(
+            eq(contractorDocuments.id, documentTypeOrId),
+            eq(contractorDocuments.professionalId, professionalId)
+          ))
+          .returning();
+      } else {
+        // Delete by document type
+        const { and } = await import("drizzle-orm");
+        deletedDocs = await db.delete(contractorDocuments)
+          .where(and(
+            eq(contractorDocuments.documentType, documentTypeOrId),
+            eq(contractorDocuments.professionalId, professionalId)
+          ))
+          .returning();
+      }
+
+      if (deletedDocs.length === 0) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+
+      // Audit log
+      await db.insert(onboardingAuditLog).values({
+        professionalId,
+        action: "document_deleted",
+        actorType: "professional",
+        actorId: professionalId,
+        documentId: deletedDocs[0].id,
+        previousValue: JSON.stringify({ 
+          documentType: deletedDocs[0].documentType,
+          documentName: deletedDocs[0].documentName,
+        }),
+        ipAddress: req.ip || "mobile",
+      });
+
+      res.json({ 
+        success: true, 
+        message: "Document deleted",
+        deletedCount: deletedDocs.length,
+      });
+    } catch (error) {
+      console.error("Error deleting document:", error);
+      res.status(500).json({ error: "Failed to delete document" });
+    }
+  });
+
   app.post("/api/mobile/onboarding/w9", mobileAuthMiddleware, async (req, res) => {
     try {
       const professionalId = req.mobileAuth!.professionalId;
