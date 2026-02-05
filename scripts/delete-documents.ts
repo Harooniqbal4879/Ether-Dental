@@ -18,7 +18,7 @@
  */
 
 import { db } from "../server/db";
-import { professionalDocuments } from "../shared/schema";
+import { contractorDocuments } from "../shared/schema";
 import { eq, and, inArray } from "drizzle-orm";
 
 async function deleteDocuments() {
@@ -56,8 +56,8 @@ async function deleteDocuments() {
   try {
     // First, list current documents
     const currentDocs = await db.select()
-      .from(professionalDocuments)
-      .where(eq(professionalDocuments.professionalId, professionalId));
+      .from(contractorDocuments)
+      .where(eq(contractorDocuments.professionalId, professionalId));
 
     console.log(`\nFound ${currentDocs.length} documents for professional ${professionalId}:`);
     currentDocs.forEach(doc => {
@@ -73,25 +73,25 @@ async function deleteDocuments() {
 
     if (deleteAll) {
       // Delete all documents for this professional
-      deleted = await db.delete(professionalDocuments)
-        .where(eq(professionalDocuments.professionalId, professionalId))
+      deleted = await db.delete(contractorDocuments)
+        .where(eq(contractorDocuments.professionalId, professionalId))
         .returning();
       console.log(`\nDeleted ALL ${deleted.length} documents.`);
     } else if (documentType === "id_all") {
       // Delete all ID-related documents (front, back, selfie)
-      deleted = await db.delete(professionalDocuments)
+      deleted = await db.delete(contractorDocuments)
         .where(and(
-          eq(professionalDocuments.professionalId, professionalId),
-          inArray(professionalDocuments.documentType, ["id_front", "id_back", "selfie"])
+          eq(contractorDocuments.professionalId, professionalId),
+          inArray(contractorDocuments.documentType, ["id_front", "id_back", "selfie"])
         ))
         .returning();
       console.log(`\nDeleted ${deleted.length} ID documents (front, back, selfie).`);
     } else if (documentType) {
       // Delete specific document type
-      deleted = await db.delete(professionalDocuments)
+      deleted = await db.delete(contractorDocuments)
         .where(and(
-          eq(professionalDocuments.professionalId, professionalId),
-          eq(professionalDocuments.documentType, documentType)
+          eq(contractorDocuments.professionalId, professionalId),
+          eq(contractorDocuments.documentType, documentType)
         ))
         .returning();
       console.log(`\nDeleted ${deleted.length} document(s) of type "${documentType}".`);
