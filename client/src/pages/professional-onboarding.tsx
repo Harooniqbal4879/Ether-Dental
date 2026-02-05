@@ -1771,9 +1771,34 @@ By signing below, I acknowledge my understanding of and commitment to HIPAA comp
                   </h5>
                   {onboardingData?.documents?.some(d => d.documentType === "id_front") ? (
                     <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                        <span className="text-sm font-medium text-green-800 dark:text-green-200">Uploaded</span>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                          <span className="text-sm font-medium text-green-800 dark:text-green-200">Uploaded</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const doc = onboardingData?.documents?.find(d => d.documentType === "id_front");
+                              if (doc?.documentUrl) window.open(doc.documentUrl, "_blank");
+                            }}
+                            data-testid="button-view-id-front"
+                          >
+                            <Eye className="h-3 w-3 mr-1" />
+                            View
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeDocumentMutation.mutate("id_front")}
+                            disabled={removeDocumentMutation.isPending}
+                            data-testid="button-remove-id-front"
+                          >
+                            {removeDocumentMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Remove"}
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ) : (
@@ -1840,9 +1865,34 @@ By signing below, I acknowledge my understanding of and commitment to HIPAA comp
                     </h5>
                     {onboardingData?.documents?.some(d => d.documentType === "id_back") ? (
                       <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                          <span className="text-sm font-medium text-green-800 dark:text-green-200">Uploaded</span>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                            <span className="text-sm font-medium text-green-800 dark:text-green-200">Uploaded</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const doc = onboardingData?.documents?.find(d => d.documentType === "id_back");
+                                if (doc?.documentUrl) window.open(doc.documentUrl, "_blank");
+                              }}
+                              data-testid="button-view-id-back"
+                            >
+                              <Eye className="h-3 w-3 mr-1" />
+                              View
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeDocumentMutation.mutate("id_back")}
+                              disabled={removeDocumentMutation.isPending}
+                              data-testid="button-remove-id-back"
+                            >
+                              {removeDocumentMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Remove"}
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     ) : (
