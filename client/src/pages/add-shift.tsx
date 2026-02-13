@@ -15,11 +15,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
   X,
   ChevronLeft,
   ChevronRight,
@@ -27,7 +22,6 @@ import {
   Minus,
   Plus,
   ChevronDown,
-  ChevronUp,
   HelpCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -66,18 +60,7 @@ function useStaffRoles() {
   return { roles, roleOptions, isLoading };
 }
 
-// Default payroll breakdown rates (overridden by API values when available)
-// Note: Social Security (6.2%) and Medicare (1.45%) are federally mandated fixed rates
-const DEFAULT_PAYROLL_BREAKDOWN = {
-  socialSecurityTax: { label: "Social security tax", rate: 0.062 },
-  medicareTax: { label: "Medicare tax", rate: 0.0145 },
-  federalUnemploymentTax: { label: "Federal unemployment tax", rate: 0.006 },
-  stateUnemploymentTax: { label: "State unemployment tax", rate: 0.027 },
-  workersCompCoverage: { label: "Workers compensation coverage", rate: 0.0019 },
-  paidSickLeave: { label: "Paid sick leave (ESTA)", rate: 0.0333 },
-};
-
-// Default fee rates (overridden by API values)
+// Default platform fee rate (overridden by API values)
 const DEFAULT_ETHERAI_FEE_RATE = 0.12;
 const MIN_RATE = 49;
 const MAX_RATE = 58;
@@ -147,16 +130,6 @@ export default function AddShiftPage() {
     queryKey: ['/api/fees/resolved'],
   });
   
-  // Build dynamic payroll breakdown from API rates
-  const PAYROLL_BREAKDOWN = useMemo(() => ({
-    socialSecurityTax: { label: "Social security tax", rate: 0.062 },
-    medicareTax: { label: "Medicare tax", rate: 0.0145 },
-    federalUnemploymentTax: { label: "Federal unemployment tax", rate: feeRates?.federalUnemploymentRate ?? DEFAULT_PAYROLL_BREAKDOWN.federalUnemploymentTax.rate },
-    stateUnemploymentTax: { label: "State unemployment tax", rate: feeRates?.stateUnemploymentRate ?? DEFAULT_PAYROLL_BREAKDOWN.stateUnemploymentTax.rate },
-    workersCompCoverage: { label: "Workers compensation coverage", rate: feeRates?.workersCompRate ?? DEFAULT_PAYROLL_BREAKDOWN.workersCompCoverage.rate },
-    paidSickLeave: { label: "Paid sick leave (ESTA)", rate: feeRates?.paidSickLeaveRate ?? DEFAULT_PAYROLL_BREAKDOWN.paidSickLeave.rate },
-  }), [feeRates]);
-  
   // Get platform fee rate from API or use default
   const ETHERAI_FEE_RATE = feeRates?.platformFeeRate ?? DEFAULT_ETHERAI_FEE_RATE;
   
@@ -178,7 +151,6 @@ export default function AddShiftPage() {
   const [maxHourlyRate, setMaxHourlyRate] = useState(MAX_RATE);
   const [fixedHourlyRate, setFixedHourlyRate] = useState(55);
   
-  const [showPayrollBreakdown, setShowPayrollBreakdown] = useState(false);
   const [pricingTab, setPricingTab] = useState<"min" | "max">("min");
 
   const createShiftsMutation = useMutation({
@@ -295,31 +267,16 @@ export default function AddShiftPage() {
   const pricing = useMemo(() => {
     const baseWage = displayRate;
     
-    const payrollFees = Object.entries(PAYROLL_BREAKDOWN).reduce((sum, [_, item]) => {
-      return sum + (baseWage * (item as { label: string; rate: number }).rate);
-    }, 0);
-    
-    const subtotal = baseWage + payrollFees;
-    const etherAIFee = subtotal * ETHERAI_FEE_RATE;
-    const hourlyTotal = subtotal + etherAIFee;
+    const etherAIFee = baseWage * ETHERAI_FEE_RATE;
+    const hourlyTotal = baseWage + etherAIFee;
     
     return {
       baseWage,
-      payrollFees,
-      payrollBreakdown: Object.entries(PAYROLL_BREAKDOWN).map(([key, item]) => {
-        const typedItem = item as { label: string; rate: number };
-        return {
-          key,
-          label: typedItem.label,
-          rate: typedItem.rate,
-          amount: baseWage * typedItem.rate,
-        };
-      }),
       etherAIFee,
       etherAIFeeRate: ETHERAI_FEE_RATE,
       hourlyTotal,
     };
-  }, [displayRate, PAYROLL_BREAKDOWN, ETHERAI_FEE_RATE]);
+  }, [displayRate, ETHERAI_FEE_RATE]);
   
   const fillRateInfo = getFillRateInfo(
     pricingMode === "fixed" ? fixedHourlyRate : maxHourlyRate,
@@ -834,30 +791,6 @@ export default function AddShiftPage() {
                     ${pricing.baseWage.toFixed(2)}
                   </span>
                 </div>
-                
-                <Collapsible open={showPayrollBreakdown} onOpenChange={setShowPayrollBreakdown}>
-                  <CollapsibleTrigger className="flex justify-between w-full group" data-testid="button-toggle-payroll-breakdown">
-                    <span className="text-sm flex items-center gap-1">
-                      Payroll fees
-                      {showPayrollBreakdown ? (
-                        <ChevronUp className="h-3 w-3" />
-                      ) : (
-                        <ChevronDown className="h-3 w-3" />
-                      )}
-                    </span>
-                    <span className="text-sm" data-testid="text-payroll-fees">
-                      ${pricing.payrollFees.toFixed(2)}
-                    </span>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="mt-2 space-y-2 pl-4">
-                    {pricing.payrollBreakdown.map((item) => (
-                      <div key={item.key} className="flex justify-between text-xs text-muted-foreground" data-testid={`text-payroll-${item.key}`}>
-                        <span>{item.label} ({(item.rate * 100).toFixed(item.rate < 0.01 ? 2 : 1)}%)</span>
-                        <span>${item.amount.toFixed(2)}</span>
-                      </div>
-                    ))}
-                  </CollapsibleContent>
-                </Collapsible>
                 
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">EtherAI-Dental fee ({(pricing.etherAIFeeRate * 100).toFixed(0)}%)</span>
