@@ -1412,6 +1412,9 @@ export const platformSettings = pgTable("platform_settings", {
   federalUnemploymentRate: decimal("federal_unemployment_rate", { precision: 5, scale: 4 }).notNull().default("0.0060"), // 0.6% FUTA
   workersCompRate: decimal("workers_comp_rate", { precision: 5, scale: 4 }).notNull().default("0.0100"), // 1% default
   paidSickLeaveRate: decimal("paid_sick_leave_rate", { precision: 5, scale: 4 }).notNull().default("0.0050"), // 0.5% default
+  defaultMinHourlyRate: decimal("default_min_hourly_rate", { precision: 10, scale: 2 }).notNull().default("49.00"),
+  defaultMaxHourlyRate: decimal("default_max_hourly_rate", { precision: 10, scale: 2 }).notNull().default("58.00"),
+  defaultFixedHourlyRate: decimal("default_fixed_hourly_rate", { precision: 10, scale: 2 }).notNull().default("55.00"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
@@ -1699,6 +1702,9 @@ export type ResolvedFeeRates = {
   stateIncomeTaxRate: number;
   additionalTaxRate: number;
   totalPayrollBurden: number; // Sum of all employer-side taxes
+  defaultMinHourlyRate: number;
+  defaultMaxHourlyRate: number;
+  defaultFixedHourlyRate: number;
 };
 
 // DentalXchange Eligibility Verifications - Stores eligibility check results

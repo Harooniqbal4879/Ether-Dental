@@ -287,11 +287,11 @@ function ShiftDetailDialog({
                       <span data-testid="text-regular-pay">{formatCurrency(transaction.regularPay)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Service Fee (22.5%)</span>
+                      <span className="text-muted-foreground">Service Fee ({(parseFloat(transaction.serviceFeeRate || "0") * 100).toFixed(1)}%)</span>
                       <span data-testid="text-service-fee">{formatCurrency(transaction.serviceFee)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Convenience Fee (3.5%)</span>
+                      <span className="text-muted-foreground">Convenience Fee ({(parseFloat(transaction.convenienceFeeRate || "0") * 100).toFixed(1)}%)</span>
                       <span data-testid="text-convenience-fee">{formatCurrency(transaction.convenienceFee)}</span>
                     </div>
                     {transaction.adjustmentMade && transaction.adjustmentAmount && (

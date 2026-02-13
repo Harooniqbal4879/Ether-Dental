@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useLocation as useLocationContext } from "@/lib/location-context";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -60,10 +60,11 @@ function useStaffRoles() {
   return { roles, roleOptions, isLoading };
 }
 
-// Default platform fee rate (overridden by API values)
-const DEFAULT_ETHERAI_FEE_RATE = 0.12;
-const MIN_RATE = 49;
-const MAX_RATE = 58;
+// Fallback values only used while API data loads
+const FALLBACK_PLATFORM_FEE_RATE = 0.12;
+const FALLBACK_MIN_RATE = 49;
+const FALLBACK_MAX_RATE = 58;
+const FALLBACK_FIXED_RATE = 55;
 
 function getMonthData(year: number, month: number) {
   const firstDay = new Date(year, month, 1);
@@ -130,8 +131,11 @@ export default function AddShiftPage() {
     queryKey: ['/api/fees/resolved'],
   });
   
-  // Get platform fee rate from API or use default
-  const ETHERAI_FEE_RATE = feeRates?.platformFeeRate ?? DEFAULT_ETHERAI_FEE_RATE;
+  // Get platform fee rate and default hourly rates from API
+  const ETHERAI_FEE_RATE = feeRates?.platformFeeRate ?? FALLBACK_PLATFORM_FEE_RATE;
+  const defaultMinRate = feeRates?.defaultMinHourlyRate ?? FALLBACK_MIN_RATE;
+  const defaultMaxRate = feeRates?.defaultMaxHourlyRate ?? FALLBACK_MAX_RATE;
+  const defaultFixedRate = feeRates?.defaultFixedHourlyRate ?? FALLBACK_FIXED_RATE;
   
   const today = new Date();
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
@@ -147,9 +151,20 @@ export default function AddShiftPage() {
   const [breakDuration, setBreakDuration] = useState("60 min");
   
   const [pricingMode, setPricingMode] = useState<"fixed" | "smart">("smart");
-  const [minHourlyRate, setMinHourlyRate] = useState(MIN_RATE);
-  const [maxHourlyRate, setMaxHourlyRate] = useState(MAX_RATE);
-  const [fixedHourlyRate, setFixedHourlyRate] = useState(55);
+  const [minHourlyRate, setMinHourlyRate] = useState(FALLBACK_MIN_RATE);
+  const [maxHourlyRate, setMaxHourlyRate] = useState(FALLBACK_MAX_RATE);
+  const [fixedHourlyRate, setFixedHourlyRate] = useState(FALLBACK_FIXED_RATE);
+  
+  // Sync defaults from platform settings when loaded
+  const [ratesInitialized, setRatesInitialized] = useState(false);
+  useEffect(() => {
+    if (feeRates && !ratesInitialized) {
+      setMinHourlyRate(defaultMinRate);
+      setMaxHourlyRate(defaultMaxRate);
+      setFixedHourlyRate(defaultFixedRate);
+      setRatesInitialized(true);
+    }
+  }, [feeRates, ratesInitialized, defaultMinRate, defaultMaxRate, defaultFixedRate]);
   
   const [pricingTab, setPricingTab] = useState<"min" | "max">("min");
 

@@ -2098,6 +2098,9 @@ export class DatabaseStorage implements IStorage {
       stateIncomeTaxRate,
       additionalTaxRate,
       totalPayrollBurden,
+      defaultMinHourlyRate: parseFloat(platform.defaultMinHourlyRate || "49"),
+      defaultMaxHourlyRate: parseFloat(platform.defaultMaxHourlyRate || "58"),
+      defaultFixedHourlyRate: parseFloat(platform.defaultFixedHourlyRate || "55"),
     };
   }
 

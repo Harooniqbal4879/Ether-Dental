@@ -142,6 +142,9 @@ function PlatformFeesForm({ settings }: { settings: PlatformSettings }) {
     federalUnemploymentRate: (parseFloat(settings.federalUnemploymentRate || "0.006") * 100).toFixed(2),
     workersCompRate: (parseFloat(settings.workersCompRate || "0.01") * 100).toFixed(2),
     paidSickLeaveRate: (parseFloat(settings.paidSickLeaveRate || "0.005") * 100).toFixed(2),
+    defaultMinHourlyRate: settings.defaultMinHourlyRate || "49.00",
+    defaultMaxHourlyRate: settings.defaultMaxHourlyRate || "58.00",
+    defaultFixedHourlyRate: settings.defaultFixedHourlyRate || "55.00",
   });
 
   const updateMutation = useMutation({
@@ -175,6 +178,9 @@ function PlatformFeesForm({ settings }: { settings: PlatformSettings }) {
       federalUnemploymentRate: (parseFloat(formData.federalUnemploymentRate) / 100).toFixed(4),
       workersCompRate: (parseFloat(formData.workersCompRate) / 100).toFixed(4),
       paidSickLeaveRate: (parseFloat(formData.paidSickLeaveRate) / 100).toFixed(4),
+      defaultMinHourlyRate: parseFloat(formData.defaultMinHourlyRate).toFixed(2),
+      defaultMaxHourlyRate: parseFloat(formData.defaultMaxHourlyRate).toFixed(2),
+      defaultFixedHourlyRate: parseFloat(formData.defaultFixedHourlyRate).toFixed(2),
     });
   };
 
@@ -319,6 +325,67 @@ function PlatformFeesForm({ settings }: { settings: PlatformSettings }) {
               />
               <span className="text-sm text-muted-foreground w-8">%</span>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Default Hourly Rates</CardTitle>
+          <CardDescription>
+            Default hourly rate values shown when creating new shifts
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="defaultMinHourlyRate">Default Min Hourly Rate ($)</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                id="defaultMinHourlyRate"
+                type="number"
+                step="1"
+                min="0"
+                value={formData.defaultMinHourlyRate}
+                onChange={(e) => setFormData({ ...formData, defaultMinHourlyRate: e.target.value })}
+                data-testid="input-default-min-hourly-rate"
+              />
+              <span className="text-sm text-muted-foreground w-8">$</span>
+            </div>
+            <p className="text-xs text-muted-foreground">Starting minimum rate for smart pricing mode</p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="defaultMaxHourlyRate">Default Max Hourly Rate ($)</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                id="defaultMaxHourlyRate"
+                type="number"
+                step="1"
+                min="0"
+                value={formData.defaultMaxHourlyRate}
+                onChange={(e) => setFormData({ ...formData, defaultMaxHourlyRate: e.target.value })}
+                data-testid="input-default-max-hourly-rate"
+              />
+              <span className="text-sm text-muted-foreground w-8">$</span>
+            </div>
+            <p className="text-xs text-muted-foreground">Starting maximum rate for smart pricing mode</p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="defaultFixedHourlyRate">Default Fixed Hourly Rate ($)</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                id="defaultFixedHourlyRate"
+                type="number"
+                step="1"
+                min="0"
+                value={formData.defaultFixedHourlyRate}
+                onChange={(e) => setFormData({ ...formData, defaultFixedHourlyRate: e.target.value })}
+                data-testid="input-default-fixed-hourly-rate"
+              />
+              <span className="text-sm text-muted-foreground w-8">$</span>
+            </div>
+            <p className="text-xs text-muted-foreground">Starting rate for fixed pricing mode</p>
           </div>
         </CardContent>
       </Card>
