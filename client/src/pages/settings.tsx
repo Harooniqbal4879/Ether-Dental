@@ -2241,9 +2241,204 @@ function StaffingSettingsTab() {
   );
 }
 
+function StripeCardForm({ practiceId, onSuccess, onCancel }: { practiceId: string; onSuccess: () => void; onCancel: () => void }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [stripeReady, setStripeReady] = useState(false);
+  const [stripePromise, setStripePromise] = useState<any>(null);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { loadStripe } = await import("@stripe/stripe-js");
+        const keyRes = await fetch("/api/stripe/publishable-key");
+        const { publishableKey } = await keyRes.json();
+        if (!cancelled) {
+          const sp = loadStripe(publishableKey);
+          setStripePromise(sp);
+        }
+
+        const intentRes = await apiRequest("POST", `/api/practices/${practiceId}/payment-methods/setup-intent`);
+        const intentData = await intentRes.json();
+        if (!cancelled) {
+          setClientSecret(intentData.clientSecret);
+          setStripeReady(true);
+        }
+      } catch (e) {
+        if (!cancelled) setError("Failed to initialize payment form");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [practiceId]);
+
+  if (error) {
+    return (
+      <div className="rounded-md border p-4 max-w-md space-y-3">
+        <p className="text-sm text-destructive">{error}</p>
+        <Button variant="outline" size="sm" onClick={onCancel}>Cancel</Button>
+      </div>
+    );
+  }
+
+  if (!stripeReady || !stripePromise || !clientSecret) {
+    return (
+      <div className="rounded-md border p-4 max-w-md flex items-center gap-2 text-muted-foreground text-sm">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Preparing secure payment form...
+      </div>
+    );
+  }
+
+  return (
+    <StripeCardFormInner
+      stripePromise={stripePromise}
+      clientSecret={clientSecret}
+      practiceId={practiceId}
+      loading={loading}
+      setLoading={setLoading}
+      onSuccess={onSuccess}
+      onCancel={onCancel}
+    />
+  );
+}
+
+function StripeCardFormInner({
+  stripePromise,
+  clientSecret,
+  practiceId,
+  loading,
+  setLoading,
+  onSuccess,
+  onCancel,
+}: {
+  stripePromise: any;
+  clientSecret: string;
+  practiceId: string;
+  loading: boolean;
+  setLoading: (v: boolean) => void;
+  onSuccess: () => void;
+  onCancel: () => void;
+}) {
+  const { toast } = useToast();
+  const [mounted, setMounted] = useState(false);
+  const [stripeInstance, setStripeInstance] = useState<any>(null);
+  const [elementsInstance, setElementsInstance] = useState<any>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const stripe = await stripePromise;
+        if (cancelled || !stripe) return;
+        setStripeInstance(stripe);
+        const elements = stripe.elements({ clientSecret, appearance: { theme: "stripe" as const } });
+        setElementsInstance(elements);
+        setMounted(true);
+      } catch (e) {
+        console.error("Failed to mount Stripe elements:", e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [stripePromise, clientSecret]);
+
+  useEffect(() => {
+    if (!mounted || !elementsInstance) return;
+    const paymentElement = elementsInstance.create("payment");
+    const container = document.getElementById("stripe-payment-element");
+    if (container) {
+      paymentElement.mount(container);
+    }
+    return () => { paymentElement.unmount(); };
+  }, [mounted, elementsInstance]);
+
+  const handleSubmit = async (e: any) => {
+    e.preventDefault();
+    if (!stripeInstance || !elementsInstance) return;
+
+    setLoading(true);
+    try {
+      const { error: stripeError, setupIntent } = await stripeInstance.confirmSetup({
+        elements: elementsInstance,
+        redirect: "if_required",
+      });
+
+      if (stripeError) {
+        toast({ title: stripeError.message || "Card verification failed", variant: "destructive" });
+        setLoading(false);
+        return;
+      }
+
+      if (setupIntent?.payment_method) {
+        await apiRequest("POST", `/api/practices/${practiceId}/payment-methods`, {
+          paymentMethodId: setupIntent.payment_method,
+        });
+        toast({ title: "Payment method added successfully" });
+        onSuccess();
+      }
+    } catch (err) {
+      toast({ title: "Failed to save payment method", variant: "destructive" });
+    }
+    setLoading(false);
+  };
+
+  if (!mounted) {
+    return (
+      <div className="rounded-md border p-4 max-w-md flex items-center gap-2 text-muted-foreground text-sm">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Loading payment form...
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-md border p-4 max-w-md" data-testid="stripe-card-form">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div id="stripe-payment-element" />
+        <div className="flex gap-2">
+          <Button type="submit" disabled={!stripeInstance || loading} data-testid="button-save-card">
+            {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</> : "Save card"}
+          </Button>
+          <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
+            Cancel
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 function BillingTab() {
   const [billingEmail, setBillingEmail] = useState("billing@yourpractice.com");
-  const [hasPaymentMethod, setHasPaymentMethod] = useState(false);
+  const [showAddCard, setShowAddCard] = useState(false);
+  const practiceId = useSettingsPracticeId();
+  const { toast } = useToast();
+
+  const { data: paymentMethods = [], isLoading: methodsLoading } = useQuery<any[]>({
+    queryKey: ["/api/practices", practiceId, "payment-methods"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/practices/${practiceId}/payment-methods`);
+      return res.json();
+    },
+    enabled: !!practiceId,
+  });
+
+  const deleteMethodMutation = useMutation({
+    mutationFn: async (methodId: string) => {
+      await apiRequest("DELETE", `/api/practices/${practiceId}/payment-methods/${methodId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/practices", practiceId, "payment-methods"] });
+      toast({ title: "Payment method removed" });
+    },
+    onError: () => {
+      toast({ title: "Failed to remove payment method", variant: "destructive" });
+    },
+  });
+
+  const hasPaymentMethod = paymentMethods.length > 0;
 
   return (
     <div className="space-y-8">
@@ -2274,29 +2469,80 @@ function BillingTab() {
       {/* Select Payment Method */}
       <div className="space-y-4">
         <div className="flex items-center gap-2">
-          <h3 className="text-lg font-semibold" data-testid="text-payment-method-title">Select payment method</h3>
-          {!hasPaymentMethod && (
+          <h3 className="text-lg font-semibold" data-testid="text-payment-method-title">Payment method</h3>
+          {!hasPaymentMethod && !methodsLoading && (
             <Badge variant="destructive" className="text-xs" data-testid="badge-payment-missing">
               MISSING
             </Badge>
           )}
         </div>
         <p className="text-sm text-muted-foreground">
-          Choose your preferred payment method. We charge after the shift based on actual hours worked, using Stripe for secure transactions.
+          Your card is charged upfront when you create a shift. The estimated total (base pay + platform fees) is collected at booking time.
         </p>
-        
-        <Button 
-          variant="default" 
-          className="bg-foreground text-background hover:bg-foreground/90"
-          data-testid="button-add-payment-method"
-        >
-          Add payment method
-        </Button>
 
-        {!hasPaymentMethod && (
-          <div className="rounded-md bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 p-4">
+        {methodsLoading ? (
+          <div className="flex items-center gap-2 text-muted-foreground text-sm">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading payment methods...
+          </div>
+        ) : (
+          <>
+            {paymentMethods.map((method: any) => (
+              <div key={method.id} className="flex items-center justify-between rounded-md border p-4 max-w-md" data-testid={`card-payment-method-${method.id}`}>
+                <div className="flex items-center gap-3">
+                  <CreditCard className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium capitalize">
+                      {method.brand || "Card"} ending in {method.last4 || "****"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Expires {method.expMonth}/{method.expYear}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {method.isDefault && (
+                    <Badge variant="secondary" className="text-xs">Default</Badge>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => deleteMethodMutation.mutate(method.id)}
+                    disabled={deleteMethodMutation.isPending}
+                    data-testid={`button-delete-payment-${method.id}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+
+            {!showAddCard ? (
+              <Button
+                variant="default"
+                onClick={() => setShowAddCard(true)}
+                data-testid="button-add-payment-method"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                {hasPaymentMethod ? "Add another card" : "Add payment method"}
+              </Button>
+            ) : (
+              <StripeCardForm
+                practiceId={practiceId || ""}
+                onSuccess={() => {
+                  setShowAddCard(false);
+                  queryClient.invalidateQueries({ queryKey: ["/api/practices", practiceId, "payment-methods"] });
+                }}
+                onCancel={() => setShowAddCard(false)}
+              />
+            )}
+          </>
+        )}
+
+        {!hasPaymentMethod && !methodsLoading && (
+          <div className="rounded-md bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 p-4 max-w-md">
             <p className="text-sm text-red-700 dark:text-red-400" data-testid="text-payment-warning">
-              A payment method is required before your first shift begins. All payments are securely collected via Stripe after the shift is completed.
+              A payment method is required before you can create shifts. Your card is charged upfront when booking.
             </p>
           </div>
         )}
@@ -2312,7 +2558,7 @@ function BillingTab() {
             History of your billing transactions and payments.
           </p>
         </div>
-        
+
         <div className="rounded-lg bg-muted/50 p-8 flex flex-col items-center justify-center min-h-[200px]">
           <div className="mb-4">
             <Search className="h-16 w-16 text-muted-foreground/50" />
@@ -2325,42 +2571,6 @@ function BillingTab() {
           </p>
         </div>
       </div>
-
-      <Separator />
-
-      {/* Legacy Subscription Card - kept for reference */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Billing History</CardTitle>
-          <CardDescription>
-            View your past invoices
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {[
-              { date: "Jan 1, 2026", amount: "$199.00", status: "Paid" },
-              { date: "Dec 1, 2025", amount: "$199.00", status: "Paid" },
-              { date: "Nov 1, 2025", amount: "$199.00", status: "Paid" },
-            ].map((invoice, i) => (
-              <div key={i} className="flex items-center justify-between rounded-lg border p-3">
-                <div className="flex items-center gap-4">
-                  <span className="text-sm text-muted-foreground">{invoice.date}</span>
-                  <span className="font-medium">{invoice.amount}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-                    {invoice.status}
-                  </Badge>
-                  <Button variant="ghost" size="sm" data-testid={`button-download-invoice-${i}`}>
-                    Download
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

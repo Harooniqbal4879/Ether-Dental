@@ -1871,7 +1871,86 @@ export async function registerRoutes(
       }
 
       const { dates, ...shiftData } = parsed.data;
-      
+      const session = req.session as any;
+      const practiceId = session?.practiceId || "practice-1";
+
+      // Calculate estimated hours per shift for charging
+      function parseTime(t: string): number {
+        const match = t.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+        if (!match) return 0;
+        let h = parseInt(match[1]);
+        const m = parseInt(match[2]);
+        const period = match[3].toUpperCase();
+        if (period === "PM" && h !== 12) h += 12;
+        if (period === "AM" && h === 12) h = 0;
+        return h + m / 60;
+      }
+
+      const startHours = parseTime(shiftData.arrivalTime);
+      const endHours = parseTime(shiftData.endTime);
+      const breakMinutes = parseInt(shiftData.breakDuration) || 0;
+      const workHours = Math.max(0, endHours - startHours - breakMinutes / 60);
+
+      const hourlyRate = shiftData.pricingMode === "fixed"
+        ? (shiftData.fixedHourlyRate || 0)
+        : (shiftData.maxHourlyRate || shiftData.minHourlyRate || 0);
+
+      // Get fee rates for this practice
+      const feeRates = await storage.getResolvedFeeRates(practiceId);
+      const serviceFeeRate = parseFloat(feeRates.serviceFeeRate);
+      const convenienceFeeRate = parseFloat(feeRates.convenienceFeeRate);
+
+      const basePay = workHours * hourlyRate;
+      const serviceFee = basePay * serviceFeeRate;
+      const convenienceFee = basePay * convenienceFeeRate;
+      const estimatedPerShift = basePay + serviceFee + convenienceFee;
+      const totalEstimated = estimatedPerShift * dates.length;
+
+      // Charge upfront via Stripe - payment method required
+      let stripePaymentIntentId: string | null = null;
+
+      if (totalEstimated > 0) {
+        const paymentMethods = await storage.getPracticePaymentMethods(practiceId);
+        const defaultMethod = paymentMethods.find(m => m.isDefault) || paymentMethods[0];
+
+        if (!defaultMethod) {
+          return res.status(402).json({
+            error: "No payment method on file. Please add a card in Settings before creating shifts.",
+          });
+        }
+
+        const practice = await storage.getPractice(practiceId);
+        if (practice?.stripeCustomerId) {
+          try {
+            const stripe = await getUncachableStripeClient();
+            const amountCents = Math.round(totalEstimated * 100);
+
+            const paymentIntent = await stripe.paymentIntents.create({
+              amount: amountCents,
+              currency: "usd",
+              customer: practice.stripeCustomerId,
+              payment_method: defaultMethod.stripePaymentMethodId,
+              off_session: true,
+              confirm: true,
+              description: `Shift${dates.length > 1 ? "s" : ""} on ${dates.join(", ")} - ${shiftData.role}`,
+              metadata: {
+                practiceId,
+                shiftDates: dates.join(","),
+                role: shiftData.role,
+              },
+            });
+
+            stripePaymentIntentId = paymentIntent.id;
+          } catch (stripeError: any) {
+            console.error("Stripe charge failed:", stripeError?.message);
+            return res.status(402).json({
+              error: "Payment failed. Please update your payment method in Settings and try again.",
+              stripeError: stripeError?.message,
+            });
+          }
+        }
+      }
+
       // Create one shift per selected date
       const shiftsToCreate = dates.map((date) => ({
         date,
@@ -1887,6 +1966,8 @@ export async function registerRoutes(
         maxHourlyRate: shiftData.maxHourlyRate?.toString() || null,
         fixedHourlyRate: shiftData.fixedHourlyRate?.toString() || null,
         status: "open" as const,
+        stripePaymentIntentId,
+        estimatedCharge: estimatedPerShift.toFixed(2),
       }));
 
       const createdShifts = await storage.createShifts(shiftsToCreate);
@@ -5633,6 +5714,101 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching staff roles:", error);
       res.status(500).json({ error: "Failed to fetch staff roles" });
+    }
+  });
+
+  // Practice Payment Methods
+  app.get("/api/practices/:practiceId/payment-methods", async (req, res) => {
+    try {
+      const methods = await storage.getPracticePaymentMethods(req.params.practiceId);
+      res.json(methods);
+    } catch (error) {
+      console.error("Error fetching payment methods:", error);
+      res.status(500).json({ error: "Failed to fetch payment methods" });
+    }
+  });
+
+  app.post("/api/practices/:practiceId/payment-methods/setup-intent", async (req, res) => {
+    try {
+      const practiceId = req.params.practiceId;
+      const practice = await storage.getPractice(practiceId);
+      if (!practice) {
+        return res.status(404).json({ error: "Practice not found" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+
+      let customerId = practice.stripeCustomerId;
+      if (!customerId) {
+        const customer = await stripe.customers.create({
+          name: practice.name,
+          email: practice.email || undefined,
+          metadata: { practiceId },
+        });
+        customerId = customer.id;
+        await storage.updatePractice(practiceId, { stripeCustomerId: customerId });
+      }
+
+      const setupIntent = await stripe.setupIntents.create({
+        customer: customerId,
+        payment_method_types: ["card"],
+      });
+
+      res.json({ clientSecret: setupIntent.client_secret });
+    } catch (error) {
+      console.error("Error creating setup intent:", error);
+      res.status(500).json({ error: "Failed to create setup intent" });
+    }
+  });
+
+  app.post("/api/practices/:practiceId/payment-methods", async (req, res) => {
+    try {
+      const practiceId = req.params.practiceId;
+      const { paymentMethodId } = req.body;
+      if (!paymentMethodId) {
+        return res.status(400).json({ error: "paymentMethodId is required" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      const pm = await stripe.paymentMethods.retrieve(paymentMethodId);
+
+      const saved = await storage.createPracticePaymentMethod({
+        practiceId,
+        stripePaymentMethodId: paymentMethodId,
+        brand: pm.card?.brand || null,
+        last4: pm.card?.last4 || null,
+        expMonth: pm.card?.exp_month || null,
+        expYear: pm.card?.exp_year || null,
+        isDefault: true,
+      });
+
+      res.json(saved);
+    } catch (error) {
+      console.error("Error saving payment method:", error);
+      res.status(500).json({ error: "Failed to save payment method" });
+    }
+  });
+
+  app.delete("/api/practices/:practiceId/payment-methods/:methodId", async (req, res) => {
+    try {
+      const method = (await storage.getPracticePaymentMethods(req.params.practiceId))
+        .find(m => m.id === req.params.methodId);
+      if (!method) {
+        return res.status(404).json({ error: "Payment method not found" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      try {
+        await stripe.paymentMethods.detach(method.stripePaymentMethodId);
+      } catch (e) {
+        // If detach fails (already detached), continue deleting from DB
+      }
+
+      await storage.deletePracticePaymentMethod(req.params.methodId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting payment method:", error);
+      res.status(500).json({ error: "Failed to delete payment method" });
     }
   });
 

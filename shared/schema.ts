@@ -1502,6 +1502,7 @@ export const practices = pgTable("practices", {
   arrivalInstructions: text("arrival_instructions"),
   dressCode: text("dress_code"),
   
+  stripeCustomerId: text("stripe_customer_id"),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

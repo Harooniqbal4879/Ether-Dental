@@ -809,10 +809,10 @@ export default function AddShiftPage() {
               
               <div className="mt-6 p-4 bg-muted/50 rounded-lg">
                 <p className="text-xs text-muted-foreground">
-                  <strong>Note:</strong> Completed shifts are not billed until after the shift is finished. The final bill will be calculated based on actual hours worked.
+                  <strong>Note:</strong> Your card on file will be charged upfront when you create this shift. The estimated total includes base pay and platform fees. If actual hours differ, an adjustment will be applied after shift completion.
                 </p>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Credit card payments will incur an additional 3% payment fee.
+                  Make sure you have a payment method saved in Settings before posting shifts.
                 </p>
               </div>
             </Card>

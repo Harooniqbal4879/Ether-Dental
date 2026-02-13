@@ -125,6 +125,9 @@ import {
   type PracticeProfessional,
   type InsertPracticeProfessional,
   type PracticeProfessionalWithDetails,
+  practicePaymentMethods,
+  type PracticePaymentMethod,
+  type InsertPracticePaymentMethod,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -325,6 +328,12 @@ export interface IStorage {
   getPracticeAdminByEmail(email: string): Promise<PracticeAdmin | undefined>;
   createPracticeAdmin(admin: InsertPracticeAdmin): Promise<PracticeAdmin>;
   updatePracticeAdmin(id: string, data: Partial<PracticeAdmin>): Promise<PracticeAdmin | undefined>;
+
+  // Practice Payment Methods
+  getPracticePaymentMethods(practiceId: string): Promise<PracticePaymentMethod[]>;
+  createPracticePaymentMethod(data: InsertPracticePaymentMethod): Promise<PracticePaymentMethod>;
+  deletePracticePaymentMethod(id: string): Promise<boolean>;
+  setDefaultPracticePaymentMethod(practiceId: string, paymentMethodId: string): Promise<void>;
 
   // Practice Settings
   getPracticeSettings(practiceId: string): Promise<PracticeSettings | undefined>;
@@ -1965,6 +1974,29 @@ export class DatabaseStorage implements IStorage {
       .where(eq(practiceAdmins.id, id))
       .returning();
     return updated;
+  }
+
+  // Practice Payment Methods
+  async getPracticePaymentMethods(practiceId: string): Promise<PracticePaymentMethod[]> {
+    return db.select().from(practicePaymentMethods).where(eq(practicePaymentMethods.practiceId, practiceId)).orderBy(desc(practicePaymentMethods.createdAt));
+  }
+
+  async createPracticePaymentMethod(data: InsertPracticePaymentMethod): Promise<PracticePaymentMethod> {
+    if (data.isDefault) {
+      await db.update(practicePaymentMethods).set({ isDefault: false }).where(eq(practicePaymentMethods.practiceId, data.practiceId));
+    }
+    const [created] = await db.insert(practicePaymentMethods).values(data).returning();
+    return created;
+  }
+
+  async deletePracticePaymentMethod(id: string): Promise<boolean> {
+    const result = await db.delete(practicePaymentMethods).where(eq(practicePaymentMethods.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async setDefaultPracticePaymentMethod(practiceId: string, paymentMethodId: string): Promise<void> {
+    await db.update(practicePaymentMethods).set({ isDefault: false }).where(eq(practicePaymentMethods.practiceId, practiceId));
+    await db.update(practicePaymentMethods).set({ isDefault: true }).where(eq(practicePaymentMethods.id, paymentMethodId));
   }
 
   // Practice Settings
