@@ -2217,6 +2217,11 @@ export async function registerRoutes(
 
   app.post("/api/shifts/:id/complete", async (req, res) => {
     try {
+      const session = req.session as any;
+      if (!session.adminId) {
+        return res.status(403).json({ error: "Only practice admins can complete shifts" });
+      }
+
       const parsed = completeShiftSchema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.errors });
@@ -2225,6 +2230,10 @@ export async function registerRoutes(
       const shift = await storage.getShift(req.params.id);
       if (!shift) {
         return res.status(404).json({ error: "Shift not found" });
+      }
+
+      if (shift.status === "completed") {
+        return res.status(400).json({ error: "Shift already completed" });
       }
 
       const data = parsed.data;
@@ -2283,6 +2292,8 @@ export async function registerRoutes(
               transactionId: transaction.id,
               professionalId: data.professionalId,
             },
+          }, {
+            idempotencyKey: `payout-shift-${req.params.id}-${transaction.id}`,
           });
 
           payoutResult = { stripeTransferId: transfer.id, payoutStatus: "paid" };
@@ -2333,12 +2344,17 @@ export async function registerRoutes(
   // Retry payout for a pending/failed transaction
   app.post("/api/shift-transactions/:id/payout", async (req, res) => {
     try {
+      const session = req.session as any;
+      if (!session.adminId) {
+        return res.status(403).json({ error: "Only practice admins can process payouts" });
+      }
+
       const transaction = await storage.getShiftTransaction(req.params.id);
       if (!transaction) {
         return res.status(404).json({ error: "Transaction not found" });
       }
 
-      if (transaction.payoutStatus === "paid") {
+      if (transaction.payoutStatus === "paid" || transaction.stripeTransferId) {
         return res.status(400).json({ error: "Payout already completed" });
       }
 
@@ -2366,6 +2382,8 @@ export async function registerRoutes(
           transactionId: transaction.id,
           professionalId: transaction.professionalId,
         },
+      }, {
+        idempotencyKey: `payout-retry-${transaction.id}-${Date.now()}`,
       });
 
       const updated = await storage.updateShiftTransaction(transaction.id, {
@@ -2410,6 +2428,14 @@ export async function registerRoutes(
   // Create Stripe Connect Express account for a professional
   app.post("/api/professionals/:id/stripe/connect/account", async (req, res) => {
     try {
+      // Auth: require admin session or the professional themselves
+      const session = req.session as any;
+      const isAdmin = session.adminId;
+      const isProfessionalSelf = session.professionalId === req.params.id;
+      if (!isAdmin && !isProfessionalSelf) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
       const professional = await storage.getProfessional(req.params.id);
       if (!professional) {
         return res.status(404).json({ error: "Professional not found" });
@@ -2441,6 +2467,8 @@ export async function registerRoutes(
           professionalId: professional.id,
           platform: "etherai-dental",
         },
+      }, {
+        idempotencyKey: `connect-create-${professional.id}`,
       });
 
       await storage.updateProfessional(professional.id, {
@@ -2458,6 +2486,13 @@ export async function registerRoutes(
   // Generate Stripe Connect onboarding link
   app.post("/api/professionals/:id/stripe/connect/onboarding-link", async (req, res) => {
     try {
+      const session = req.session as any;
+      const isAdmin = session.adminId;
+      const isProfessionalSelf = session.professionalId === req.params.id;
+      if (!isAdmin && !isProfessionalSelf) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
       const professional = await storage.getProfessional(req.params.id);
       if (!professional) {
         return res.status(404).json({ error: "Professional not found" });
@@ -2487,6 +2522,13 @@ export async function registerRoutes(
   // Check Stripe Connect account status
   app.get("/api/professionals/:id/stripe/connect/status", async (req, res) => {
     try {
+      const session = req.session as any;
+      const isAdmin = session.adminId;
+      const isProfessionalSelf = session.professionalId === req.params.id;
+      if (!isAdmin && !isProfessionalSelf) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
       const professional = await storage.getProfessional(req.params.id);
       if (!professional) {
         return res.status(404).json({ error: "Professional not found" });
@@ -3532,7 +3574,7 @@ export async function registerRoutes(
           });
           stripeAccountId = account.id;
 
-          // Save the Stripe account ID
+          // Save the Stripe account ID in payment methods
           await db.insert(professionalPaymentMethods).values({
             professionalId: session.professionalId,
             methodType: "stripe_connect",
@@ -3541,14 +3583,20 @@ export async function registerRoutes(
             stripeOnboardingComplete: false,
             verificationStatus: "pending",
           });
+
+          // Also sync Connect account to professionals table for payout routing
+          await storage.updateProfessional(session.professionalId, {
+            stripeConnectAccountId: stripeAccountId,
+            stripeConnectStatus: "pending",
+          });
         }
 
         // Create account link for onboarding
-        const baseUrl = process.env.REPLIT_DEPLOYMENT_URL || `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
+        const baseUrl = req.headers.origin || `https://${req.headers.host}`;
         const accountLink = await stripe.accountLinks.create({
           account: stripeAccountId,
-          refresh_url: `${baseUrl}/app/hub?stripe_refresh=true`,
-          return_url: `${baseUrl}/app/hub?stripe_complete=true`,
+          refresh_url: `${baseUrl}/app/onboarding?step=payment&refresh=true`,
+          return_url: `${baseUrl}/app/onboarding?step=payment&connected=true`,
           type: "account_onboarding",
         });
 
