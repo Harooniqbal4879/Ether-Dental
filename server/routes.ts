@@ -2202,10 +2202,10 @@ export async function registerRoutes(
     }
   });
 
-  // Complete a shift and create transaction
+  // Complete a shift and create transaction with Stripe payout to professional
   const completeShiftSchema = z.object({
     professionalId: z.string(),
-    practiceId: z.string().optional(), // Optional practice ID for fee resolution
+    practiceId: z.string().optional(),
     hoursWorked: z.coerce.number(),
     hourlyRate: z.coerce.number(),
     mealBreakMinutes: z.coerce.number().default(0),
@@ -2229,10 +2229,8 @@ export async function registerRoutes(
 
       const data = parsed.data;
       
-      // Get configurable fee rates from platform settings (with practice fallback if practiceId provided)
-      const feeRates = await storage.getResolvedFeeRates(data.practiceId);
+      const feeRates = await storage.getResolvedFeeRates(data.practiceId || shift.practiceId);
       
-      // Calculate payment breakdown using configurable rates
       const regularPay = data.hoursWorked * data.hourlyRate;
       const serviceFeeRate = feeRates.serviceFeeRate;
       const convenienceFeeRate = feeRates.convenienceFeeRate;
@@ -2241,7 +2239,10 @@ export async function registerRoutes(
       const adjustment = data.adjustmentMade ? (data.adjustmentAmount || 0) : 0;
       const totalPay = regularPay + serviceFee + convenienceFee + adjustment - data.counterCoverDiscount;
 
-      // Create transaction with the effective rates stored for audit trail
+      // Professional's payout = regularPay + any adjustments - discount (platform keeps service + convenience fees)
+      const payoutAmount = regularPay + adjustment - data.counterCoverDiscount;
+
+      // Create transaction record
       const transaction = await storage.createShiftTransaction({
         shiftId: req.params.id,
         professionalId: data.professionalId,
@@ -2259,8 +2260,53 @@ export async function registerRoutes(
         convenienceFee: convenienceFee.toFixed(2),
         counterCoverDiscount: data.counterCoverDiscount.toFixed(2),
         totalPay: totalPay.toFixed(2),
+        payoutAmount: payoutAmount.toFixed(2),
         status: "pending",
+        payoutStatus: "pending",
       });
+
+      // Attempt Stripe Transfer payout to professional
+      let payoutResult: { stripeTransferId?: string; payoutStatus: string } = { payoutStatus: "pending" };
+      
+      const professional = await storage.getProfessional(data.professionalId);
+      if (professional?.stripeConnectAccountId && professional?.stripeConnectPayoutsEnabled && payoutAmount > 0) {
+        try {
+          const stripe = await getUncachableStripeClient();
+          const transfer = await stripe.transfers.create({
+            amount: Math.round(payoutAmount * 100),
+            currency: "usd",
+            destination: professional.stripeConnectAccountId,
+            transfer_group: req.params.id,
+            description: `Shift payout - ${shift.date} ${shift.role}`,
+            metadata: {
+              shiftId: req.params.id,
+              transactionId: transaction.id,
+              professionalId: data.professionalId,
+            },
+          });
+
+          payoutResult = { stripeTransferId: transfer.id, payoutStatus: "paid" };
+
+          await storage.updateShiftTransaction(transaction.id, {
+            stripeTransferId: transfer.id,
+            payoutStatus: "paid",
+            payoutDate: new Date(),
+            status: "paid",
+          });
+        } catch (stripeError: any) {
+          console.error("Stripe Transfer payout failed:", stripeError?.message);
+          await storage.updateShiftTransaction(transaction.id, {
+            payoutStatus: "failed",
+            status: "payout_pending",
+          });
+          payoutResult = { payoutStatus: "failed" };
+        }
+      } else {
+        await storage.updateShiftTransaction(transaction.id, {
+          status: "payout_pending",
+          payoutStatus: "pending",
+        });
+      }
 
       // Update shift status to completed
       await storage.updateShift(req.params.id, {
@@ -2268,7 +2314,13 @@ export async function registerRoutes(
         assignedProfessionalId: data.professionalId,
       });
 
-      res.status(201).json(transaction);
+      const updatedTransaction = await storage.getShiftTransaction(transaction.id);
+      res.status(201).json({
+        transaction: updatedTransaction,
+        payout: payoutResult,
+        payoutAmount: payoutAmount.toFixed(2),
+        platformFees: (serviceFee + convenienceFee).toFixed(2),
+      });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: error.errors });
@@ -2278,7 +2330,59 @@ export async function registerRoutes(
     }
   });
 
-  // Charge a pending transaction
+  // Retry payout for a pending/failed transaction
+  app.post("/api/shift-transactions/:id/payout", async (req, res) => {
+    try {
+      const transaction = await storage.getShiftTransaction(req.params.id);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transaction not found" });
+      }
+
+      if (transaction.payoutStatus === "paid") {
+        return res.status(400).json({ error: "Payout already completed" });
+      }
+
+      const professional = await storage.getProfessional(transaction.professionalId);
+      if (!professional?.stripeConnectAccountId || !professional?.stripeConnectPayoutsEnabled) {
+        return res.status(400).json({ 
+          error: "Professional has not completed Stripe Connect setup. Payouts cannot be processed." 
+        });
+      }
+
+      const payoutAmount = parseFloat(transaction.payoutAmount || transaction.regularPay || "0");
+      if (payoutAmount <= 0) {
+        return res.status(400).json({ error: "Invalid payout amount" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      const transfer = await stripe.transfers.create({
+        amount: Math.round(payoutAmount * 100),
+        currency: "usd",
+        destination: professional.stripeConnectAccountId,
+        transfer_group: transaction.shiftId,
+        description: `Shift payout (retry) - Transaction ${transaction.id}`,
+        metadata: {
+          shiftId: transaction.shiftId,
+          transactionId: transaction.id,
+          professionalId: transaction.professionalId,
+        },
+      });
+
+      const updated = await storage.updateShiftTransaction(transaction.id, {
+        stripeTransferId: transfer.id,
+        payoutStatus: "paid",
+        payoutDate: new Date(),
+        status: "paid",
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error processing payout:", error?.message);
+      res.status(500).json({ error: "Failed to process payout" });
+    }
+  });
+
+  // Legacy charge route - now redirects to payout
   app.post("/api/shift-transactions/:id/charge", async (req, res) => {
     try {
       const transaction = await storage.getShiftTransaction(req.params.id);
@@ -2286,11 +2390,10 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Transaction not found" });
       }
 
-      if (transaction.status !== "pending") {
-        return res.status(400).json({ error: "Transaction is not pending" });
+      if (transaction.status === "paid") {
+        return res.status(400).json({ error: "Transaction already completed" });
       }
 
-      // For now, just mark as charged (Stripe integration can be added later)
       const updated = await storage.updateShiftTransaction(req.params.id, {
         status: "charged",
       });
@@ -2299,6 +2402,128 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error charging transaction:", error);
       res.status(500).json({ error: "Failed to charge transaction" });
+    }
+  });
+
+  // ============= Stripe Connect for Professionals =============
+  
+  // Create Stripe Connect Express account for a professional
+  app.post("/api/professionals/:id/stripe/connect/account", async (req, res) => {
+    try {
+      const professional = await storage.getProfessional(req.params.id);
+      if (!professional) {
+        return res.status(404).json({ error: "Professional not found" });
+      }
+
+      if (professional.stripeConnectAccountId) {
+        return res.json({ 
+          accountId: professional.stripeConnectAccountId, 
+          status: professional.stripeConnectStatus,
+          alreadyExists: true 
+        });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      const account = await stripe.accounts.create({
+        type: "express",
+        country: "US",
+        email: professional.email,
+        business_type: "individual",
+        individual: {
+          first_name: professional.firstName,
+          last_name: professional.lastName,
+          email: professional.email,
+        },
+        capabilities: {
+          transfers: { requested: true },
+        },
+        metadata: {
+          professionalId: professional.id,
+          platform: "etherai-dental",
+        },
+      });
+
+      await storage.updateProfessional(professional.id, {
+        stripeConnectAccountId: account.id,
+        stripeConnectStatus: "pending",
+      });
+
+      res.json({ accountId: account.id, status: "pending" });
+    } catch (error: any) {
+      console.error("Error creating Connect account:", error?.message);
+      res.status(500).json({ error: "Failed to create Stripe Connect account" });
+    }
+  });
+
+  // Generate Stripe Connect onboarding link
+  app.post("/api/professionals/:id/stripe/connect/onboarding-link", async (req, res) => {
+    try {
+      const professional = await storage.getProfessional(req.params.id);
+      if (!professional) {
+        return res.status(404).json({ error: "Professional not found" });
+      }
+
+      if (!professional.stripeConnectAccountId) {
+        return res.status(400).json({ error: "No Connect account. Create one first." });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      const baseUrl = req.headers.origin || `https://${req.headers.host}`;
+
+      const accountLink = await stripe.accountLinks.create({
+        account: professional.stripeConnectAccountId,
+        refresh_url: `${baseUrl}/app/onboarding?step=payment&refresh=true`,
+        return_url: `${baseUrl}/app/onboarding?step=payment&connected=true`,
+        type: "account_onboarding",
+      });
+
+      res.json({ url: accountLink.url });
+    } catch (error: any) {
+      console.error("Error creating onboarding link:", error?.message);
+      res.status(500).json({ error: "Failed to create onboarding link" });
+    }
+  });
+
+  // Check Stripe Connect account status
+  app.get("/api/professionals/:id/stripe/connect/status", async (req, res) => {
+    try {
+      const professional = await storage.getProfessional(req.params.id);
+      if (!professional) {
+        return res.status(404).json({ error: "Professional not found" });
+      }
+
+      if (!professional.stripeConnectAccountId) {
+        return res.json({ 
+          status: "not_created", 
+          chargesEnabled: false, 
+          payoutsEnabled: false,
+          detailsSubmitted: false,
+        });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      const account = await stripe.accounts.retrieve(professional.stripeConnectAccountId);
+
+      const status = account.payouts_enabled ? "active" : 
+                     account.details_submitted ? "pending" : "pending";
+
+      await storage.updateProfessional(professional.id, {
+        stripeConnectStatus: status,
+        stripeConnectChargesEnabled: account.charges_enabled || false,
+        stripeConnectPayoutsEnabled: account.payouts_enabled || false,
+        stripeConnectDetailsSubmitted: account.details_submitted || false,
+        paymentMethodVerified: account.payouts_enabled || false,
+      });
+
+      res.json({
+        status,
+        chargesEnabled: account.charges_enabled,
+        payoutsEnabled: account.payouts_enabled,
+        detailsSubmitted: account.details_submitted,
+      });
+    } catch (error: any) {
+      console.error("Error checking Connect status:", error?.message);
+      res.status(500).json({ error: "Failed to check Connect status" });
     }
   });
 

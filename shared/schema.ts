@@ -502,9 +502,14 @@ export const shiftTransactions = pgTable("shift_transactions", {
   convenienceFee: decimal("convenience_fee", { precision: 10, scale: 2 }).notNull(),
   counterCoverDiscount: decimal("counter_cover_discount", { precision: 10, scale: 2 }).default("0.00"),
   totalPay: decimal("total_pay", { precision: 10, scale: 2 }).notNull(),
-  status: text("status").notNull().default("pending"), // pending, charged, failed
+  status: text("status").notNull().default("pending"), // pending, charged, payout_pending, paid, failed
   stripePaymentIntentId: text("stripe_payment_intent_id"),
   stripeChargeId: text("stripe_charge_id"),
+  // Payout tracking (payment to professional)
+  payoutAmount: decimal("payout_amount", { precision: 10, scale: 2 }),
+  stripeTransferId: text("stripe_transfer_id"),
+  payoutStatus: text("payout_status"), // pending, paid, failed
+  payoutDate: timestamp("payout_date"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -663,6 +668,12 @@ export const professionals = pgTable("professionals", {
   w9Completed: boolean("w9_completed").default(false),
   agreementsSigned: boolean("agreements_signed").default(false),
   paymentMethodVerified: boolean("payment_method_verified").default(false),
+  // Stripe Connect (for receiving payouts)
+  stripeConnectAccountId: text("stripe_connect_account_id"),
+  stripeConnectStatus: text("stripe_connect_status").default("not_created"), // not_created, pending, active, restricted, disabled
+  stripeConnectChargesEnabled: boolean("stripe_connect_charges_enabled").default(false),
+  stripeConnectPayoutsEnabled: boolean("stripe_connect_payouts_enabled").default(false),
+  stripeConnectDetailsSubmitted: boolean("stripe_connect_details_submitted").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
