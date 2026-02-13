@@ -410,6 +410,8 @@ export const staffShifts = pgTable("staff_shifts", {
   checkOutMethod: text("check_out_method"), // "manual" or "automatic"
   checkOutLatitude: decimal("check_out_latitude", { precision: 10, scale: 7 }),
   checkOutLongitude: decimal("check_out_longitude", { precision: 10, scale: 7 }),
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  estimatedCharge: decimal("estimated_charge", { precision: 10, scale: 2 }),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -1512,6 +1514,25 @@ export const insertPracticeSchema = createInsertSchema(practices).omit({
 });
 export type InsertPractice = z.infer<typeof insertPracticeSchema>;
 export type Practice = typeof practices.$inferSelect;
+
+export const practicePaymentMethods = pgTable("practice_payment_methods", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  practiceId: varchar("practice_id").notNull().references(() => practices.id, { onDelete: "cascade" }),
+  stripePaymentMethodId: text("stripe_payment_method_id").notNull(),
+  brand: text("brand"),
+  last4: text("last4"),
+  expMonth: integer("exp_month"),
+  expYear: integer("exp_year"),
+  isDefault: boolean("is_default").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPracticePaymentMethodSchema = createInsertSchema(practicePaymentMethods).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertPracticePaymentMethod = z.infer<typeof insertPracticePaymentMethodSchema>;
+export type PracticePaymentMethod = typeof practicePaymentMethods.$inferSelect;
 
 // Registration-specific schema with required fields and validation
 export const practiceRegistrationSchema = z.object({
