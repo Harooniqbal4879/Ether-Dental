@@ -143,8 +143,8 @@ export default function PatientDetail() {
 
   const verificationTimelineEvents = verifications?.map((v) => ({
     id: v.id,
-    type: (v.method as "clearinghouse" | "phone" | "manual") || "manual",
-    status: v.status as "completed" | "failed" | "in_progress",
+    type: v.method || "manual",
+    status: v.status || "in_progress",
     timestamp: new Date(v.verifiedAt || v.createdAt!),
     verifiedBy: v.verifiedBy || undefined,
     notes: v.notes || undefined,

@@ -4,8 +4,8 @@ import { cn } from "@/lib/utils";
 
 interface TimelineEvent {
   id: string;
-  type: "clearinghouse" | "phone" | "manual";
-  status: "completed" | "failed" | "in_progress";
+  type: string;
+  status: string;
   timestamp: Date;
   verifiedBy?: string;
   notes?: string;
@@ -16,16 +16,18 @@ interface VerificationTimelineProps {
   className?: string;
 }
 
-const methodIcons = {
+const methodIcons: Record<string, typeof Database> = {
   clearinghouse: Database,
   phone: Phone,
   manual: User,
+  automatic: Database,
 };
 
-const methodLabels = {
+const methodLabels: Record<string, string> = {
   clearinghouse: "Clearinghouse Verification",
   phone: "AI Phone Verification",
   manual: "Manual Verification",
+  automatic: "Automatic Verification",
 };
 
 const statusIcons = {
@@ -53,8 +55,8 @@ export function VerificationTimeline({ events, className }: VerificationTimeline
   return (
     <div className={cn("space-y-4", className)}>
       {events.map((event, index) => {
-        const MethodIcon = methodIcons[event.type];
-        const StatusIcon = statusIcons[event.status];
+        const MethodIcon = methodIcons[event.type] || Database;
+        const StatusIcon = statusIcons[event.status as keyof typeof statusIcons] || Clock;
         const isLast = index === events.length - 1;
 
         return (
@@ -67,8 +69,8 @@ export function VerificationTimeline({ events, className }: VerificationTimeline
             </div>
             <div className="flex-1 space-y-1 pb-4">
               <div className="flex items-center gap-2">
-                <span className="font-medium">{methodLabels[event.type]}</span>
-                <StatusIcon className={cn("h-4 w-4", statusColors[event.status])} />
+                <span className="font-medium">{methodLabels[event.type] || "Verification"}</span>
+                <StatusIcon className={cn("h-4 w-4", statusColors[event.status as keyof typeof statusColors] || "text-muted-foreground")} />
               </div>
               <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                 <span>{format(event.timestamp, "MMM d, yyyy 'at' h:mm a")}</span>
