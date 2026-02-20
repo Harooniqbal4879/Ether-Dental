@@ -2663,6 +2663,134 @@ export async function registerRoutes(
     }
   });
 
+  app.delete("/api/professionals/:id/account", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const session = req.session as any;
+
+      const isAdmin = session.isAuthenticated && session.adminId;
+      const isSelf = session.professionalId === id;
+      if (!isAdmin && !isSelf) {
+        return res.status(403).json({ error: "Not authorized to delete this account" });
+      }
+
+      const professional = await storage.getProfessional(id);
+      if (!professional) {
+        return res.status(404).json({ error: "Professional not found" });
+      }
+
+      if (isSelf && !isAdmin && professional.passwordHash) {
+        const { password } = req.body || {};
+        if (!password) {
+          return res.status(400).json({ error: "Password is required to delete your account" });
+        }
+        const { verifyPassword } = await import("./services/auth");
+        const isValid = await verifyPassword(password, professional.passwordHash);
+        if (!isValid) {
+          return res.status(401).json({ error: "Incorrect password" });
+        }
+      }
+
+      const { professionals, staffShifts, shiftTransactions, shiftNegotiations, practiceInvitations, practiceProfessionals, conversations, contractorDocuments, contractorTaxForms, professionalPaymentMethods, professionalAgreements, onboardingAuditLog } = await import("@shared/schema");
+
+      const activeShifts = await db
+        .select()
+        .from(staffShifts)
+        .where(eq(staffShifts.assignedProfessionalId, id));
+      const hasActiveShifts = activeShifts.some((s: any) => s.status === "open" || s.status === "filled");
+      if (hasActiveShifts) {
+        return res.status(409).json({
+          error: "Cannot delete account while there are active or upcoming shifts assigned.",
+        });
+      }
+
+      if (professional.stripeConnectAccountId) {
+        try {
+          const { getUncachableStripeClient } = await import("./stripeClient");
+          const stripe = await getUncachableStripeClient();
+          await stripe.accounts.del(professional.stripeConnectAccountId);
+        } catch (stripeError) {
+          console.error("Failed to delete Stripe Connect account:", stripeError);
+        }
+      }
+
+      await db.update(staffShifts)
+        .set({ assignedProfessionalId: null })
+        .where(eq(staffShifts.assignedProfessionalId, id));
+      await db.delete(shiftNegotiations).where(eq(shiftNegotiations.professionalId, id));
+      await db.update(practiceInvitations)
+        .set({ professionalId: null })
+        .where(eq(practiceInvitations.professionalId, id));
+      await db.delete(conversations).where(eq(conversations.professionalId, id));
+      await db.delete(shiftTransactions).where(eq(shiftTransactions.professionalId, id));
+      await db.delete(practiceProfessionals).where(eq(practiceProfessionals.professionalId, id));
+      await db.delete(contractorDocuments).where(eq(contractorDocuments.professionalId, id));
+      await db.delete(contractorTaxForms).where(eq(contractorTaxForms.professionalId, id));
+      await db.delete(professionalPaymentMethods).where(eq(professionalPaymentMethods.professionalId, id));
+      await db.delete(professionalAgreements).where(eq(professionalAgreements.professionalId, id));
+
+      const deletedTimestamp = Date.now();
+      await db.update(professionals)
+        .set({
+          firstName: "Deleted",
+          lastName: "User",
+          email: `deleted-${deletedTimestamp}@removed.local`,
+          phone: null,
+          photoUrl: null,
+          bio: null,
+          passwordHash: null,
+          isActive: false,
+          onboardingStatus: "deleted",
+          emailVerified: false,
+          phoneVerified: false,
+          identityVerified: false,
+          w9Completed: false,
+          agreementsSigned: false,
+          paymentMethodVerified: false,
+          paymentEligible: false,
+          stripeConnectAccountId: null,
+          stripeConnectStatus: "not_created",
+          stripeConnectChargesEnabled: false,
+          stripeConnectPayoutsEnabled: false,
+          stripeConnectDetailsSubmitted: false,
+          licenseNumber: null,
+          licenseState: null,
+          dateOfBirth: null,
+          addressStreet: null,
+          addressCity: null,
+          addressState: null,
+          addressZip: null,
+          phoneVerificationCode: null,
+          phoneVerificationExpiry: null,
+          emailVerificationCode: null,
+          emailVerificationExpiry: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(professionals.id, id));
+
+      await db.insert(onboardingAuditLog).values({
+        professionalId: id,
+        action: "account_deleted",
+        details: isAdmin
+          ? `Account deleted by admin (adminId: ${session.adminId})`
+          : "Account deletion requested by professional via web app",
+        performedBy: isAdmin ? session.adminId : id,
+      });
+
+      if (isSelf) {
+        req.session.destroy(() => {});
+      }
+
+      res.json({
+        success: true,
+        message: "Account has been successfully deleted and personal data removed.",
+      });
+    } catch (error) {
+      console.error("Error deleting professional account:", error);
+      res.status(500).json({ error: "Failed to delete account" });
+    }
+  });
+
   // ============================================================
   // Professional Onboarding API
   // ============================================================

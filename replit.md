@@ -43,6 +43,8 @@ The platform is built on a modern web stack designed for scalability and maintai
         - Onboarding status and progress tracking (`/api/mobile/onboarding`)
         - Document upload with multipart/form-data support (`/api/mobile/onboarding/documents/upload`)
         - W-9 submission, agreement signing, and payment method setup
+        - **Account Deletion** (iOS App Review compliance): `DELETE /api/mobile/account` with password confirmation, soft-deletes by anonymizing personal data, cleans up Stripe Connect, blocks if active shifts exist
+    - **Account Deletion (Web)**: `DELETE /api/professionals/:id/account` for admin or self-deletion with same soft-delete + anonymization logic, audit logging
     - **Patient Portal**: Allows patients to view bills and make payments.
     - **Services**: Manages subscription offerings for insurance and patient billing with tiered pricing.
     - **Settings**: Consolidated practice configuration.
