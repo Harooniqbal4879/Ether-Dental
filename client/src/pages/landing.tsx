@@ -2,6 +2,7 @@ import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { AppDownloadHero } from "@/components/app-download-hero";
 import { Building2, UserCircle, ArrowRight, Shield, Zap, Clock } from "lucide-react";
 import logoPath from "@assets/just_logo_1770330927218.jpg";
 
@@ -47,6 +48,12 @@ export default function Landing() {
             <Link href="/features" data-testid="link-features">
               <Button variant="ghost" size="sm">Features</Button>
             </Link>
+            <Link href="/how-it-works" data-testid="link-how-it-works">
+              <Button variant="ghost" size="sm">How It Works</Button>
+            </Link>
+            <Link href="/benefits" data-testid="link-benefits">
+              <Button variant="ghost" size="sm">Benefits</Button>
+            </Link>
             <Link href="/pricing" data-testid="link-pricing">
               <Button variant="ghost" size="sm">Pricing</Button>
             </Link>
@@ -63,6 +70,8 @@ export default function Landing() {
           </div>
         </div>
       </header>
+
+      <AppDownloadHero />
 
       <main className="flex-1">
         <section className="py-16 lg:py-24" data-testid="section-hero">
@@ -162,6 +171,8 @@ export default function Landing() {
           <p>&copy; {new Date().getFullYear()} EtherAI-Dental. All rights reserved.</p>
           <div className="flex justify-center gap-4 mt-2">
             <Link href="/features" className="hover:text-foreground" data-testid="link-footer-features">Features</Link>
+            <Link href="/how-it-works" className="hover:text-foreground" data-testid="link-footer-how-it-works">How It Works</Link>
+            <Link href="/benefits" className="hover:text-foreground" data-testid="link-footer-benefits">Benefits</Link>
             <Link href="/pricing" className="hover:text-foreground" data-testid="link-footer-pricing">Pricing</Link>
             <Link href="/faq" className="hover:text-foreground" data-testid="link-footer-faq">FAQ</Link>
             <Link href="/demo" className="hover:text-foreground" data-testid="link-footer-demo">Demo</Link>
