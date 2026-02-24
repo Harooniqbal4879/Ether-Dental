@@ -52,6 +52,62 @@ export async function registerRoutes(
   });
 
   // ============================================================
+  // Demo Requests API (Public)
+  // ============================================================
+
+  app.post("/api/demo-requests", async (req, res) => {
+    try {
+      const { insertDemoRequestSchema } = await import("@shared/schema");
+      const parsed = insertDemoRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid form data", details: parsed.error.flatten() });
+      }
+
+      const demoRequest = await storage.createDemoRequest(parsed.data);
+
+      const { sendDemoRequestNotification } = await import("./services/email");
+      sendDemoRequestNotification({
+        firstName: parsed.data.firstName,
+        lastName: parsed.data.lastName,
+        email: parsed.data.email,
+        phone: parsed.data.phone || undefined,
+        practiceName: parsed.data.practiceName,
+        practiceSize: parsed.data.practiceSize || undefined,
+        currentSoftware: parsed.data.currentSoftware || undefined,
+        message: parsed.data.message || undefined,
+      }).catch(err => console.error("Demo notification email failed:", err));
+
+      res.status(201).json(demoRequest);
+    } catch (error) {
+      console.error("Error creating demo request:", error);
+      res.status(500).json({ error: "Failed to submit demo request" });
+    }
+  });
+
+  app.get("/api/demo-requests", async (req, res) => {
+    try {
+      const requests = await storage.getDemoRequests();
+      res.json(requests);
+    } catch (error) {
+      console.error("Error fetching demo requests:", error);
+      res.status(500).json({ error: "Failed to fetch demo requests" });
+    }
+  });
+
+  app.patch("/api/demo-requests/:id", async (req, res) => {
+    try {
+      const updated = await storage.updateDemoRequest(req.params.id, req.body);
+      if (!updated) {
+        return res.status(404).json({ error: "Demo request not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating demo request:", error);
+      res.status(500).json({ error: "Failed to update demo request" });
+    }
+  });
+
+  // ============================================================
   // Practice Admin Authentication API
   // ============================================================
 

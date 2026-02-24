@@ -128,6 +128,9 @@ import {
   practicePaymentMethods,
   type PracticePaymentMethod,
   type InsertPracticePaymentMethod,
+  demoRequests,
+  type DemoRequest,
+  type InsertDemoRequest,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -382,6 +385,12 @@ export interface IStorage {
   getPracticeProfessionalByEmail(practiceId: string, email: string): Promise<PracticeProfessional | undefined>;
   updatePracticeProfessional(id: string, data: Partial<PracticeProfessional>): Promise<PracticeProfessional | undefined>;
   deletePracticeProfessional(id: string): Promise<boolean>;
+
+  // Demo Requests
+  createDemoRequest(data: InsertDemoRequest): Promise<DemoRequest>;
+  getDemoRequests(): Promise<DemoRequest[]>;
+  getDemoRequest(id: string): Promise<DemoRequest | undefined>;
+  updateDemoRequest(id: string, data: Partial<DemoRequest>): Promise<DemoRequest | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2644,6 +2653,25 @@ export class DatabaseStorage implements IStorage {
     const result = await db.delete(practiceProfessionals)
       .where(eq(practiceProfessionals.id, id));
     return true;
+  }
+
+  async createDemoRequest(data: InsertDemoRequest): Promise<DemoRequest> {
+    const [request] = await db.insert(demoRequests).values(data).returning();
+    return request;
+  }
+
+  async getDemoRequests(): Promise<DemoRequest[]> {
+    return await db.select().from(demoRequests).orderBy(desc(demoRequests.createdAt));
+  }
+
+  async getDemoRequest(id: string): Promise<DemoRequest | undefined> {
+    const [request] = await db.select().from(demoRequests).where(eq(demoRequests.id, id));
+    return request;
+  }
+
+  async updateDemoRequest(id: string, data: Partial<DemoRequest>): Promise<DemoRequest | undefined> {
+    const [updated] = await db.update(demoRequests).set(data).where(eq(demoRequests.id, id)).returning();
+    return updated;
   }
 }
 

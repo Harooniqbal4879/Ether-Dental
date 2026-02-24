@@ -24,6 +24,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Calendar, Users, Clock, CheckCircle } from "lucide-react";
 import { useState } from "react";
+import { apiRequest } from "@/lib/queryClient";
 
 const demoFormSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -80,13 +81,20 @@ export default function Demo() {
   });
 
   const onSubmit = async (data: DemoFormData) => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    console.log("Demo request submitted:", data);
-    setSubmitted(true);
-    toast({
-      title: "Demo Request Submitted",
-      description: "We'll be in touch within 24 hours to schedule your demo.",
-    });
+    try {
+      await apiRequest("POST", "/api/demo-requests", data);
+      setSubmitted(true);
+      toast({
+        title: "Demo Request Submitted",
+        description: "We'll be in touch within 24 hours to schedule your demo.",
+      });
+    } catch (error) {
+      toast({
+        title: "Submission Failed",
+        description: "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   if (submitted) {

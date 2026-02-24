@@ -2017,6 +2017,26 @@ export const insertServiceSubscriptionSchema = createInsertSchema(serviceSubscri
 export type InsertServiceSubscription = z.infer<typeof insertServiceSubscriptionSchema>;
 export type ServiceSubscription = typeof serviceSubscriptions.$inferSelect;
 
+// Demo Requests - Captures demo form submissions from the marketing site
+export const demoRequests = pgTable("demo_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone"),
+  practiceName: text("practice_name").notNull(),
+  practiceSize: text("practice_size"),
+  currentSoftware: text("current_software"),
+  message: text("message"),
+  status: text("status").notNull().default("new"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDemoRequestSchema = createInsertSchema(demoRequests).omit({ id: true, status: true, notes: true, createdAt: true });
+export type InsertDemoRequest = z.infer<typeof insertDemoRequestSchema>;
+export type DemoRequest = typeof demoRequests.$inferSelect;
+
 // US States for dropdown
 export const US_STATES = [
   { code: "AL", name: "Alabama" },
