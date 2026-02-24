@@ -16,6 +16,7 @@ import {
   MapPin,
   MessageSquare,
   ClipboardCheck,
+  CalendarCheck,
 } from "lucide-react";
 import {
   Sidebar,
@@ -98,6 +99,12 @@ const configNavItems = [
     url: "/app/settings",
     icon: Settings,
     personas: ["admin"],
+  },
+  {
+    title: "Demo Requests",
+    url: "/app/demo-requests",
+    icon: CalendarCheck,
+    personas: ["system_admin"],
   },
   {
     title: "Practices",

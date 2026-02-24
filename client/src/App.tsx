@@ -46,6 +46,7 @@ import ProfessionalLogin from "@/pages/professional-login";
 import ProfessionalRegister from "@/pages/professional-register";
 import ProfessionalOnboarding from "@/pages/professional-onboarding";
 import ContractorVerification from "@/pages/contractor-verification";
+import DemoRequests from "@/pages/demo-requests";
 
 function MainRouter() {
   return (
@@ -77,6 +78,7 @@ function MainRouter() {
       <Route path="/app/profile" component={Profile} />
       <Route path="/app/onboarding" component={ProfessionalOnboarding} />
       <Route path="/app/contractor-verification" component={ContractorVerification} />
+      <Route path="/app/demo-requests" component={DemoRequests} />
       <Route component={NotFound} />
     </Switch>
   );
