@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { AppDownloadHero } from "@/components/app-download-hero";
 import { Menu, X } from "lucide-react";
 import { useState } from "react";
 import logoPath from "@assets/just_logo_1770330927218.jpg";
@@ -96,6 +97,8 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
           </Link>
         </nav>
       </header>
+
+      <AppDownloadHero />
 
       <main className="flex-1" data-testid="main-content">
         {children}

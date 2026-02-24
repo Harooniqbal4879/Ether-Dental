@@ -2,7 +2,6 @@ import { MarketingLayout } from "@/components/marketing-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { QRCodeSVG } from "qrcode.react";
 import {
   ClipboardCheck,
   Users,
@@ -16,13 +15,7 @@ import {
   RefreshCw,
   CreditCard,
   BarChart3,
-  Smartphone,
 } from "lucide-react";
-
-const APP_LINKS = {
-  ios: "https://apps.apple.com/us/app/etherai-dental/id6758028012",
-  android: "https://play.google.com/store/apps/details?id=com.dentalshield.professional&hl=en_US",
-};
 
 const features = [
   {
@@ -114,81 +107,6 @@ export default function Features() {
                 </CardContent>
               </Card>
             ))}
-          </div>
-
-          <div className="mt-20 mb-12" data-testid="section-mobile-apps">
-            <div className="text-center max-w-3xl mx-auto mb-10">
-              <div className="flex items-center justify-center gap-3 mb-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-                  <Smartphone className="h-6 w-6 text-primary" />
-                </div>
-                <h2 className="text-3xl lg:text-4xl font-bold" data-testid="text-mobile-apps-title">
-                  Get the Mobile App
-                </h2>
-              </div>
-              <p className="text-lg text-muted-foreground" data-testid="text-mobile-apps-description">
-                Manage shifts, check in/out, track earnings, and stay connected — all from your phone.
-                Scan a QR code below to download the EtherAI Dental app.
-              </p>
-            </div>
-
-            <div className="grid gap-8 sm:grid-cols-2 max-w-2xl mx-auto">
-              <Card className="hover-elevate" data-testid="card-app-ios">
-                <CardContent className="p-8 flex flex-col items-center text-center gap-4">
-                  <h3 className="text-xl font-semibold">iOS App</h3>
-                  <div className="bg-white p-4 rounded-xl shadow-sm" data-testid="qr-ios">
-                    <QRCodeSVG
-                      value={APP_LINKS.ios}
-                      size={180}
-                      level="H"
-                      includeMargin={false}
-                      fgColor="#0d9488"
-                    />
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Scan with your iPhone camera
-                  </p>
-                  <a
-                    href={APP_LINKS.ios}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    data-testid="link-app-ios"
-                  >
-                    <Button variant="outline" size="sm">
-                      Open in App Store
-                    </Button>
-                  </a>
-                </CardContent>
-              </Card>
-
-              <Card className="hover-elevate" data-testid="card-app-android">
-                <CardContent className="p-8 flex flex-col items-center text-center gap-4">
-                  <h3 className="text-xl font-semibold">Android App</h3>
-                  <div className="bg-white p-4 rounded-xl shadow-sm" data-testid="qr-android">
-                    <QRCodeSVG
-                      value={APP_LINKS.android}
-                      size={180}
-                      level="H"
-                      includeMargin={false}
-                      fgColor="#0d9488"
-                    />
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Scan with your Android camera
-                  </p>
-                  <a
-                    href={APP_LINKS.android}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    data-testid="link-app-android"
-                  >
-                    <Button variant="outline" size="sm">
-                      Open in Google Play
-                    </Button>
-                  </a>
-                </CardContent>
-              </Card>
-            </div>
           </div>
 
           <div className="text-center mt-12">
