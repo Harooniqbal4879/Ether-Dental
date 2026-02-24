@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Stethoscope, ArrowLeft, Loader2, Eye, EyeOff, CheckCircle } from "lucide-react";
+import { ArrowLeft, Loader2, Eye, EyeOff, CheckCircle } from "lucide-react";
+import logoPath from "@assets/just_logo_1770330927218.jpg";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import {
@@ -113,9 +114,7 @@ export default function ProfessionalRegister() {
         <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="container mx-auto flex h-16 items-center justify-between px-4 gap-4">
             <Link href="/" className="flex items-center gap-2" data-testid="link-home">
-              <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary">
-                <Stethoscope className="h-5 w-5 text-primary-foreground" />
-              </div>
+              <img src={logoPath} alt="EtherAI-Dental" className="h-9 w-9 object-contain" />
               <span className="text-xl font-bold">EtherAI-Dental</span>
             </Link>
             <ThemeToggle />
@@ -164,9 +163,7 @@ export default function ProfessionalRegister() {
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto flex h-16 items-center justify-between px-4 gap-4">
           <Link href="/" className="flex items-center gap-2" data-testid="link-home">
-            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary">
-              <Stethoscope className="h-5 w-5 text-primary-foreground" />
-            </div>
+            <img src={logoPath} alt="EtherAI-Dental" className="h-9 w-9 object-contain" />
             <span className="text-xl font-bold">EtherAI-Dental</span>
           </Link>
           <ThemeToggle />

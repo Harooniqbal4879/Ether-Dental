@@ -6,7 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Stethoscope, ArrowLeft, Loader2, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Loader2, Eye, EyeOff } from "lucide-react";
+import logoPath from "@assets/just_logo_1770330927218.jpg";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { usePersona } from "@/lib/persona-context";
@@ -75,9 +76,7 @@ export default function ProfessionalLogin() {
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto flex h-16 items-center justify-between px-4 gap-4">
           <Link href="/" className="flex items-center gap-2" data-testid="link-home">
-            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary">
-              <Stethoscope className="h-5 w-5 text-primary-foreground" />
-            </div>
+            <img src={logoPath} alt="EtherAI-Dental" className="h-9 w-9 object-contain" />
             <span className="text-xl font-bold">EtherAI-Dental</span>
           </Link>
           <ThemeToggle />
