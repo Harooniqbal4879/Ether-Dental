@@ -74,8 +74,6 @@ export default function Landing() {
         </div>
       </header>
 
-      <AppDownloadHero />
-
       <main className="flex-1">
         <section className="py-16 lg:py-24" data-testid="section-hero">
           <div className="container mx-auto px-4">
@@ -168,6 +166,8 @@ export default function Landing() {
           </div>
         </section>
       </main>
+
+      <AppDownloadHero />
 
       <footer className="border-t py-6" data-testid="footer-landing">
         <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
