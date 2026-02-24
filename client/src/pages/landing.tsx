@@ -67,6 +67,9 @@ export default function Landing() {
             <Link href="/demo" data-testid="link-demo">
               <Button variant="outline" size="sm">Request Demo</Button>
             </Link>
+            <Link href="/" data-testid="link-login">
+              <Button size="sm" data-testid="button-login">Login</Button>
+            </Link>
           </div>
         </div>
       </header>

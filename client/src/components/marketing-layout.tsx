@@ -49,9 +49,9 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
                 Request Demo
               </Button>
             </Link>
-            <Link href="/" data-testid="link-get-started">
-              <Button size="sm" data-testid="button-get-started">
-                Get Started
+            <Link href="/" data-testid="link-login">
+              <Button size="sm" data-testid="button-login">
+                Login
               </Button>
             </Link>
             <Button
