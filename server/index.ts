@@ -128,11 +128,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// Trust proxy in production (Replit runs behind a reverse proxy)
-// This is required for secure cookies to work properly
-if (process.env.NODE_ENV === "production") {
-  app.set("trust proxy", 1);
-}
+// Trust proxy — Replit runs behind a reverse proxy in both dev and production
+app.set("trust proxy", 1);
 
 // Session middleware for authentication
 app.use(
@@ -141,10 +138,10 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: process.env.NODE_ENV === "production",
+      secure: true,
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      sameSite: "lax",
+      sameSite: "none",
     },
   })
 );
