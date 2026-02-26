@@ -50,13 +50,17 @@ The platform is built on a modern web stack designed for scalability and maintai
     - **Settings**: Consolidated practice configuration.
     - **Messaging Center**: Real-time messaging system for Practice Admins to communicate with hygienists, including shift invitations.
     - **Chrome Extension**: Manifest V3 Chrome extension (`chrome-extension/` directory) that complements existing dental PMS/SOR systems:
-        - **SOR Detection**: Auto-detects Dentrix Ascend, Curve Dental, Open Dental Cloud, Oryx, tab32 via content scripts
-        - **Patient Data Extraction**: Reads patient name, DOB, member ID, and insurance info from the PMS screen
-        - **Side Panel UI**: Tabbed interface for eligibility verification, AI benefits summary, and staffing alerts
-        - **AI Benefits Summary**: OpenAI-powered plain-English benefits breakdown from raw eligibility data
-        - **Staffing Alerts**: Badge notification showing open shifts count with details
-        - **Extension API**: Server endpoints at `/api/extension/*` (status, payers, eligibility/check, benefits/summarize, shifts/alerts)
+        - **SOR Detection**: Auto-detects Dentrix Ascend, Curve Dental, Open Dental Cloud, Oryx, tab32 via content scripts with MutationObserver for dynamic page updates
+        - **Patient Data Extraction**: Reads patient name, DOB, member ID, and insurance info from the PMS screen; generic fallback extractor for unrecognized PMS systems
+        - **Side Panel UI**: Tabbed interface (Eligibility, Benefits, Shifts) with user info bar, loading states, session expiry handling, and dark mode support
+        - **JWT Authentication**: Token-based auth via `/api/extension/auth/login`, stored in chrome.storage.local, auto-logout on 401 expiry
+        - **AI Benefits Summary**: OpenAI-powered plain-English benefits breakdown with fallback summary generation if AI unavailable; XSS-protected HTML rendering
+        - **Staffing Alerts**: Badge notification showing open shifts count with location names, auto-refreshed every 5 minutes via chrome.alarms
+        - **Connection Testing**: Settings tab validates API URL connectivity before saving
+        - **Retry Logic**: Service worker retries failed requests with exponential backoff for server errors and network failures
+        - **Extension API**: Server endpoints at `/api/extension/*` (status, auth/login, payers, eligibility/check, benefits/summarize, shifts/alerts); pulls practice NPI/TaxID from database
         - **CORS**: Chrome extension origins allowed in CORS middleware
+        - **Installation Guide**: Dedicated page at `/chrome-extension` with 6-step setup instructions, supported systems list, troubleshooting section
 - **Multi-Location Support**: Enables management of multiple office locations with assignable shifts and appointments.
 - **Mobile App Integration**: Provides APIs for a mobile application to manage professional shifts (browsing, claiming, check-in/out, negotiations).
 - **API Design**: A RESTful API provides endpoints for all major functionalities.

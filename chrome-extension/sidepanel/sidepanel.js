@@ -1,5 +1,6 @@
 document.addEventListener("DOMContentLoaded", () => {
   const views = {
+    loading: document.getElementById("view-loading"),
     login: document.getElementById("view-login"),
     eligibility: document.getElementById("view-eligibility"),
     benefits: document.getElementById("view-benefits"),
@@ -11,10 +12,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnLogout = document.getElementById("btn-logout");
   const btnSettings = document.getElementById("btn-settings");
   const tabs = document.querySelectorAll(".tab");
+  const userBar = document.getElementById("user-bar");
 
   let currentBenefits = null;
   let currentPatientName = "";
   let insuranceType = "dental";
+  let lastBenefitsHtml = "";
 
   function showView(name) {
     Object.values(views).forEach((v) => v.classList.remove("active"));
@@ -22,19 +25,51 @@ document.addEventListener("DOMContentLoaded", () => {
     tabs.forEach((t) => t.classList.toggle("active", t.dataset.tab === name));
   }
 
+  function showUserBar(adminInfo, practiceInfo) {
+    if (!adminInfo) {
+      userBar.style.display = "none";
+      return;
+    }
+    const initials = ((adminInfo.firstName?.[0] || "") + (adminInfo.lastName?.[0] || "")).toUpperCase() || "?";
+    document.getElementById("user-avatar").textContent = initials;
+    document.getElementById("user-name").textContent =
+      [adminInfo.firstName, adminInfo.lastName].filter(Boolean).join(" ") || adminInfo.email;
+    document.getElementById("user-practice").textContent = practiceInfo?.name || "";
+    userBar.style.display = "flex";
+  }
+
   async function checkAuth() {
-    const { isLoggedIn, adminInfo } = await chrome.storage.local.get(["isLoggedIn", "adminInfo"]);
+    const { isLoggedIn, adminInfo, practiceInfo } = await chrome.storage.local.get([
+      "isLoggedIn",
+      "adminInfo",
+      "practiceInfo",
+    ]);
     if (isLoggedIn && adminInfo) {
       tabNav.style.display = "flex";
       btnLogout.style.display = "flex";
+      showUserBar(adminInfo, practiceInfo);
       showView("eligibility");
       loadPayers();
       checkDetectedPatient();
       loadShifts();
+      updateAccountInfo(adminInfo, practiceInfo);
     } else {
       tabNav.style.display = "none";
       btnLogout.style.display = "none";
+      showUserBar(null);
       showView("login");
+    }
+  }
+
+  function updateAccountInfo(adminInfo, practiceInfo) {
+    const section = document.getElementById("settings-account");
+    if (adminInfo) {
+      section.style.display = "block";
+      document.getElementById("account-name").textContent =
+        [adminInfo.firstName, adminInfo.lastName].filter(Boolean).join(" ") || adminInfo.email;
+      document.getElementById("account-practice").textContent = practiceInfo?.name || "Unknown Practice";
+    } else {
+      section.style.display = "none";
     }
   }
 
@@ -42,6 +77,9 @@ document.addEventListener("DOMContentLoaded", () => {
     tab.addEventListener("click", () => {
       showView(tab.dataset.tab);
       if (tab.dataset.tab === "shifts") loadShifts();
+      if (tab.dataset.tab === "benefits" && lastBenefitsHtml) {
+        document.getElementById("benefits-content").innerHTML = lastBenefitsHtml;
+      }
     });
   });
 
@@ -57,6 +95,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   btnLogout.addEventListener("click", async () => {
     await chrome.runtime.sendMessage({ type: "LOGOUT" });
+    lastBenefitsHtml = "";
+    currentBenefits = null;
+    currentPatientName = "";
+    document.getElementById("benefits-content").innerHTML =
+      '<div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10,9 9,9 8,9"/></svg><p>Run an eligibility check first to see AI-summarized benefits</p></div>';
+    document.getElementById("eligibility-result").style.display = "none";
     checkAuth();
   });
 
@@ -81,6 +125,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       if (result.error) throw new Error(result.error);
+      loginForm.reset();
       checkAuth();
     } catch (err) {
       loginError.textContent = err.message;
@@ -118,7 +163,10 @@ document.addEventListener("DOMContentLoaded", () => {
         payerType: insuranceType,
       });
 
-      if (result.error) throw new Error(result.error);
+      if (result.error) {
+        if (result.authExpired) return handleSessionExpired();
+        throw new Error(result.error);
+      }
 
       select.innerHTML = '<option value="">Select a payer...</option>';
       const payers = result.payers || result;
@@ -134,6 +182,21 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch {
       select.innerHTML = '<option value="">Failed to load payers</option>';
     }
+  }
+
+  function handleSessionExpired() {
+    tabNav.style.display = "none";
+    btnLogout.style.display = "none";
+    showUserBar(null);
+    lastBenefitsHtml = "";
+    currentBenefits = null;
+    currentPatientName = "";
+    document.getElementById("benefits-content").innerHTML =
+      '<div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10,9 9,9 8,9"/></svg><p>Run an eligibility check first to see AI-summarized benefits</p></div>';
+    document.getElementById("eligibility-result").style.display = "none";
+    showView("login");
+    loginError.textContent = "Your session has expired. Please sign in again.";
+    loginError.style.display = "block";
   }
 
   async function checkDetectedPatient() {
@@ -169,7 +232,8 @@ document.addEventListener("DOMContentLoaded", () => {
     e.preventDefault();
     const btn = document.getElementById("btn-check-eligibility");
     btn.disabled = true;
-    btn.innerHTML = '<div class="spinner" style="width:14px;height:14px;border-width:2px;"></div> Verifying...';
+    btn.innerHTML =
+      '<div class="spinner" style="width:14px;height:14px;border-width:2px;"></div> Verifying...';
     eligError.style.display = "none";
     eligResult.style.display = "none";
 
@@ -194,14 +258,18 @@ document.addEventListener("DOMContentLoaded", () => {
         data,
       });
 
-      if (result.error) throw new Error(result.error);
+      if (result.error) {
+        if (result.authExpired) return handleSessionExpired();
+        throw new Error(result.error);
+      }
       displayEligibilityResult(result);
     } catch (err) {
       eligError.textContent = err.message;
       eligError.style.display = "block";
     } finally {
       btn.disabled = false;
-      btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22,4 12,14.01 9,11.01"/></svg> Verify Eligibility`;
+      btn.innerHTML =
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22,4 12,14.01 9,11.01"/></svg> Verify Eligibility';
     }
   });
 
@@ -213,7 +281,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const coverageStatus = verification.coverageStatus || result.coverage?.status || "unknown";
 
     status.className = `result-status ${coverageStatus}`;
-    status.textContent = coverageStatus === "active" ? "Active" : coverageStatus === "inactive" ? "Inactive" : "Unknown";
+    status.textContent =
+      coverageStatus === "active"
+        ? "Active"
+        : coverageStatus === "inactive"
+        ? "Inactive"
+        : "Unknown";
 
     document.getElementById("result-date").textContent = new Date().toLocaleDateString();
 
@@ -221,17 +294,32 @@ document.addEventListener("DOMContentLoaded", () => {
     const rows = [];
 
     if (verification.planDescription || result.coverage?.planName) {
-      rows.push({ label: "Plan", value: verification.planDescription || result.coverage.planName });
+      rows.push({
+        label: "Plan",
+        value: verification.planDescription || result.coverage.planName,
+      });
     }
     if (verification.effectiveDate) {
-      rows.push({ label: "Effective", value: new Date(verification.effectiveDate).toLocaleDateString() });
+      rows.push({
+        label: "Effective",
+        value: new Date(verification.effectiveDate).toLocaleDateString(),
+      });
     }
     if (verification.terminationDate) {
-      rows.push({ label: "Terminates", value: new Date(verification.terminationDate).toLocaleDateString() });
+      rows.push({
+        label: "Terminates",
+        value: new Date(verification.terminationDate).toLocaleDateString(),
+      });
+    }
+    if (verification.groupNumber) {
+      rows.push({ label: "Group #", value: verification.groupNumber });
     }
 
     details.innerHTML = rows
-      .map((r) => `<div class="result-row"><span class="result-label">${r.label}</span><span class="result-value">${r.value}</span></div>`)
+      .map(
+        (r) =>
+          `<div class="result-row"><span class="result-label">${r.label}</span><span class="result-value">${r.value}</span></div>`
+      )
       .join("");
 
     const benefits = result.benefits || [];
@@ -249,7 +337,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function displayBenefits(benefits) {
     const container = document.getElementById("benefits-content");
-    container.innerHTML = '<div class="loading" style="display:flex;"><div class="spinner"></div><span>Generating AI summary...</span></div>';
+    container.innerHTML =
+      '<div class="loading" style="display:flex;"><div class="spinner"></div><span>Generating AI summary...</span></div>';
 
     try {
       const result = await chrome.runtime.sendMessage({
@@ -258,27 +347,45 @@ document.addEventListener("DOMContentLoaded", () => {
         patientName: currentPatientName,
       });
 
-      if (result.error) throw new Error(result.error);
+      if (result.error) {
+        if (result.authExpired) return handleSessionExpired();
+        throw new Error(result.error);
+      }
 
       let html = '<div class="benefits-summary">';
-      html += '<h3><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 110 20 10 10 0 010-20z"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg> AI Benefits Summary</h3>';
-      html += `<div class="benefits-text">${result.summary || "No summary available"}</div>`;
+      html +=
+        '<h3><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 110 20 10 10 0 010-20z"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg> AI Benefits Summary</h3>';
+      html += `<div class="benefits-text">${formatSummary(result.summary || "No summary available")}</div>`;
       html += "</div>";
 
-      html += '<details class="benefits-raw"><summary>View Raw Benefits Data</summary>';
-      html += '<table class="benefits-table"><thead><tr><th>Type</th><th>Amount</th><th>Network</th></tr></thead><tbody>';
+      html +=
+        '<details class="benefits-raw"><summary>View Raw Benefits Data</summary>';
+      html +=
+        '<table class="benefits-table"><thead><tr><th>Type</th><th>Amount</th><th>Network</th></tr></thead><tbody>';
       benefits.forEach((b) => {
         const type = b.benefitType || b.serviceTypeName || b.type || "N/A";
-        const amount = b.amount || b.percent || b.coinsurancePercent || b.copayAmount || "N/A";
+        const amount =
+          b.amount || b.percent || b.coinsurancePercent || b.copayAmount || "N/A";
         const network = b.inNetwork ? "In-Network" : b.network || "N/A";
-        html += `<tr><td>${type}</td><td>${amount}</td><td>${network}</td></tr>`;
+        html += `<tr><td>${escapeHtml(String(type))}</td><td>${escapeHtml(String(amount))}</td><td>${escapeHtml(String(network))}</td></tr>`;
       });
       html += "</tbody></table></details>";
 
       container.innerHTML = html;
+      lastBenefitsHtml = html;
     } catch (err) {
-      container.innerHTML = `<div class="error-msg">${err.message}</div>`;
+      container.innerHTML = `<div class="error-msg">${escapeHtml(err.message)}</div>`;
     }
+  }
+
+  function formatSummary(text) {
+    return escapeHtml(text).replace(/\n/g, "<br>");
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
   }
 
   async function loadShifts() {
@@ -291,7 +398,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const result = await chrome.runtime.sendMessage({ type: "GET_OPEN_SHIFTS" });
       loading.style.display = "none";
 
-      if (result.error) throw new Error(result.error);
+      if (result.error) {
+        if (result.authExpired) return handleSessionExpired();
+        throw new Error(result.error);
+      }
 
       const shifts = result.shifts || [];
       const count = result.openShifts || shifts.length;
@@ -299,17 +409,39 @@ document.addEventListener("DOMContentLoaded", () => {
       let html = `<div class="shift-count-badge">${count} Open Shift${count !== 1 ? "s" : ""}</div>`;
 
       if (shifts.length === 0) {
-        html += '<div class="empty-state"><p>No open shifts at this time</p></div>';
+        html +=
+          '<div class="empty-state"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><p>No open shifts at this time</p></div>';
       } else {
         shifts.forEach((shift) => {
-          const date = shift.date ? new Date(shift.date).toLocaleDateString() : "TBD";
+          const date = shift.date
+            ? new Date(shift.date).toLocaleDateString("en-US", {
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+              })
+            : "TBD";
+          const timeRange = [shift.startTime, shift.endTime].filter(Boolean).join(" - ");
+          const rate = shift.hourlyRate || shift.rate;
+
           html += `
-            <div class="shift-card">
-              <div class="shift-role">${shift.role || shift.requiredRole || "Staff"}</div>
+            <div class="shift-card" data-testid="card-shift-${shift.id}">
+              <div class="shift-header">
+                <span class="shift-role">${escapeHtml(shift.role || shift.requiredRole || "Staff")}</span>
+                ${rate ? `<span class="shift-rate">$${escapeHtml(String(rate))}/hr</span>` : ""}
+              </div>
               <div class="shift-meta">
-                <span>${date} ${shift.startTime || ""} - ${shift.endTime || ""}</span>
-                <span>${shift.locationName || shift.location || ""}</span>
-                <span>$${shift.hourlyRate || shift.rate || "N/A"}/hr</span>
+                <div class="shift-meta-row">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  <span>${escapeHtml(date)}${timeRange ? " &middot; " + escapeHtml(timeRange) : ""}</span>
+                </div>
+                ${
+                  shift.locationName
+                    ? `<div class="shift-meta-row">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                  <span>${escapeHtml(shift.locationName)}</span>
+                </div>`
+                    : ""
+                }
               </div>
             </div>
           `;
@@ -319,21 +451,30 @@ document.addEventListener("DOMContentLoaded", () => {
       container.innerHTML = html;
     } catch (err) {
       loading.style.display = "none";
-      container.innerHTML = `<div class="error-msg">${err.message}</div>`;
+      container.innerHTML = `<div class="error-msg">${escapeHtml(err.message)}</div>`;
     }
   }
 
   async function loadSettings() {
-    const { apiUrl } = await chrome.storage.local.get("apiUrl");
+    const { apiUrl, adminInfo, practiceInfo } = await chrome.storage.local.get([
+      "apiUrl",
+      "adminInfo",
+      "practiceInfo",
+    ]);
     document.getElementById("settings-api-url").value = apiUrl || "";
+    updateAccountInfo(adminInfo, practiceInfo);
+
+    const manifest = chrome.runtime.getManifest();
+    document.getElementById("ext-version").textContent = manifest.version;
 
     try {
       const result = await chrome.runtime.sendMessage({ type: "CHECK_STATUS" });
       const statusEl = document.getElementById("connection-status");
       if (result.error) {
-        statusEl.innerHTML = '<span class="status-dot disconnected"></span><span>Disconnected</span>';
+        statusEl.innerHTML =
+          '<span class="status-dot disconnected"></span><span>Disconnected</span>';
       } else {
-        statusEl.innerHTML = '<span class="status-dot connected"></span><span>Connected</span>';
+        statusEl.innerHTML = `<span class="status-dot connected"></span><span>Connected — v${result.version || "?"}</span>`;
       }
     } catch {
       document.getElementById("connection-status").innerHTML =
@@ -345,19 +486,43 @@ document.addEventListener("DOMContentLoaded", () => {
   settingsForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const url = document.getElementById("settings-api-url").value.replace(/\/$/, "");
+    const statusMsg = document.getElementById("settings-status");
+    const errorMsg = document.getElementById("settings-error");
+    const btn = settingsForm.querySelector("button[type=submit]");
+
+    statusMsg.style.display = "none";
+    errorMsg.style.display = "none";
+    btn.disabled = true;
+    btn.textContent = "Testing connection...";
+
     await chrome.storage.local.set({ apiUrl: url });
 
-    const status = document.getElementById("settings-status");
-    status.textContent = "Settings saved successfully";
-    status.style.display = "block";
-    setTimeout(() => (status.style.display = "none"), 3000);
+    try {
+      const result = await chrome.runtime.sendMessage({ type: "TEST_CONNECTION", url });
 
-    loadSettings();
+      if (result.success) {
+        statusMsg.textContent = `Connected successfully (API v${result.version || "?"})`;
+        statusMsg.style.display = "block";
+        loadSettings();
+      } else {
+        errorMsg.textContent = `Connection failed: ${result.error || "Unknown error"}`;
+        errorMsg.style.display = "block";
+      }
+    } catch (err) {
+      errorMsg.textContent = `Connection failed: ${err.message}`;
+      errorMsg.style.display = "block";
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Save & Test Connection";
+    }
   });
 
   chrome.storage.onChanged.addListener((changes) => {
     if (changes.detectedPatient) {
       checkDetectedPatient();
+    }
+    if (changes.isLoggedIn && !changes.isLoggedIn.newValue) {
+      handleSessionExpired();
     }
   });
 

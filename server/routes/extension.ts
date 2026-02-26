@@ -2,8 +2,8 @@ import { Router } from "express";
 import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { db } from "../db";
-import { insuranceCarriers, staffShifts, practiceAdmins, practices } from "@shared/schema";
-import { eq, and, gte } from "drizzle-orm";
+import { insuranceCarriers, staffShifts, practiceAdmins, practices, practiceLocations } from "@shared/schema";
+import { eq, and, gte, inArray } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
 const router = Router();
@@ -138,14 +138,30 @@ router.post("/eligibility/check", extensionAuth, async (req: Request, res: Respo
       });
     }
 
+    const [practice] = await db
+      .select()
+      .from(practices)
+      .where(eq(practices.id, auth.practiceId))
+      .limit(1);
+
+    const providerName = practice?.name || "Practice";
+    const providerNpi = practice?.npiNumber;
+    const providerTaxId = practice?.taxId;
+
+    if (!providerNpi || !providerTaxId) {
+      return res.status(400).json({
+        error: "Practice NPI number and Tax ID must be configured before running eligibility checks. Please update your practice settings.",
+      });
+    }
+
     if (insuranceType === "medical") {
       const { availityService } = await import("../services/availity");
 
       const result = await availityService.checkEligibility({
         provider: {
-          npi: "1234567890",
-          taxId: "000000000",
-          organizationName: "Practice",
+          npi: providerNpi,
+          taxId: providerTaxId,
+          organizationName: providerName,
         },
         payer: {
           payerId: payerId,
@@ -168,6 +184,7 @@ router.post("/eligibility/check", extensionAuth, async (req: Request, res: Respo
           coverageStatus: result.coverage?.status || "unknown",
           planDescription: result.coverage?.planName || "",
           effectiveDate: result.coverage?.effectiveDate || null,
+          groupNumber: result.coverage?.groupNumber || null,
         },
       });
     } else {
@@ -176,9 +193,9 @@ router.post("/eligibility/check", extensionAuth, async (req: Request, res: Respo
       const result = await dentalXchangeService.checkEligibility({
         provider: {
           type: "2",
-          organizationName: "Practice",
-          npi: "1234567890",
-          taxId: "000000000",
+          organizationName: providerName,
+          npi: providerNpi,
+          taxId: providerTaxId,
         },
         payer: {
           name: payerName || "",
@@ -200,6 +217,7 @@ router.post("/eligibility/check", extensionAuth, async (req: Request, res: Respo
           planDescription: result.planDescription || "",
           effectiveDate: result.effectiveDate || null,
           terminationDate: result.terminationDate || null,
+          groupNumber: result.groupNumber || null,
         },
         benefits: result.benefits || [],
       });
@@ -306,7 +324,17 @@ router.get("/shifts/alerts", extensionAuth, async (req: Request, res: Response) 
           gte(staffShifts.date, todayStr)
         )
       )
-      .limit(10);
+      .limit(20);
+
+    const locationIds = [...new Set(openShifts.map((s) => s.locationId).filter(Boolean))] as string[];
+    let locationMap: Record<string, string> = {};
+    if (locationIds.length > 0) {
+      const locations = await db
+        .select({ id: practiceLocations.id, name: practiceLocations.name })
+        .from(practiceLocations)
+        .where(inArray(practiceLocations.id, locationIds));
+      locationMap = Object.fromEntries(locations.map((l) => [l.id, l.name]));
+    }
 
     const shifts = openShifts.map((s) => ({
       id: s.id,
@@ -316,6 +344,7 @@ router.get("/shifts/alerts", extensionAuth, async (req: Request, res: Response) 
       endTime: s.endTime,
       hourlyRate: s.fixedHourlyRate || s.minHourlyRate,
       locationId: s.locationId,
+      locationName: s.locationId ? locationMap[s.locationId] || null : null,
     }));
 
     res.json({

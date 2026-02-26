@@ -103,6 +103,50 @@ body {
   color: var(--text);
 }
 
+.user-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px 8px;
+}
+
+.user-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.user-details {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.user-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-practice {
+  font-size: 10px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 #tab-nav {
   display: flex;
   padding: 0 16px;
@@ -425,7 +469,6 @@ body {
   font-size: 13px;
   line-height: 1.7;
   color: var(--text);
-  white-space: pre-wrap;
 }
 
 .benefits-raw {
@@ -472,18 +515,44 @@ body {
   box-shadow: var(--shadow-sm);
 }
 
-.shift-card .shift-role {
-  font-weight: 700;
-  font-size: 13px;
-  margin-bottom: 4px;
+.shift-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
 }
 
-.shift-card .shift-meta {
-  font-size: 11px;
-  color: var(--text-secondary);
+.shift-role {
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.shift-rate {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary);
+  background: var(--primary-light);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.shift-meta {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
+}
+
+.shift-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.shift-meta-row svg {
+  flex-shrink: 0;
+  opacity: 0.6;
 }
 
 .shift-count-badge {
@@ -506,14 +575,15 @@ body {
 }
 
 .empty-state svg {
-  margin-bottom: 12px;
+  margin: 0 auto 12px;
+  display: block;
 }
 
 .empty-state p {
   font-size: 13px;
 }
 
-.loading {
+.loading, .loading-screen {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -521,6 +591,11 @@ body {
   padding: 24px;
   color: var(--text-secondary);
   font-size: 12px;
+}
+
+.loading-screen {
+  flex-direction: column;
+  padding: 48px 24px;
 }
 
 .spinner {
@@ -568,6 +643,38 @@ body {
   font-size: 13px;
   font-weight: 700;
   margin-bottom: 8px;
+}
+
+.account-info {
+  padding: 8px 0;
+}
+
+.account-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.account-practice {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.ext-info {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 12px;
+}
+
+.ext-info-label {
+  color: var(--text-secondary);
+}
+
+.ext-info-value {
+  color: var(--text);
+  font-weight: 600;
 }
 
 .sor-list {
