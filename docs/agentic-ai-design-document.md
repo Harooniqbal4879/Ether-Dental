@@ -1,9 +1,11 @@
 # EtherAI-Dental: Agentic AI Digital Workforce Design Document
 
-**Version:** 1.1  
+**Version:** 1.2  
 **Date:** February 2026  
 **Status:** Draft — Pending Review  
-**Changelog:** v1.1 — Added DSO/Multi-Location hierarchy, location-level agent execution, pricing/subscription model, and usage metering.
+**Changelog:**  
+- v1.2 — Added Multi-PMS Integration Strategy (Section 8) with 4-tier integration architecture, DSO software fragmentation analysis, integration pricing model, and Chrome Extension as unifying layer.  
+- v1.1 — Added DSO/Multi-Location hierarchy, location-level agent execution, pricing/subscription model, and usage metering.
 
 ---
 
