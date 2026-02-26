@@ -48,6 +48,7 @@ import ProfessionalOnboarding from "@/pages/professional-onboarding";
 import ContractorVerification from "@/pages/contractor-verification";
 import DemoRequests from "@/pages/demo-requests";
 import Integrations from "@/pages/integrations";
+import ChromeExtension from "@/pages/chrome-extension";
 
 function MainRouter() {
   return (
@@ -194,6 +195,7 @@ function App() {
               <Route path="/faq" component={FAQ} />
               <Route path="/demo" component={Demo} />
               <Route path="/integrations" component={Integrations} />
+              <Route path="/chrome-extension" component={ChromeExtension} />
               <Route path="/invitation/:token" component={InvitationPage} />
               <Route path="/app/:rest*">
                 <MainLayout />

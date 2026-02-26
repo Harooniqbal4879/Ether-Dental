@@ -11,6 +11,7 @@ import {
   MonitorSmartphone, Sparkles, Zap, Eye
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Link } from "wouter";
 import { useState, useMemo } from "react";
 import type { InsuranceCarrier, ClearinghouseConfig } from "@shared/schema";
 
@@ -478,9 +479,12 @@ export default function Integrations() {
                     <Chrome className="h-3 w-3" />
                     Manifest V3
                   </Badge>
-                  <span className="text-xs text-muted-foreground">
-                    Load as unpacked extension from the <code className="bg-muted px-1 py-0.5 rounded text-xs">chrome-extension/</code> directory
-                  </span>
+                  <Link href="/chrome-extension">
+                    <span className="text-xs text-primary font-medium hover:underline cursor-pointer inline-flex items-center gap-1" data-testid="link-extension-install">
+                      Installation Guide & Details
+                      <ArrowUpRight className="h-3 w-3" />
+                    </span>
+                  </Link>
                 </div>
               </div>
             </div>
