@@ -1,9 +1,10 @@
 # EtherAI-Dental: Agentic AI Digital Workforce Design Document
 
-**Version:** 1.3  
+**Version:** 1.4  
 **Date:** February 2026  
 **Status:** Draft — Pending Review  
 **Changelog:**  
+- v1.4 — Added Multi-Model LLM Strategy (Section 7.3) with hybrid execution patterns per agent, multi-provider cost analysis, model routing architecture, and fallback/resilience design. Replaced single-provider OpenAI approach with tiered model selection optimized for cost, quality, and reliability.  
 - v1.3 — Added Human-Agent Interaction Model (Section 5) defining the relationship between Chrome Extension (human interface), AI agents (server-side automation), and the extension as a bridge for HITL approvals and agent monitoring.  
 - v1.2 — Added Multi-PMS Integration Strategy with 4-tier integration architecture, DSO software fragmentation analysis, integration pricing model, and Chrome Extension as unifying layer.  
 - v1.1 — Added DSO/Multi-Location hierarchy, location-level agent execution, pricing/subscription model, and usage metering.
@@ -24,6 +25,8 @@
    - 5.5 Data Flow: Human ↔ Agent ↔ Extension
 6. [DSO & Multi-Location Hierarchy](#6-dso--multi-location-hierarchy)
 7. [Core Infrastructure](#7-core-infrastructure)
+   - 7.3 Multi-Model LLM Strategy
+   - 7.4 Multi-Location Agent Scheduling
 8. [Agent Definitions](#8-agent-definitions)
    - 8.1 Insurance Verification Agent
    - 8.2 AI Shift Matchmaker Agent
@@ -42,7 +45,7 @@
 
 ## 1. Executive Summary
 
-This document defines the architecture for building six **Agentic AI solutions** within the EtherAI-Dental platform. Each agent follows the **GPAORI pattern** (Goal → Plan → Act → Observe → Reflect → Iterate) and incorporates **Human-in-the-Loop (HITL)** checkpoints at every step to ensure accuracy, compliance, and trust.
+This document defines the architecture for building six **Agentic AI solutions** within the EtherAI-Dental platform. Each agent uses the **execution pattern best suited to its task complexity** — ranging from pure state machines (no AI) to full **GPAORI** (Goal → Plan → Act → Observe → Reflect → Iterate) — with a **multi-model LLM strategy** that routes tasks to the optimal provider (OpenAI, Google Gemini, or Anthropic Claude) based on cost and quality needs. All agents incorporate **Human-in-the-Loop (HITL)** checkpoints to ensure accuracy, compliance, and trust.
 
 These agents form a "Digital Workforce" that automates repetitive, time-consuming tasks across dental practice operations while keeping practice administrators in full control. The agents don't replace staff — they augment them by handling the grunt work and surfacing decisions for human approval.
 
@@ -234,14 +237,15 @@ Practices can configure how much autonomy each agent has. Configuration can be s
 │                          │                                               │
 │              ┌───────────┼────────────┐                                  │
 │              │           │            │                                   │
-│        ┌─────▼────┐ ┌───▼────┐ ┌─────▼──────┐                          │
-│        │PostgreSQL │ │ OpenAI │ │ External   │                          │
-│        │  Database │ │  API   │ │ Services   │                          │
-│        └──────────┘ └────────┘ │(DentalXch, │                          │
-│                                │ Availity,  │                           │
-│                                │ Stripe,    │                           │
-│                                │ Resend)    │                           │
-│                                └────────────┘                           │
+│        ┌─────▼────┐ ┌───▼──────────┐ ┌─────▼──────┐                    │
+│        │PostgreSQL │ │ LLM Providers │ │ External   │                    │
+│        │  Database │ │ (Model Router)│ │ Services   │                    │
+│        └──────────┘ └───┬──────────┘ │(DentalXch, │                    │
+│                          │            │ Availity,  │                     │
+│                    ┌─────┼─────┐      │ Stripe,    │                     │
+│                    ▼     ▼     ▼      │ Resend)    │                     │
+│                 OpenAI Google Anthro-  └────────────┘                    │
+│                  API  Gemini  pic                                        │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -255,7 +259,7 @@ Practices can configure how much autonomy each agent has. Configuration can be s
 | **Agent Runtime** | Executes individual agent instances. Each run is isolated with its own state and scoped to a specific location (or practice-wide for aggregate agents). |
 | **Subscription & Metering** | Tracks agent run counts against subscription limits, manages billing via Stripe, enforces tier-based access. |
 | **DSO/Practice Hierarchy** | Manages the relationship between DSO organizations, practices, and locations. Controls config inheritance and reporting rollups. |
-| **OpenAI API** | Powers reasoning (Plan, Reflect phases), natural language summaries, and confidence scoring. |
+| **LLM Providers (Model Router)** | Routes AI tasks to the optimal model per agent and task type. Supports OpenAI (GPT-4o, GPT-4o-mini), Google (Gemini 2.0 Flash, Gemini 1.5 Pro), and Anthropic (Claude 3.5 Sonnet, Claude 3.5 Haiku) with automatic fallback between providers. |
 
 ---
 
@@ -735,18 +739,251 @@ interface GPAORIStep {
 }
 ```
 
-### 7.3 OpenAI Integration Pattern
+### 7.3 Multi-Model LLM Strategy
 
-Each GPAORI phase uses OpenAI differently:
+Rather than using a single LLM provider for all tasks, the platform employs a **multi-model strategy** that routes each agent and task type to the optimal model based on cost, quality, and reliability requirements. The primary benefit is **quality optimization** — using premium models (GPT-4o, Claude 3.5 Sonnet) only for high-stakes tasks like claims analysis and revenue intelligence where mistakes cost real money, while using economy models (Gemini Flash) for routine tasks. This approach also provides **resilience** through multi-provider fallback, ensuring agents continue working even if one provider has an outage.
 
-| Phase | OpenAI Role | Model | Prompt Pattern |
-|---|---|---|---|
-| **Goal** | Parse and structure the goal | gpt-4o-mini | "Given this objective, extract structured goal with success criteria" |
-| **Plan** | Generate step-by-step plan | gpt-4o | "Given this goal and available tools, create an execution plan" |
-| **Act** | Determine action parameters | gpt-4o-mini | "Given this step, determine the correct API call/query" |
-| **Observe** | Analyze action results | gpt-4o | "Analyze this result. Was the action successful? Extract key data." |
-| **Reflect** | Evaluate progress and decide | gpt-4o | "Given goal, plan, and progress so far, assess and recommend next." |
-| **Iterate** | Decide continue/retry/complete | gpt-4o-mini | "Should we continue, retry, modify, or complete?" |
+#### 7.3.1 Supported LLM Providers
+
+| Model | Provider | Tier | Input Cost (per 1M tokens) | Output Cost (per 1M tokens) | Best For |
+|---|---|---|---|---|---|
+| **GPT-4o** | OpenAI | Premium | $2.50 | $10.00 | Complex reasoning, multi-step analysis, claims interpretation |
+| **GPT-4o-mini** | OpenAI | Standard | $0.15 | $0.60 | Fast structured parsing, simple planning, template generation |
+| **Claude 3.5 Sonnet** | Anthropic | Premium | $3.00 | $15.00 | Safety-critical HIPAA decisions, nuanced text, low hallucination |
+| **Claude 3.5 Haiku** | Anthropic | Standard | $0.80 | $4.00 | Fast quality text, structured output |
+| **Gemini 2.0 Flash** | Google | Economy | $0.10 | $0.40 | High-volume simple tasks, template-based generation |
+| **Gemini 1.5 Flash** | Google | Economy | $0.075 | $0.30 | Ultra-cheap parsing, simple transformations |
+| **Gemini 1.5 Pro** | Google | Premium | $1.25 | $5.00 | Long-context analysis, multimodal tasks |
+
+*Prices reflect early 2025 rates. The Model Router configuration supports updating costs without code changes.*
+
+#### 7.3.2 Model Tiers & Routing
+
+The Model Router assigns each AI task to a tier based on complexity, risk, and cost sensitivity:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        Model Router                          │
+│                                                              │
+│  Agent Config ──▶ Task Type ──▶ Tier Selection ──▶ Provider  │
+│                                                              │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │ Tier 1 — Economy (80% of calls)                     │    │
+│  │   Primary:  Gemini 2.0 Flash                        │    │
+│  │   Fallback: GPT-4o-mini                             │    │
+│  │   Use: Benefits summarization, patient comms,       │    │
+│  │        simple parsing, template generation           │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                                                              │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │ Tier 2 — Standard (15% of calls)                    │    │
+│  │   Primary:  GPT-4o-mini                             │    │
+│  │   Fallback: Claude 3.5 Haiku                        │    │
+│  │   Use: Shift matching plans, eligibility parsing,   │    │
+│  │        structured data extraction                    │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                                                              │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │ Tier 3 — Premium (5% of calls)                      │    │
+│  │   Primary:  GPT-4o                                  │    │
+│  │   Fallback: Claude 3.5 Sonnet                       │    │
+│  │   Alt:      Gemini 1.5 Pro (long-context analysis)  │    │
+│  │   Use: Claims analysis, revenue intelligence,       │    │
+│  │        complex multi-step reasoning                  │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                                                              │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │ Tier 0 — No AI (variable)                           │    │
+│  │   Pure code execution, no LLM call needed           │    │
+│  │   Use: Credential date checks, eligibility API      │    │
+│  │        calls, deterministic scoring                  │    │
+│  └─────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### 7.3.3 Hybrid Execution Patterns per Agent
+
+Each agent uses the execution pattern best suited to its task complexity. Not every agent needs the full GPAORI cycle:
+
+| Agent | Execution Pattern | Why This Pattern | LLM Calls/Run | Tier |
+|---|---|---|---|---|
+| **Insurance Verification** | State Machine with Conditional AI | Steps are well-defined (query → API call → record). AI only needed for ambiguous responses or benefits summarization. | 0-2 | Tier 0 / Tier 1 |
+| **Shift Matchmaker** | Plan-and-Execute | One LLM call to set matching criteria, then deterministic scoring algorithm executes without AI. | 1-2 | Tier 2 |
+| **Claims Follow-Up** | ReAct (Reasoning + Acting) | Denial analysis requires flexible reasoning — different denial codes need different investigation paths. | 3-5 | Tier 3 |
+| **Patient Communication** | Plan-and-Execute + AI Generation | Plan the batch in one call, generate message templates with one call, then send deterministically. | 2 | Tier 1 |
+| **Credential Monitoring** | Pure State Machine (No AI) | Date math only — check expiration dates, categorize by urgency, notify. Zero AI needed. | 0 | Tier 0 |
+| **Revenue Intelligence** | Full GPAORI | Genuinely needs the full cycle — trend analysis, pattern recognition, cross-location comparison, recommendation generation. | 4-6 | Tier 3 |
+
+##### Execution Pattern Definitions
+
+**State Machine with Conditional AI:**
+```
+State: CHECK_ELIGIBILITY
+  → Code: Call DentalXchange/Availity API (no AI)
+  → If result clear → State: RECORD_RESULT (no AI)
+  → If result ambiguous → State: AI_INTERPRET (LLM: Tier 1)
+  → If API failed → State: RETRY_OR_ESCALATE (no AI)
+
+State: AI_INTERPRET
+  → LLM analyzes ambiguous eligibility response
+  → If confident → State: RECORD_RESULT
+  → If uncertain → State: HUMAN_REVIEW (HITL)
+```
+
+**Plan-and-Execute:**
+```
+Phase 1 — Planning (1 LLM call):
+  "For 25 patients, I will: 1. Query appointments. 2. Check eligibility.
+   3. Group results. 4. Flag issues."
+
+Phase 2 — Execution (deterministic code, no LLM):
+  Step 1: SQL query → 25 appointments
+  Step 2: API call × 25 → eligibility results  
+  Step 3: Code groups results → 22 active, 2 inactive, 1 failed
+  Step 4: Code creates action items
+
+Phase 3 — Report (1 optional LLM call):
+  "22 of 25 patients verified. Summary: ..."
+```
+
+**ReAct (Reasoning + Acting):**
+```
+Thought: Claim #4521 denied — reason code CO-4 (procedure not covered)
+Action: query_policy_benefits(patientId, procedureCode="D2740")
+Observation: D2740 (crown) is covered at 50% after waiting period (met)
+Thought: Coverage exists — denial may be incorrect. Check prior auth requirement.
+Action: check_prior_auth_requirement(payerId, procedureCode="D2740")
+Observation: Prior auth required, none on file
+Thought: Root cause found — missing prior auth. Recommend resubmission with auth.
+→ Create action item: "Obtain prior auth for D2740, then resubmit claim #4521"
+```
+
+#### 7.3.4 Model Assignment per Agent
+
+| Agent | Task | Model (Primary) | Model (Fallback) | Prompt Pattern |
+|---|---|---|---|---|
+| **Insurance Verification** | Parse ambiguous eligibility response | Gemini 2.0 Flash | GPT-4o-mini | "Analyze this eligibility response. Is coverage active? Extract key fields." |
+| **Insurance Verification** | Summarize benefits for front desk | Gemini 2.0 Flash | GPT-4o-mini | "Summarize these dental benefits in plain English for front desk staff." |
+| **Shift Matchmaker** | Generate matching criteria plan | GPT-4o-mini | Claude 3.5 Haiku | "Given these open shifts and constraints, define matching criteria and weights." |
+| **Shift Matchmaker** | Explain match reasoning | Gemini 2.0 Flash | GPT-4o-mini | "Explain why this professional is a good match for this shift." |
+| **Claims Follow-Up** | Analyze denial reason | GPT-4o | Claude 3.5 Sonnet | "Analyze this denial code. What is the root cause? What corrective action is needed?" |
+| **Claims Follow-Up** | Draft appeal letter | Claude 3.5 Sonnet | GPT-4o | "Draft a professional appeal letter for this denied claim with supporting evidence." |
+| **Patient Communication** | Draft personalized messages | Gemini 2.0 Flash | GPT-4o-mini | "Draft an appointment reminder for {patient} at {location} including insurance status." |
+| **Credential Monitoring** | *(none)* | N/A | N/A | Pure code — date math only |
+| **Revenue Intelligence** | Analyze financial trends | GPT-4o | Claude 3.5 Sonnet | "Analyze this month's revenue data across locations. Identify patterns and anomalies." |
+| **Revenue Intelligence** | Generate recommendations | GPT-4o | Claude 3.5 Sonnet | "Based on this analysis, generate actionable recommendations ranked by revenue impact." |
+| **Chrome Extension** | Benefits summary (real-time) | GPT-4o-mini | Gemini 2.0 Flash | "Summarize these benefits for patient {name} in plain English." |
+
+#### 7.3.5 Cost Analysis: Single-Provider vs. Multi-Model
+
+**Per Practice Per Month** (1 location, daily agent runs):
+
+| Agent | Runs/Month | Tokens/Run | Single-Provider (GPT-4o-mini for all) | Multi-Model (Optimized) |
+|---|---|---|---|---|
+| Insurance Verification | 30 | ~2,000 | $0.05 | $0.02 (Gemini Flash, only ambiguous cases) |
+| Benefits Summarization | 600 | ~1,500 | $0.14 | $0.05 (Gemini Flash) |
+| Shift Matchmaker | 20 | ~3,000 | $0.05 | $0.04 (GPT-4o-mini) |
+| Patient Communication | 30 | ~2,000 | $0.05 | $0.02 (Gemini Flash) |
+| Claims Follow-Up | 4 | ~5,000 | $0.06 | $0.25 (GPT-4o — worth it for accuracy) |
+| Revenue Intelligence | 1 | ~10,000 | $0.08 | $0.13 (GPT-4o — full GPAORI) |
+| Credential Monitoring | 30 | 0 | $0.00 | $0.00 (no AI) |
+| **Total** | | | **~$0.43/month** | **~$0.51/month** |
+
+**At Scale — DSO with 10 Locations:**
+
+| Approach | Cost/Month | Quality |
+|---|---|---|
+| GPT-4o for everything | ~$25-35 | Overkill for simple tasks |
+| GPT-4o-mini for everything | ~$4-5 | Good enough, but weaker on claims/revenue |
+| **Multi-Model (Recommended)** | **~$5-6** | Best quality where it matters, cheapest where it doesn't |
+| Gemini Flash for everything | ~$1-2 | Cheapest, but too weak for claims analysis |
+
+**Key Insight:** At small scale, the multi-model approach costs slightly more ($0.51 vs $0.43/month) because it uses premium models (GPT-4o) for claims and revenue intelligence — tasks where the single-provider approach uses GPT-4o-mini and produces lower quality results. The difference is negligible (~$0.08/month per practice), and the multi-model approach delivers **significantly better quality** where it matters: claims analysis mistakes can cost a practice thousands in lost revenue. At DSO scale (10+ locations), the real savings come from using **Tier 0 (no AI)** for credential monitoring and **Tier 1 (economy)** for routine tasks, avoiding unnecessary premium model calls. The multi-provider fallback also prevents agent downtime during provider outages.
+
+#### 7.3.6 Model Router Implementation
+
+```typescript
+interface ModelConfig {
+  provider: "openai" | "google" | "anthropic";
+  model: string;
+  maxTokens: number;
+  temperature: number;
+  costPerInputToken: number;
+  costPerOutputToken: number;
+}
+
+interface ModelRouterConfig {
+  tier1_economy: {
+    primary: ModelConfig;    // Gemini 2.0 Flash
+    fallback: ModelConfig;   // GPT-4o-mini
+  };
+  tier2_standard: {
+    primary: ModelConfig;    // GPT-4o-mini
+    fallback: ModelConfig;   // Claude 3.5 Haiku
+  };
+  tier3_premium: {
+    primary: ModelConfig;    // GPT-4o
+    fallback: ModelConfig;   // Claude 3.5 Sonnet
+  };
+}
+
+// Agent-level override (stored in agent_configs table)
+interface AgentModelOverride {
+  agentType: string;
+  taskType: string;
+  tier: "economy" | "standard" | "premium";
+  overrideModel?: string;  // Practice can force a specific model
+}
+```
+
+**Routing Logic:**
+1. Agent requests AI completion for a specific task type
+2. Model Router looks up the agent's configured tier for that task
+3. Attempts primary model
+4. On failure (timeout, rate limit, provider outage), falls back to secondary
+5. Logs provider, model, tokens used, latency, and cost for metering
+6. Practice-level overrides allow forcing a specific model (e.g., "always use GPT-4o")
+
+#### 7.3.7 Fallback & Resilience
+
+```
+Primary Model Request
+    │
+    ├── Success → Return result, log cost
+    │
+    ├── Rate Limited (429) → Wait & retry (1x) → Fallback provider
+    │
+    ├── Timeout (>30s) → Fallback provider
+    │
+    ├── Provider Outage (5xx) → Fallback provider
+    │
+    └── Fallback Provider
+            │
+            ├── Success → Return result, log cost + fallback event
+            │
+            └── Failure → Return error to agent
+                          → Agent enters HITL escalation
+                          → Admin notified: "AI unavailable"
+```
+
+**Provider Health Monitoring:**
+- Track success/failure rates per provider over rolling 5-minute windows
+- If a provider's error rate exceeds 20%, proactively route to fallback for that tier
+- Alert practice admins if all providers in a tier are degraded
+
+#### 7.3.8 Practice-Configurable Model Preferences
+
+Practices can override the default model assignments through the Agent Dashboard:
+
+| Setting | Options | Default |
+|---|---|---|
+| **Economy Tier Model** | Gemini 2.0 Flash, GPT-4o-mini, Gemini 1.5 Flash | Gemini 2.0 Flash |
+| **Standard Tier Model** | GPT-4o-mini, Claude 3.5 Haiku | GPT-4o-mini |
+| **Premium Tier Model** | GPT-4o, Claude 3.5 Sonnet, Gemini 1.5 Pro | GPT-4o |
+| **Force Single Provider** | OpenAI Only, Google Only, Anthropic Only, Auto (default) | Auto |
+| **Cost Limit per Month** | Dollar amount cap on LLM spending | No limit |
+
+This allows practices with specific preferences (e.g., "we only want to use OpenAI" or "minimize cost above all") to customize their AI behavior without changing the agent logic.
 
 ### 7.4 Multi-Location Agent Scheduling
 
@@ -779,9 +1016,12 @@ For practice-level agents (e.g., Credential Monitoring), a single run covers all
 ### 8.1 Insurance Verification Agent
 
 **Purpose:** Automatically verify insurance eligibility for patients with upcoming appointments.  
-**Execution Level:** Per Location
+**Execution Level:** Per Location  
+**Execution Pattern:** State Machine with Conditional AI  
+**LLM Tier:** Tier 0 (no AI for clear results) / Tier 1 Economy (Gemini 2.0 Flash for ambiguous cases)  
+**Est. LLM Calls per Run:** 0-2  
 
-#### GPAORI Flow
+#### Execution Flow (State Machine)
 
 | Phase | Action | HITL Gate |
 |---|---|---|
@@ -807,9 +1047,12 @@ For practice-level agents (e.g., Credential Monitoring), a single run covers all
 ### 8.2 AI Shift Matchmaker Agent
 
 **Purpose:** Match open shifts with the best-fit available professionals.  
-**Execution Level:** Per Location
+**Execution Level:** Per Location  
+**Execution Pattern:** Plan-and-Execute  
+**LLM Tier:** Tier 2 Standard (GPT-4o-mini for planning) / Tier 1 Economy (Gemini 2.0 Flash for explanations)  
+**Est. LLM Calls per Run:** 1-2  
 
-#### GPAORI Flow
+#### Execution Flow (Plan-and-Execute)
 
 | Phase | Action | HITL Gate |
 |---|---|---|
@@ -840,9 +1083,12 @@ For practice-level agents (e.g., Credential Monitoring), a single run covers all
 ### 8.3 Claims Follow-Up Agent
 
 **Purpose:** Monitor submitted insurance claims and automate follow-up on unpaid/denied claims.  
-**Execution Level:** Per Location
+**Execution Level:** Per Location  
+**Execution Pattern:** ReAct (Reasoning + Acting)  
+**LLM Tier:** Tier 3 Premium (GPT-4o for denial analysis, Claude 3.5 Sonnet for appeal drafting)  
+**Est. LLM Calls per Run:** 3-5  
 
-#### GPAORI Flow
+#### Execution Flow (ReAct)
 
 | Phase | Action | HITL Gate |
 |---|---|---|
@@ -863,9 +1109,12 @@ For practice-level agents (e.g., Credential Monitoring), a single run covers all
 ### 8.4 Patient Communication Agent
 
 **Purpose:** Send automated, contextual communications to patients (reminders, verification updates, billing).  
-**Execution Level:** Per Location
+**Execution Level:** Per Location  
+**Execution Pattern:** Plan-and-Execute + AI Generation  
+**LLM Tier:** Tier 1 Economy (Gemini 2.0 Flash for message drafting)  
+**Est. LLM Calls per Run:** 2  
 
-#### GPAORI Flow
+#### Execution Flow (Plan-and-Execute + AI Generation)
 
 | Phase | Action | HITL Gate |
 |---|---|---|
@@ -896,9 +1145,12 @@ For practice-level agents (e.g., Credential Monitoring), a single run covers all
 ### 8.5 Credential Monitoring Agent
 
 **Purpose:** Track contractor credentials and proactively alert on expirations, renewals, and compliance gaps.  
-**Execution Level:** Per Practice (cross-location)
+**Execution Level:** Per Practice (cross-location)  
+**Execution Pattern:** Pure State Machine (No AI)  
+**LLM Tier:** Tier 0 — No LLM calls required  
+**Est. LLM Calls per Run:** 0  
 
-#### GPAORI Flow
+#### Execution Flow (Pure State Machine)
 
 | Phase | Action | HITL Gate |
 |---|---|---|
@@ -930,7 +1182,10 @@ For practice-level agents (e.g., Credential Monitoring), a single run covers all
 ### 8.6 Revenue Cycle Intelligence Agent
 
 **Purpose:** Analyze financial data across the practice to identify revenue optimization opportunities.  
-**Execution Level:** Both (per-location analysis + practice/DSO rollup)
+**Execution Level:** Both (per-location analysis + practice/DSO rollup)  
+**Execution Pattern:** Full GPAORI  
+**LLM Tier:** Tier 3 Premium (GPT-4o for analysis and recommendations, Claude 3.5 Sonnet as fallback)  
+**Est. LLM Calls per Run:** 4-6  
 
 #### GPAORI Flow
 
@@ -1572,6 +1827,12 @@ GET    /api/agents/stream                    # Real-time updates for:
 | **Automated Mode** | Operations triggered by AI agents on the server (batch, scheduled, asynchronous) |
 | **Bridge Pattern** | The Chrome Extension serving as a lightweight interface between human users and server-side AI agents |
 | **Duplicate Work Prevention** | Logic that checks if an agent has recently verified a patient before allowing a manual re-check |
+| **Model Router** | Service component that routes LLM requests to the optimal provider/model based on task type, tier, and practice configuration |
+| **Model Tier** | Classification of LLM models: Economy (Gemini Flash), Standard (GPT-4o-mini), Premium (GPT-4o/Claude Sonnet) |
+| **State Machine Pattern** | Deterministic execution flow where AI is only invoked for ambiguous or judgment-requiring states |
+| **Plan-and-Execute Pattern** | Two-phase pattern: one LLM call creates a plan, then deterministic code executes each step |
+| **ReAct Pattern** | Reasoning + Acting loop where the agent alternates between thinking and taking actions until the task is complete |
+| **Fallback Provider** | Secondary LLM provider used when the primary provider fails (rate limit, timeout, outage) |
 
 ### B. Example: DSO Running Insurance Verification Across 3 Locations
 
