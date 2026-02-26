@@ -49,6 +49,14 @@ The platform is built on a modern web stack designed for scalability and maintai
     - **Services**: Manages subscription offerings for insurance and patient billing with tiered pricing.
     - **Settings**: Consolidated practice configuration.
     - **Messaging Center**: Real-time messaging system for Practice Admins to communicate with hygienists, including shift invitations.
+    - **Chrome Extension**: Manifest V3 Chrome extension (`chrome-extension/` directory) that complements existing dental PMS/SOR systems:
+        - **SOR Detection**: Auto-detects Dentrix Ascend, Curve Dental, Open Dental Cloud, Oryx, tab32 via content scripts
+        - **Patient Data Extraction**: Reads patient name, DOB, member ID, and insurance info from the PMS screen
+        - **Side Panel UI**: Tabbed interface for eligibility verification, AI benefits summary, and staffing alerts
+        - **AI Benefits Summary**: OpenAI-powered plain-English benefits breakdown from raw eligibility data
+        - **Staffing Alerts**: Badge notification showing open shifts count with details
+        - **Extension API**: Server endpoints at `/api/extension/*` (status, payers, eligibility/check, benefits/summarize, shifts/alerts)
+        - **CORS**: Chrome extension origins allowed in CORS middleware
 - **Multi-Location Support**: Enables management of multiple office locations with assignable shifts and appointments.
 - **Mobile App Integration**: Provides APIs for a mobile application to manage professional shifts (browsing, claiming, check-in/out, negotiations).
 - **API Design**: A RESTful API provides endpoints for all major functionalities.

@@ -110,7 +110,8 @@ app.use((req, res, next) => {
     origin.includes('.replit.app') || 
     origin.includes('.replit.dev') ||
     origin.startsWith('http://localhost:') ||
-    origin.startsWith('exp://')
+    origin.startsWith('exp://') ||
+    origin.startsWith('chrome-extension://')
   ) {
     res.setHeader('Access-Control-Allow-Origin', origin);
   }
@@ -189,6 +190,9 @@ app.use((req, res, next) => {
   // Initialize Stripe on startup
   await initStripe();
   
+  const extensionRoutes = (await import("./routes/extension")).default;
+  app.use("/api/extension", extensionRoutes);
+
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

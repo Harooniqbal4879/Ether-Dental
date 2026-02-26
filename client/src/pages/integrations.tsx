@@ -7,7 +7,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Shield, CreditCard, Mail, MapPin, Brain, FileText, Building2, 
   CheckCircle2, XCircle, AlertCircle, Globe, Server, Link2, Plug,
-  Stethoscope, Activity, Database, ArrowUpRight, Search
+  Stethoscope, Activity, Database, ArrowUpRight, Search, Chrome,
+  MonitorSmartphone, Sparkles, Zap, Eye
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useState, useMemo } from "react";
@@ -415,6 +416,76 @@ export default function Integrations() {
             Platform integrations, supported clearinghouses, and insurance payer directory
           </p>
         </div>
+
+        <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-transparent" data-testid="card-chrome-extension">
+          <CardContent className="p-6 md:p-8">
+            <div className="flex flex-col md:flex-row items-start gap-6">
+              <div className="p-3 rounded-xl bg-primary/10 text-primary shrink-0">
+                <Chrome className="h-10 w-10" />
+              </div>
+              <div className="flex-1 space-y-4">
+                <div>
+                  <h2 className="text-2xl font-bold" data-testid="text-extension-title">Chrome Extension</h2>
+                  <p className="text-muted-foreground mt-1">
+                    AI-powered assistant that works alongside your existing Practice Management System
+                  </p>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="flex items-start gap-2.5">
+                    <Eye className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium">Auto-Detect Patient Data</p>
+                      <p className="text-xs text-muted-foreground">Reads patient info directly from your PMS screen</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <Zap className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium">One-Click Eligibility</p>
+                      <p className="text-xs text-muted-foreground">Verify insurance without leaving your SOR</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <Sparkles className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium">AI Benefits Summary</p>
+                      <p className="text-xs text-muted-foreground">Plain-English breakdown of coverage and limits</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <MonitorSmartphone className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium">Staffing Alerts</p>
+                      <p className="text-xs text-muted-foreground">Open shift notifications right in your browser</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Supported Systems</p>
+                  <div className="flex flex-wrap gap-2">
+                    {["Dentrix Ascend", "Curve Dental", "Open Dental Cloud", "Oryx Dental", "tab32", "Generic PMS"].map((sor) => (
+                      <Badge key={sor} variant="secondary" className="text-xs" data-testid={`badge-sor-${sor.toLowerCase().replace(/\s+/g, "-")}`}>
+                        {sor}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 pt-2">
+                  <Badge variant="outline" className="text-xs gap-1">
+                    <Chrome className="h-3 w-3" />
+                    Manifest V3
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">
+                    Load as unpacked extension from the <code className="bg-muted px-1 py-0.5 rounded text-xs">chrome-extension/</code> directory
+                  </span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <Tabs defaultValue="integrations" className="space-y-6">
           <div className="flex justify-center">

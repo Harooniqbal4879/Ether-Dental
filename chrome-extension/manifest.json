@@ -1,0 +1,65 @@
+{
+  "manifest_version": 3,
+  "name": "EtherAI-Dental Assistant",
+  "version": "1.0.0",
+  "description": "AI-powered dental insurance eligibility verification and benefits summarization. Complements your existing Practice Management System.",
+  "permissions": [
+    "activeTab",
+    "sidePanel",
+    "storage",
+    "tabs",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://*.replit.app/*",
+    "https://*.replit.dev/*",
+    "http://localhost:5000/*",
+    "https://*.dentrixascend.com/*",
+    "https://*.curvedental.com/*",
+    "https://*.tab32.com/*",
+    "https://*.opendental.com/*",
+    "https://*.oryxdental.com/*",
+    "https://*.oryx.dental/*"
+  ],
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  "side_panel": {
+    "default_path": "sidepanel/sidepanel.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.dentrixascend.com/*",
+        "https://*.curvedental.com/*",
+        "https://*.tab32.com/*",
+        "https://*.opendental.com/*",
+        "https://*.oryxdental.com/*",
+        "https://*.oryx.dental/*"
+      ],
+      "js": [
+        "content/extractors/generic.js",
+        "content/extractors/dentrix-ascend.js",
+        "content/extractors/curve-dental.js",
+        "content/extractors/open-dental-cloud.js",
+        "content/extractors/tab32.js",
+        "content/extractors/oryx.js",
+        "content/detector.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "EtherAI-Dental Assistant",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
