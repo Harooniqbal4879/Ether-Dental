@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PageHeader } from "@/components/page-header";
+import { MarketingLayout } from "@/components/marketing-layout";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Shield, CreditCard, Mail, MapPin, Brain, FileText, Building2, 
@@ -407,44 +407,50 @@ export default function Integrations() {
   });
 
   return (
-    <div className="space-y-6" data-testid="page-integrations">
-      <PageHeader
-        title="Integrations & Payers"
-        description="Platform integrations, supported clearinghouses, and insurance payer directory"
-      />
+    <MarketingLayout>
+      <div className="container mx-auto px-4 py-12 space-y-8" data-testid="page-integrations">
+        <div className="text-center max-w-3xl mx-auto space-y-3">
+          <h1 className="text-4xl font-bold tracking-tight" data-testid="text-page-title">Integrations & Payers</h1>
+          <p className="text-lg text-muted-foreground" data-testid="text-page-description">
+            Platform integrations, supported clearinghouses, and insurance payer directory
+          </p>
+        </div>
 
-      <Tabs defaultValue="integrations" className="space-y-6">
-        <TabsList data-testid="tabs-integrations">
-          <TabsTrigger value="integrations" data-testid="tab-integrations">
-            <Plug className="h-4 w-4 mr-1.5" />
-            Integrations ({platformIntegrations.length})
-          </TabsTrigger>
-          <TabsTrigger value="payers" data-testid="tab-payers">
-            <Shield className="h-4 w-4 mr-1.5" />
-            Supported Payers ({carriers?.length || 0})
-          </TabsTrigger>
-          <TabsTrigger value="connections" data-testid="tab-connections">
-            <Server className="h-4 w-4 mr-1.5" />
-            Connections ({configs?.length || 0})
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="integrations" className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-2">
-            {platformIntegrations.map((item) => (
-              <IntegrationCard key={item.name} item={item} />
-            ))}
+        <Tabs defaultValue="integrations" className="space-y-6">
+          <div className="flex justify-center">
+            <TabsList data-testid="tabs-integrations">
+              <TabsTrigger value="integrations" data-testid="tab-integrations">
+                <Plug className="h-4 w-4 mr-1.5" />
+                Integrations ({platformIntegrations.length})
+              </TabsTrigger>
+              <TabsTrigger value="payers" data-testid="tab-payers">
+                <Shield className="h-4 w-4 mr-1.5" />
+                Supported Payers ({carriers?.length || 0})
+              </TabsTrigger>
+              <TabsTrigger value="connections" data-testid="tab-connections">
+                <Server className="h-4 w-4 mr-1.5" />
+                Connections ({configs?.length || 0})
+              </TabsTrigger>
+            </TabsList>
           </div>
-        </TabsContent>
 
-        <TabsContent value="payers">
-          <PayersList carriers={carriers} isLoading={carriersLoading} />
-        </TabsContent>
+          <TabsContent value="integrations" className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-2">
+              {platformIntegrations.map((item) => (
+                <IntegrationCard key={item.name} item={item} />
+              ))}
+            </div>
+          </TabsContent>
 
-        <TabsContent value="connections">
-          <ClearinghouseStatus configs={configs} isLoading={configsLoading} />
-        </TabsContent>
-      </Tabs>
-    </div>
+          <TabsContent value="payers">
+            <PayersList carriers={carriers} isLoading={carriersLoading} />
+          </TabsContent>
+
+          <TabsContent value="connections">
+            <ClearinghouseStatus configs={configs} isLoading={configsLoading} />
+          </TabsContent>
+        </Tabs>
+      </div>
+    </MarketingLayout>
   );
 }

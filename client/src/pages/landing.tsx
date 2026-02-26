@@ -60,6 +60,9 @@ export default function Landing() {
             <Link href="/faq" data-testid="link-faq">
               <Button variant="ghost" size="sm">FAQ</Button>
             </Link>
+            <Link href="/integrations" data-testid="link-integrations">
+              <Button variant="ghost" size="sm">Integrations</Button>
+            </Link>
           </nav>
 
           <div className="flex items-center gap-2">

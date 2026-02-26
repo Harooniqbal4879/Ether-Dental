@@ -80,7 +80,6 @@ function MainRouter() {
       <Route path="/app/onboarding" component={ProfessionalOnboarding} />
       <Route path="/app/contractor-verification" component={ContractorVerification} />
       <Route path="/app/demo-requests" component={DemoRequests} />
-      <Route path="/app/integrations" component={Integrations} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -194,6 +193,7 @@ function App() {
               <Route path="/pricing" component={Pricing} />
               <Route path="/faq" component={FAQ} />
               <Route path="/demo" component={Demo} />
+              <Route path="/integrations" component={Integrations} />
               <Route path="/invitation/:token" component={InvitationPage} />
               <Route path="/app/:rest*">
                 <MainLayout />

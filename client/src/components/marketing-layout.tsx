@@ -12,6 +12,7 @@ const navLinks = [
   { href: "/benefits", label: "Benefits", id: "benefits" },
   { href: "/pricing", label: "Pricing", id: "pricing" },
   { href: "/faq", label: "FAQ", id: "faq" },
+  { href: "/integrations", label: "Integrations", id: "integrations" },
 ];
 
 export function MarketingLayout({ children }: { children: React.ReactNode }) {
