@@ -17,6 +17,7 @@ import {
   MessageSquare,
   ClipboardCheck,
   CalendarCheck,
+  Plug,
 } from "lucide-react";
 import {
   Sidebar,
@@ -99,6 +100,12 @@ const configNavItems = [
     url: "/app/settings",
     icon: Settings,
     personas: ["admin"],
+  },
+  {
+    title: "Integrations",
+    url: "/app/integrations",
+    icon: Plug,
+    personas: ["system_admin", "admin"],
   },
   {
     title: "Demo Requests",
