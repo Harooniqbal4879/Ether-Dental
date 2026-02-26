@@ -1,10 +1,11 @@
 # EtherAI-Dental: Agentic AI Digital Workforce Design Document
 
-**Version:** 1.2  
+**Version:** 1.3  
 **Date:** February 2026  
 **Status:** Draft — Pending Review  
 **Changelog:**  
-- v1.2 — Added Multi-PMS Integration Strategy (Section 8) with 4-tier integration architecture, DSO software fragmentation analysis, integration pricing model, and Chrome Extension as unifying layer.  
+- v1.3 — Added Human-Agent Interaction Model (Section 5) defining the relationship between Chrome Extension (human interface), AI agents (server-side automation), and the extension as a bridge for HITL approvals and agent monitoring.  
+- v1.2 — Added Multi-PMS Integration Strategy with 4-tier integration architecture, DSO software fragmentation analysis, integration pricing model, and Chrome Extension as unifying layer.  
 - v1.1 — Added DSO/Multi-Location hierarchy, location-level agent execution, pricing/subscription model, and usage metering.
 
 ---
@@ -15,21 +16,27 @@
 2. [GPAORI Pattern Overview](#2-gpaori-pattern-overview)
 3. [Human-in-the-Loop (HITL) Framework](#3-human-in-the-loop-hitl-framework)
 4. [System Architecture](#4-system-architecture)
-5. [DSO & Multi-Location Hierarchy](#5-dso--multi-location-hierarchy)
-6. [Core Infrastructure](#6-core-infrastructure)
-7. [Agent Definitions](#7-agent-definitions)
-   - 7.1 Insurance Verification Agent
-   - 7.2 AI Shift Matchmaker Agent
-   - 7.3 Claims Follow-Up Agent
-   - 7.4 Patient Communication Agent
-   - 7.5 Credential Monitoring Agent
-   - 7.6 Revenue Cycle Intelligence Agent
-8. [Pricing & Subscription Model](#8-pricing--subscription-model)
-9. [Database Schema](#9-database-schema)
-10. [API Design](#10-api-design)
-11. [Security & Compliance](#11-security--compliance)
-12. [Implementation Roadmap](#12-implementation-roadmap)
-13. [Appendix](#13-appendix)
+5. [Human-Agent Interaction Model](#5-human-agent-interaction-model)
+   - 5.1 Two Operating Modes
+   - 5.2 Chrome Extension as the Bridge
+   - 5.3 Interaction Patterns by Role
+   - 5.4 Extension-Agent Integration Features
+   - 5.5 Data Flow: Human ↔ Agent ↔ Extension
+6. [DSO & Multi-Location Hierarchy](#6-dso--multi-location-hierarchy)
+7. [Core Infrastructure](#7-core-infrastructure)
+8. [Agent Definitions](#8-agent-definitions)
+   - 8.1 Insurance Verification Agent
+   - 8.2 AI Shift Matchmaker Agent
+   - 8.3 Claims Follow-Up Agent
+   - 8.4 Patient Communication Agent
+   - 8.5 Credential Monitoring Agent
+   - 8.6 Revenue Cycle Intelligence Agent
+9. [Pricing & Subscription Model](#9-pricing--subscription-model)
+10. [Database Schema](#10-database-schema)
+11. [API Design](#11-api-design)
+12. [Security & Compliance](#12-security--compliance)
+13. [Implementation Roadmap](#13-implementation-roadmap)
+14. [Appendix](#14-appendix)
 
 ---
 
@@ -252,9 +259,296 @@ Practices can configure how much autonomy each agent has. Configuration can be s
 
 ---
 
-## 5. DSO & Multi-Location Hierarchy
+## 5. Human-Agent Interaction Model
 
-### 5.1 Entity Hierarchy
+This section defines the relationship between human users, AI agents, and the Chrome Extension — clarifying who does what, when, and how they interact.
+
+### 5.1 Two Operating Modes
+
+The EtherAI-Dental platform has two fundamentally different operating modes for insurance verification, staffing, and practice operations:
+
+| | Chrome Extension (Human Mode) | AI Agents (Automated Mode) |
+|---|---|---|
+| **Where it runs** | In the user's Chrome browser, overlaid on their PMS | On the server as background processes |
+| **Who triggers it** | Human clicks a button or opens the panel | Scheduled cron job, manual trigger from dashboard, or another agent |
+| **Data source** | Reads from the PMS screen the human is viewing | Reads directly from the platform database |
+| **Scope** | One patient at a time, on-demand | Batch processing (e.g., all 25 patients for tomorrow) |
+| **Speed** | Real-time, interactive | Asynchronous, may take minutes for large batches |
+| **Decision-making** | Human decides what to do with results | Agent proposes actions, human approves via HITL |
+| **Requires browser** | Yes — Chrome with extension installed | No — runs headlessly on the server |
+| **Use case** | "I'm looking at this patient right now and need to check their coverage" | "Verify all patients scheduled tomorrow across all 3 locations before staff arrives" |
+
+**Key principle:** The AI agents do NOT use the Chrome Extension. They are server-side processes that operate independently of any browser session. The extension is exclusively a human interface.
+
+### 5.2 Chrome Extension as the Bridge
+
+While the extension is a human tool, it can serve as a **bridge** between humans and agents — giving humans visibility into agent activity and a lightweight way to act on agent outputs without switching to the full platform dashboard.
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                         Human Workflow                                │
+│                                                                      │
+│   Front Desk Staff                                                   │
+│        │                                                             │
+│        ▼                                                             │
+│   ┌──────────────┐     ┌──────────────────────┐                     │
+│   │ Dental PMS    │     │ Chrome Extension      │                     │
+│   │ (Dentrix,     │────▶│ Side Panel            │                     │
+│   │  Curve, etc.) │     │                       │                     │
+│   └──────────────┘     │  ┌─ Eligibility Tab   │                     │
+│                         │  │  (Manual check)    │                     │
+│                         │  ├─ Benefits Tab      │                     │
+│                         │  │  (AI summary)      │                     │
+│                         │  ├─ Shifts Tab        │                     │
+│                         │  │  (Open positions)  │                     │
+│                         │  └─ Agent Hub Tab ◀───┼── NEW              │
+│                         │     (Agent alerts,    │                     │
+│                         │      HITL approvals,  │                     │
+│                         │      status monitor)  │                     │
+│                         └──────────┬────────────┘                     │
+│                                    │                                  │
+│                                    │ API calls                        │
+│                                    │                                  │
+└────────────────────────────────────┼──────────────────────────────────┘
+                                     │
+                                     ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                       EtherAI-Dental Backend                           │
+│                                                                        │
+│   ┌──────────────────────────────────────────────────────────────┐    │
+│   │                    Shared Database                             │    │
+│   │  patients, verifications, shifts, approvals, agent_runs       │    │
+│   └──────────────────────────────┬───────────────────────────────┘    │
+│                                   │                                    │
+│          ┌────────────────────────┼──────────────────────┐            │
+│          │                        │                      │             │
+│   ┌──────▼──────┐         ┌──────▼──────┐        ┌──────▼──────┐    │
+│   │ Insurance    │         │ Shift       │        │ Claims      │    │
+│   │ Verify Agent │         │ Matchmaker  │        │ Follow-Up   │    │
+│   │ (scheduled   │         │ Agent       │        │ Agent       │    │
+│   │  6PM daily)  │         │ (triggered) │        │ (weekly)    │    │
+│   └─────────────┘         └─────────────┘        └─────────────┘    │
+│                                                                        │
+│   ┌─────────────┐         ┌─────────────┐        ┌─────────────┐    │
+│   │ Patient     │         │ Credential  │        │ Revenue     │    │
+│   │ Comms Agent │         │ Monitor     │        │ Intelligence│    │
+│   └─────────────┘         └─────────────┘        └─────────────┘    │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+### 5.3 Interaction Patterns by Role
+
+#### Front Desk Staff (Extension User)
+| Scenario | Tool Used | What Happens |
+|---|---|---|
+| Patient walks in, staff needs to verify coverage | **Chrome Extension** | Staff views patient in PMS, extension auto-detects data, staff clicks "Verify" |
+| Agent already verified this patient last night | **Chrome Extension** | Extension shows "Already verified" badge with timestamp; staff skips manual check |
+| Agent found inactive coverage for a patient | **Chrome Extension (Agent Hub)** | Alert appears: "Agent flagged 3 patients with expired coverage — review needed" |
+| Open shift needs to be filled | **Chrome Extension (Shifts tab)** | Staff sees count and details, can escalate to admin |
+
+#### Practice Admin / Office Manager (Extension + Dashboard User)
+| Scenario | Tool Used | What Happens |
+|---|---|---|
+| Review overnight agent results | **Platform Dashboard** or **Extension (Agent Hub)** | Summary of what agents accomplished while staff was away |
+| Approve agent actions (e.g., resubmit a corrected claim) | **Platform Dashboard** or **Extension (Agent Hub)** | HITL approval queue with one-click approve/reject |
+| Configure agent schedules and autonomy | **Platform Dashboard** | Settings page — not in extension (too complex for side panel) |
+| Quick check on agent status mid-day | **Chrome Extension (Agent Hub)** | Compact view: last run time, success rate, pending approvals count |
+
+#### DSO Administrator (Dashboard Only)
+| Scenario | Tool Used | What Happens |
+|---|---|---|
+| Cross-location performance comparison | **Platform Dashboard** | DSO executive dashboard with rollup metrics |
+| Adjust agent autonomy for a location | **Platform Dashboard** | Configuration inheritance: Organization → Practice → Location |
+| Review usage and billing | **Platform Dashboard** | Subscription and metering UI |
+
+**Rule of thumb:** The Chrome Extension is for **quick, in-context actions** while working in the PMS. The Platform Dashboard is for **configuration, reporting, and complex decisions**. Some features appear in both (agent alerts, approvals), but the extension shows a simplified view.
+
+### 5.4 Extension-Agent Integration Features
+
+These features bring agent activity into the Chrome Extension side panel, allowing humans to monitor and interact with agents without leaving their PMS:
+
+#### 5.4.1 Agent Hub Tab (New)
+
+A fourth tab in the Chrome Extension side panel:
+
+```
+┌──────────────────────────────────────────────┐
+│  Eligibility │ Benefits │ Shifts │ Agent Hub  │
+├──────────────────────────────────────────────┤
+│                                              │
+│  ┌──────────────────────────────────────┐   │
+│  │  ⚡ 3 items need your attention       │   │
+│  └──────────────────────────────────────┘   │
+│                                              │
+│  ┌──────────────────────────────────────┐   │
+│  │  Insurance Verification Agent         │   │
+│  │  Last run: Today 6:15 PM              │   │
+│  │  Result: 22/25 verified ✓             │   │
+│  │  ⚠ 3 inactive policies found         │   │
+│  │  [View Details]                       │   │
+│  └──────────────────────────────────────┘   │
+│                                              │
+│  ┌──────────────────────────────────────┐   │
+│  │  ⏳ Pending Approval                  │   │
+│  │  "Resubmit claim #4821 with          │   │
+│  │   corrected code D2740→D2750"        │   │
+│  │  Confidence: 94%                      │   │
+│  │  [Approve] [Reject] [View Full]       │   │
+│  └──────────────────────────────────────┘   │
+│                                              │
+│  ┌──────────────────────────────────────┐   │
+│  │  Credential Monitor                   │   │
+│  │  Last run: Today 2:00 AM              │   │
+│  │  ⚠ 2 expiring in 14 days             │   │
+│  │  [View Report]                        │   │
+│  └──────────────────────────────────────┘   │
+│                                              │
+└──────────────────────────────────────────────┘
+```
+
+**Features:**
+- Pending HITL approval count badge on the Agent Hub tab (similar to shift count badge)
+- Compact agent status cards showing last run, result summary, and action items
+- Inline approve/reject buttons for simple HITL decisions (Level 1-2)
+- "View Full" links to the platform dashboard for complex reviews
+- Location filter for multi-location practices
+
+#### 5.4.2 Agent Alert Badge
+
+The extension toolbar icon already shows open shift count. With agent integration, it also shows:
+- Combined badge: open shifts + pending approvals (e.g., "5" = 2 shifts + 3 approvals)
+- Color coding: teal (normal), amber (approvals pending), red (urgent/expired)
+
+#### 5.4.3 Agent Context in Eligibility Tab
+
+When a staff member views a patient in the extension:
+- If the Insurance Verification Agent already checked this patient, show the result with timestamp instead of asking the staff to re-check
+- Label: "Verified by AI Agent — Today 6:22 PM" vs. "Verified manually — Now"
+- Staff can still re-run manually if desired (override)
+
+#### 5.4.4 Notification Preferences
+
+Users configure which agent events they want to see in the extension:
+
+| Event Type | Default | Configurable |
+|---|---|---|
+| HITL approval required | Always shown | Cannot disable |
+| Agent run completed | Shown | Can disable |
+| Agent found issues | Shown | Can disable |
+| Credential expiring | Shown | Can disable |
+| Agent error/failure | Shown | Cannot disable |
+
+### 5.5 Data Flow: Human ↔ Agent ↔ Extension
+
+#### Scenario 1: Agent Verifies, Human Reviews in Extension
+
+```
+6:00 PM — Insurance Agent starts scheduled run
+         │
+         ▼
+6:05 PM — Agent queries appointments table: 25 patients for tomorrow at Location 1
+         │
+         ▼
+6:12 PM — Agent completes: 22 active, 2 inactive, 1 failed lookup
+         │
+         ▼
+6:12 PM — Agent writes results to verifications table
+         Agent creates 2 action items: "Contact patient #42 and #67 about expired coverage"
+         Agent creates HITL approval request for action items
+         │
+         ▼
+6:12 PM — Extension badge updates (via polling): "2" (2 pending approvals)
+         │
+         ▼
+Next morning — Staff opens PMS, sees extension badge "2"
+         │
+         ▼
+Staff clicks Agent Hub tab → sees approval requests
+         │
+         ▼
+Staff clicks "Approve" on contacting patients → Agent sends emails via Patient Comms Agent
+         │
+         ▼
+Staff views patient #42 in PMS → Extension Eligibility tab shows:
+  "⚠ Inactive — Verified by AI Agent, Yesterday 6:12 PM"
+  "Coverage expired 01/15/2026. Patient was notified via email."
+```
+
+#### Scenario 2: Human Verifies in Extension, Agent Uses Result Later
+
+```
+10:30 AM — Walk-in patient not on tomorrow's schedule
+          │
+          ▼
+10:30 AM — Staff uses Extension to manually verify eligibility
+          │
+          ▼
+10:30 AM — Result saved to verifications table: Active, Delta Dental PPO
+          │
+          ▼
+6:00 PM  — Insurance Agent starts evening run
+          │
+          ▼
+6:01 PM  — Agent finds this patient already verified today → skips
+          Agent log: "Patient #88 — already verified (manual, 10:30 AM). Skipping."
+          │
+          ▼
+          ✓ No duplicate work — human and agent share the same data layer
+```
+
+#### Scenario 3: DSO Admin Monitors Multiple Locations via Extension
+
+```
+DSO Admin opens Chrome → Extension badge: "7" (5 approvals + 2 alerts)
+         │
+         ▼
+Agent Hub tab shows location-grouped view:
+  📍 Main Office: 2 approvals pending
+  📍 West Branch: 3 approvals pending  
+  📍 North Clinic: ✓ All clear
+         │
+         ▼
+Admin approves 4 routine items inline (insurance follow-ups)
+         │
+         ▼
+Admin clicks "View Full" on 1 complex denial → opens Platform Dashboard
+         │
+         ▼
+Extension badge updates: "2" (remaining items)
+```
+
+### 5.6 What Stays in the Dashboard vs. Extension
+
+| Feature | Platform Dashboard | Chrome Extension |
+|---|---|---|
+| Agent configuration (enable, schedule, autonomy) | ✅ Full control | ❌ Not available |
+| Agent run history and audit logs | ✅ Full detail | 🟡 Last run summary only |
+| HITL approval queue | ✅ Full with detail | ✅ Compact with approve/reject |
+| Cross-location analytics | ✅ Full dashboard | ❌ Not available |
+| Manual eligibility verification | 🟡 Available | ✅ Primary use case |
+| Benefits AI summary | 🟡 In verification detail | ✅ Primary use case |
+| Staffing alerts | ✅ Full management | ✅ Alert count + details |
+| Subscription management | ✅ Full control | ❌ Not available |
+| Agent notifications and alerts | ✅ In-app + email | ✅ Badge + Agent Hub tab |
+| Practice/NPI/Tax ID configuration | ✅ Settings page | ❌ Not available |
+
+### 5.7 Extension API Additions for Agent Integration
+
+New endpoints needed to support the Agent Hub tab:
+
+| Endpoint | Method | Auth | Description |
+|---|---|---|---|
+| `/api/extension/agents/status` | GET | JWT | Returns compact status of all enabled agents for the practice |
+| `/api/extension/agents/approvals` | GET | JWT | Returns pending HITL approvals for the logged-in admin |
+| `/api/extension/agents/approvals/:id/decide` | POST | JWT | Submit approve/reject decision from the extension |
+| `/api/extension/agents/alerts/count` | GET | JWT | Returns combined count (pending approvals + agent alerts) for badge |
+| `/api/extension/agents/patient/:patientId/verification` | GET | JWT | Returns most recent verification result for a patient (agent or manual) |
+
+---
+
+## 6. DSO & Multi-Location Hierarchy
+
+### 6.1 Entity Hierarchy
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -284,7 +578,7 @@ Practices can configure how much autonomy each agent has. Configuration can be s
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 5.2 Configuration Inheritance
+### 6.2 Configuration Inheritance
 
 Agent settings follow a **cascading inheritance** model — more specific settings override less specific ones:
 
@@ -308,7 +602,7 @@ Location-Level Overrides (can override practice defaults)
 
 **Example:** A DSO enables the Insurance Verification Agent at autonomy level 2 for all practices. Practice A overrides to level 3 (exception-based) because they trust the system. Location 2 of Practice A overrides back to level 1 (full supervision) because they're a new office still learning the workflow.
 
-### 5.3 Execution Scope: Location vs. Practice
+### 6.3 Execution Scope: Location vs. Practice
 
 Each agent type has a natural execution scope:
 
@@ -321,7 +615,7 @@ Each agent type has a natural execution scope:
 | **Credential Monitoring** | Per Practice | Professionals work across locations; credentials are person-level not location-level |
 | **Revenue Cycle Intelligence** | Both | Per-location analysis for operational insights; per-practice/DSO rollup for strategic decisions |
 
-### 5.4 Reporting Rollup
+### 6.4 Reporting Rollup
 
 ```
 Location-Level Reports
@@ -335,7 +629,7 @@ Location-Level Reports
         "Location 1: 95% verification success rate, 12 shifts filled this week"
 ```
 
-### 5.5 Admin Roles in DSO Context
+### 6.5 Admin Roles in DSO Context
 
 | Role | Scope | Agent Permissions |
 |---|---|---|
@@ -346,9 +640,9 @@ Location-Level Reports
 
 ---
 
-## 6. Core Infrastructure
+## 7. Core Infrastructure
 
-### 6.1 Agent Run State Machine
+### 7.1 Agent Run State Machine
 
 ```
                     ┌────────────┐
@@ -400,7 +694,7 @@ Location-Level Reports
                            └────────────┘
 ```
 
-### 6.2 GPAORI Step Execution Flow
+### 7.2 GPAORI Step Execution Flow
 
 For each step in an agent's plan, the runtime executes:
 
@@ -441,7 +735,7 @@ interface GPAORIStep {
 }
 ```
 
-### 6.3 OpenAI Integration Pattern
+### 7.3 OpenAI Integration Pattern
 
 Each GPAORI phase uses OpenAI differently:
 
@@ -454,7 +748,7 @@ Each GPAORI phase uses OpenAI differently:
 | **Reflect** | Evaluate progress and decide | gpt-4o | "Given goal, plan, and progress so far, assess and recommend next." |
 | **Iterate** | Decide continue/retry/complete | gpt-4o-mini | "Should we continue, retry, modify, or complete?" |
 
-### 6.4 Multi-Location Agent Scheduling
+### 7.4 Multi-Location Agent Scheduling
 
 When a scheduled agent fires, the orchestrator spawns separate runs for each applicable location:
 
@@ -480,9 +774,9 @@ For practice-level agents (e.g., Credential Monitoring), a single run covers all
 
 ---
 
-## 7. Agent Definitions
+## 8. Agent Definitions
 
-### 7.1 Insurance Verification Agent
+### 8.1 Insurance Verification Agent
 
 **Purpose:** Automatically verify insurance eligibility for patients with upcoming appointments.  
 **Execution Level:** Per Location
@@ -510,7 +804,7 @@ For practice-level agents (e.g., Credential Monitoring), a single run covers all
 
 ---
 
-### 7.2 AI Shift Matchmaker Agent
+### 8.2 AI Shift Matchmaker Agent
 
 **Purpose:** Match open shifts with the best-fit available professionals.  
 **Execution Level:** Per Location
@@ -543,7 +837,7 @@ For practice-level agents (e.g., Credential Monitoring), a single run covers all
 
 ---
 
-### 7.3 Claims Follow-Up Agent
+### 8.3 Claims Follow-Up Agent
 
 **Purpose:** Monitor submitted insurance claims and automate follow-up on unpaid/denied claims.  
 **Execution Level:** Per Location
@@ -566,7 +860,7 @@ For practice-level agents (e.g., Credential Monitoring), a single run covers all
 
 ---
 
-### 7.4 Patient Communication Agent
+### 8.4 Patient Communication Agent
 
 **Purpose:** Send automated, contextual communications to patients (reminders, verification updates, billing).  
 **Execution Level:** Per Location
@@ -599,7 +893,7 @@ For practice-level agents (e.g., Credential Monitoring), a single run covers all
 
 ---
 
-### 7.5 Credential Monitoring Agent
+### 8.5 Credential Monitoring Agent
 
 **Purpose:** Track contractor credentials and proactively alert on expirations, renewals, and compliance gaps.  
 **Execution Level:** Per Practice (cross-location)
@@ -633,7 +927,7 @@ For practice-level agents (e.g., Credential Monitoring), a single run covers all
 
 ---
 
-### 7.6 Revenue Cycle Intelligence Agent
+### 8.6 Revenue Cycle Intelligence Agent
 
 **Purpose:** Analyze financial data across the practice to identify revenue optimization opportunities.  
 **Execution Level:** Both (per-location analysis + practice/DSO rollup)
@@ -667,9 +961,9 @@ For practice-level agents (e.g., Credential Monitoring), a single run covers all
 
 ---
 
-## 8. Pricing & Subscription Model
+## 9. Pricing & Subscription Model
 
-### 8.1 Pricing Philosophy
+### 9.1 Pricing Philosophy
 
 The AI agent pricing follows three principles:
 
@@ -677,7 +971,7 @@ The AI agent pricing follows three principles:
 2. **Scale with value** — DSOs with more locations generate more value and pay more, but get volume discounts
 3. **Land and expand** — Low entry point for solo practices; grow naturally as they add agents and locations
 
-### 8.2 Subscription Tiers
+### 9.2 Subscription Tiers
 
 | | Starter | Professional | Enterprise (DSO) |
 |---|---|---|---|
@@ -692,7 +986,7 @@ The AI agent pricing follows three principles:
 | **Support** | Email | Priority email | Dedicated account manager |
 | **Overage Rate** | $0.15/run | $0.10/run | N/A (unlimited) |
 
-### 8.3 Pricing Examples
+### 9.3 Pricing Examples
 
 | Customer Type | Configuration | Monthly Cost |
 |---|---|---|
@@ -702,7 +996,7 @@ The AI agent pricing follows three principles:
 | **Mid DSO, 25 locations** | Enterprise: $249 × 25 locations | $6,225/mo |
 | **Large DSO, 100 locations** | Enterprise (custom): Negotiated volume rate | Custom |
 
-### 8.4 What Counts as an "Agent Run"
+### 9.4 What Counts as an "Agent Run"
 
 An **agent run** is one complete GPAORI cycle for one agent at one location. Examples:
 
@@ -716,7 +1010,7 @@ An **agent run** is one complete GPAORI cycle for one agent at one location. Exa
 | A failed run that is retried | 1 additional run |
 | A run cancelled by admin before completion | 0 runs (not counted) |
 
-### 8.5 Metering & Billing Flow
+### 9.5 Metering & Billing Flow
 
 ```
 Agent Run Completes
@@ -747,7 +1041,7 @@ Monthly Billing Cycle (via Stripe):
   3. Invoice generated with usage breakdown per location
 ```
 
-### 8.6 Free Trial & Onboarding
+### 9.6 Free Trial & Onboarding
 
 | Phase | Duration | Included |
 |---|---|---|
@@ -755,7 +1049,7 @@ Monthly Billing Cycle (via Stripe):
 | **Onboarding** | First 30 days | Guided setup, agent configuration assistance, first-run walkthrough |
 | **Upgrade Prompt** | Day 12 | In-app notification with usage summary and tier recommendation |
 
-### 8.7 Add-On Services
+### 9.7 Add-On Services
 
 | Add-On | Price | Description |
 |---|---|---|
@@ -764,7 +1058,7 @@ Monthly Billing Cycle (via Stripe):
 | **Custom Agent Development** | $5,000+ one-time | Build a custom agent tailored to the practice's specific workflow |
 | **Premium Analytics** | $99/mo | Extended data retention (2 years), export to BI tools, custom reports |
 
-### 8.8 Stripe Integration for Agent Billing
+### 9.8 Stripe Integration for Agent Billing
 
 The agent subscription system integrates with the existing Stripe setup:
 
@@ -799,9 +1093,9 @@ The agent subscription system integrates with the existing Stripe setup:
 
 ---
 
-## 9. Database Schema
+## 10. Database Schema
 
-### 9.1 New Tables Required
+### 10.1 New Tables Required
 
 ```sql
 -- DSO Organization grouping (optional — for DSOs managing multiple practices)
@@ -1036,7 +1330,7 @@ CREATE TABLE agent_audit_log (
 );
 ```
 
-### 9.2 Relationship Diagram
+### 10.2 Relationship Diagram
 
 ```
 organizations (DSO)
@@ -1082,9 +1376,9 @@ Existing tables referenced by agents:
 
 ---
 
-## 10. API Design
+## 11. API Design
 
-### 10.1 Agent Management APIs
+### 11.1 Agent Management APIs
 
 ```
 # Agent Definitions (admin only)
@@ -1140,7 +1434,7 @@ GET    /api/organizations/:orgId/agents/compare        # Cross-location comparis
 GET    /api/agents/audit                               # Query audit log (filterable)
 ```
 
-### 10.2 WebSocket / SSE for Real-Time Updates
+### 11.2 WebSocket / SSE for Real-Time Updates
 
 ```
 # SSE stream for agent activity
@@ -1154,9 +1448,9 @@ GET    /api/agents/stream                    # Real-time updates for:
 
 ---
 
-## 11. Security & Compliance
+## 12. Security & Compliance
 
-### 11.1 HIPAA Considerations
+### 12.1 HIPAA Considerations
 
 | Concern | Mitigation |
 |---|---|
@@ -1167,7 +1461,7 @@ GET    /api/agents/stream                    # Real-time updates for:
 | Data retention | Agent run data follows same retention policy as existing platform data. |
 | Cross-practice isolation | DSO admins see aggregate data; individual practice data is never shared between practices within a DSO. |
 
-### 11.2 Authorization Model
+### 12.2 Authorization Model
 
 | Role | Scope | Agent Permissions |
 |---|---|---|
@@ -1179,7 +1473,7 @@ GET    /api/agents/stream                    # Real-time updates for:
 | **Front Desk** | One specific location | View notifications from agents (e.g., verification results) |
 | **Professional** | N/A | No access to agents (receives notifications only — shift invitations, credential alerts) |
 
-### 11.3 Rate Limiting & Safety
+### 12.3 Rate Limiting & Safety
 
 - Maximum concurrent agent runs per practice: 3 (Starter), 5 (Professional), 10 (Enterprise)
 - Maximum concurrent runs per location: 2
@@ -1191,7 +1485,7 @@ GET    /api/agents/stream                    # Real-time updates for:
 
 ---
 
-## 12. Implementation Roadmap
+## 13. Implementation Roadmap
 
 ### Phase 1: Core Framework + DSO Hierarchy (Weeks 1-4)
 - [ ] Database schema for organizations, agent tables, subscriptions, and usage metering
@@ -1231,19 +1525,32 @@ GET    /api/agents/stream                    # Real-time updates for:
 - [ ] DSO executive dashboard with benchmarking
 - [ ] Practice-level autonomy configuration UI with location overrides
 
-### Phase 6: Billing, Polish & Scale (Weeks 16-18)
+### Phase 6: Chrome Extension ↔ Agent Integration (Weeks 16-17)
+- [ ] New "Agent Hub" tab in Chrome Extension side panel
+- [ ] `GET /api/extension/agents/status` — compact agent status for extension
+- [ ] `GET /api/extension/agents/approvals` — pending HITL approvals for extension
+- [ ] `POST /api/extension/agents/approvals/:id/decide` — approve/reject from extension
+- [ ] `GET /api/extension/agents/alerts/count` — combined badge count (shifts + approvals)
+- [ ] `GET /api/extension/agents/patient/:patientId/verification` — check if agent already verified a patient
+- [ ] Agent status cards in extension (last run, result summary, action items)
+- [ ] Inline HITL approve/reject in extension for Level 1-2 decisions
+- [ ] Combined badge: shift count + pending approvals with color coding
+- [ ] "Already verified by agent" indicator in Eligibility tab when agent has recent result
+- [ ] Agent notification preferences in extension settings
+- [ ] Duplicate work prevention: extension checks for recent agent verification before manual run
+
+### Phase 7: Billing, Polish & Scale (Weeks 18-20)
 - [ ] Stripe subscription products and pricing setup
 - [ ] Usage metering and overage billing
 - [ ] Subscription management UI (upgrade/downgrade, usage dashboard)
 - [ ] Free trial flow and upgrade prompts
-- [ ] Chrome Extension integration (agent alerts in side panel)
 - [ ] Mobile app notifications for approvals
 - [ ] Performance optimization and caching
 - [ ] Documentation and training materials
 
 ---
 
-## 13. Appendix
+## 14. Appendix
 
 ### A. Glossary
 
@@ -1260,6 +1567,11 @@ GET    /api/agents/stream                    # Real-time updates for:
 | **Execution Level** | Whether an agent runs per-location, per-practice, or both |
 | **Config Inheritance** | Settings cascade: Organization → Practice → Location (more specific overrides less specific) |
 | **Metered Usage** | Agent runs counted against subscription limits for billing |
+| **Agent Hub** | A tab in the Chrome Extension side panel showing agent status, alerts, and HITL approval queue |
+| **Human Mode** | Operations triggered by a human via the Chrome Extension (one patient, on-demand, interactive) |
+| **Automated Mode** | Operations triggered by AI agents on the server (batch, scheduled, asynchronous) |
+| **Bridge Pattern** | The Chrome Extension serving as a lightweight interface between human users and server-side AI agents |
+| **Duplicate Work Prevention** | Logic that checks if an agent has recently verified a patient before allowing a manual re-check |
 
 ### B. Example: DSO Running Insurance Verification Across 3 Locations
 
